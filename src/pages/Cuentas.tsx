@@ -178,7 +178,15 @@ export default function Cuentas() {
 
       toast({ title: "Cuenta actualizada" });
     } else {
-      const { error } = await supabase.from("cuentas_contables").insert([form]);
+      const { error } = await supabase.from("cuentas_contables").insert({
+        empresa_id: form.empresa_id,
+        codigo: form.codigo,
+        nombre: form.nombre,
+        naturaleza: form.naturaleza,
+        clasificacion: form.clasificacion,
+        cuenta_padre_id: form.cuenta_padre_id || null,
+        nivel: form.nivel,
+      });
 
       if (error) {
         toast({
