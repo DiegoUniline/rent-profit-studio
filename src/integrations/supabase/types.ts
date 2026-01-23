@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      centros_negocio: {
+        Row: {
+          activo: boolean
+          codigo: string
+          created_at: string
+          empresa_id: string
+          id: string
+          nombre: string
+          responsable: string | null
+          tipo_actividad: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          nombre: string
+          responsable?: string | null
+          tipo_actividad?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          responsable?: string | null
+          tipo_actividad?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "centros_negocio_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cuentas_contables: {
         Row: {
           activa: boolean
@@ -187,6 +231,89 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      terceros: {
+        Row: {
+          activo: boolean
+          banco: string | null
+          calle: string | null
+          ciudad: string | null
+          clabe: string | null
+          codigo_postal: string | null
+          colonia: string | null
+          contacto_nombre: string | null
+          created_at: string
+          email: string | null
+          empresa_id: string
+          estado: string | null
+          id: string
+          nombre_comercial: string | null
+          numero_cuenta: string | null
+          numero_exterior: string | null
+          numero_interior: string | null
+          razon_social: string
+          rfc: string
+          telefono: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          banco?: string | null
+          calle?: string | null
+          ciudad?: string | null
+          clabe?: string | null
+          codigo_postal?: string | null
+          colonia?: string | null
+          contacto_nombre?: string | null
+          created_at?: string
+          email?: string | null
+          empresa_id: string
+          estado?: string | null
+          id?: string
+          nombre_comercial?: string | null
+          numero_cuenta?: string | null
+          numero_exterior?: string | null
+          numero_interior?: string | null
+          razon_social: string
+          rfc: string
+          telefono?: string | null
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          banco?: string | null
+          calle?: string | null
+          ciudad?: string | null
+          clabe?: string | null
+          codigo_postal?: string | null
+          colonia?: string | null
+          contacto_nombre?: string | null
+          created_at?: string
+          email?: string | null
+          empresa_id?: string
+          estado?: string | null
+          id?: string
+          nombre_comercial?: string | null
+          numero_cuenta?: string | null
+          numero_exterior?: string | null
+          numero_interior?: string | null
+          razon_social?: string
+          rfc?: string
+          telefono?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "terceros_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

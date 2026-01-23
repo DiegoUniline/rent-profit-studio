@@ -20,14 +20,18 @@ import {
   BookOpen,
   User,
   LogOut,
+  Briefcase,
+  Users2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
   { title: "Dashboard", icon: LayoutDashboard, href: "/", roles: ["admin", "contador", "usuario"] },
-  { title: "Usuarios", icon: Users, href: "/usuarios", roles: ["admin"] },
   { title: "Empresas", icon: Building, href: "/empresas", roles: ["admin", "contador"] },
+  { title: "Centro de Negocios", icon: Briefcase, href: "/centros-negocio", roles: ["admin", "contador"] },
+  { title: "Terceros", icon: Users2, href: "/terceros", roles: ["admin", "contador"] },
   { title: "Cuentas", icon: BookOpen, href: "/cuentas", roles: ["admin", "contador"] },
+  { title: "Usuarios", icon: Users, href: "/usuarios", roles: ["admin"] },
   { title: "Mi Perfil", icon: User, href: "/perfil", roles: ["admin", "contador", "usuario"] },
 ];
 
