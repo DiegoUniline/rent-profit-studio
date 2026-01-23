@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -26,8 +27,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Users, Edit } from "lucide-react";
+import { Users, Edit, Plus, Search } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { NuevoUsuarioDialog } from "@/components/dialogs/NuevoUsuarioDialog";
 
 interface UserWithRole {
   id: string;
@@ -54,6 +56,8 @@ const roleBadgeVariants: Record<string, "default" | "secondary" | "outline"> = {
 export default function Usuarios() {
   const { toast } = useToast();
   const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [search, setSearch] = useState("");
+  const [nuevoDialogOpen, setNuevoDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
   const [newRole, setNewRole] = useState<string>("");
@@ -137,6 +141,12 @@ export default function Usuarios() {
     fetchUsers();
   };
 
+  const filteredUsers = users.filter(
+    (user) =>
+      user.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
+      user.nombre_usuario.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -144,6 +154,10 @@ export default function Usuarios() {
           <h1 className="text-3xl font-bold text-foreground">Usuarios</h1>
           <p className="text-muted-foreground">Gestión de usuarios del sistema</p>
         </div>
+        <Button onClick={() => setNuevoDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Nuevo Usuario
+        </Button>
       </div>
 
       <Card>
@@ -154,11 +168,22 @@ export default function Usuarios() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4">
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre o usuario..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
           {loading ? (
             <div className="flex h-32 items-center justify-center">
               <p className="text-muted-foreground">Cargando...</p>
             </div>
-          ) : users.length === 0 ? (
+          ) : filteredUsers.length === 0 ? (
             <div className="flex h-32 items-center justify-center">
               <p className="text-muted-foreground">No hay usuarios registrados</p>
             </div>
@@ -175,7 +200,7 @@ export default function Usuarios() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
+                {filteredUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">
                       {user.nombre_completo}
@@ -238,6 +263,12 @@ export default function Usuarios() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <NuevoUsuarioDialog
+        open={nuevoDialogOpen}
+        onOpenChange={setNuevoDialogOpen}
+        onSuccess={fetchUsers}
+      />
     </div>
   );
 }
