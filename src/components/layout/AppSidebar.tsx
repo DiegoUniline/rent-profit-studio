@@ -13,7 +13,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import {
-  Building2,
+  Monitor,
   LayoutDashboard,
   Users,
   Building,
@@ -48,10 +48,10 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <Link to="/" className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <Building2 className="h-5 w-5 text-primary-foreground" />
+            <Monitor className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-sidebar-foreground">MaqRentable</h1>
+            <h1 className="text-lg font-bold text-sidebar-foreground">Uniline App</h1>
             <p className="text-xs text-muted-foreground">Sistema Contable</p>
           </div>
         </Link>
