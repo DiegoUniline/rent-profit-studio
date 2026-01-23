@@ -222,7 +222,28 @@ export default function Empresas() {
 
       toast({ title: "Empresa actualizada" });
     } else {
-      const { error } = await supabase.from("empresas").insert([cleanedData]);
+      const { error } = await supabase.from("empresas").insert({
+        tipo_persona: form.tipo_persona,
+        rfc: form.rfc,
+        razon_social: form.razon_social,
+        nombre_comercial: form.nombre_comercial || null,
+        regimen_fiscal: form.regimen_fiscal || null,
+        uso_cfdi: form.uso_cfdi || null,
+        calle: form.calle || null,
+        numero_exterior: form.numero_exterior || null,
+        numero_interior: form.numero_interior || null,
+        colonia: form.colonia || null,
+        codigo_postal: form.codigo_postal || null,
+        ciudad: form.ciudad || null,
+        estado: form.estado || null,
+        telefono_principal: form.telefono_principal || null,
+        email_fiscal: form.email_fiscal || null,
+        representante_legal: form.representante_legal || null,
+        banco: form.banco || null,
+        numero_cuenta: form.numero_cuenta || null,
+        clabe: form.clabe || null,
+        created_by: user?.id,
+      });
 
       if (error) {
         toast({
