@@ -1,11 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
@@ -18,15 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  BarChart3,
-  CalendarIcon,
-  FileSpreadsheet,
-  Scale,
-  TrendingUp,
-  Wallet,
-  Loader2,
-} from "lucide-react";
+import { BarChart3, CalendarIcon, Loader2 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfYear } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -36,10 +27,7 @@ import {
   AsientoContable,
   calcularSaldosCuentas,
 } from "@/lib/accounting-utils";
-import { BalanzaComprobacion } from "@/components/reportes/BalanzaComprobacion";
-import { BalanceGeneral } from "@/components/reportes/BalanceGeneral";
-import { EstadoResultados } from "@/components/reportes/EstadoResultados";
-import { FlujoEfectivo } from "@/components/reportes/FlujoEfectivo";
+import { EstadoFinanciero } from "@/components/reportes/EstadoFinanciero";
 
 interface Empresa {
   id: string;
@@ -51,10 +39,9 @@ export default function Reportes() {
   const [loading, setLoading] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [empresaId, setEmpresaId] = useState<string>("");
+  const [empresaId, setEmpresaId] = useState<string>("todas");
   const [fechaInicio, setFechaInicio] = useState<Date>(startOfYear(new Date()));
   const [fechaFin, setFechaFin] = useState<Date>(endOfMonth(new Date()));
-  const [activeTab, setActiveTab] = useState("balanza");
 
   // Datos cargados
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
@@ -68,10 +55,8 @@ export default function Reportes() {
 
   // Cargar datos cuando cambia empresa o fechas
   useEffect(() => {
-    if (empresaId) {
-      loadDatosContables();
-    }
-  }, [empresaId, fechaInicio, fechaFin]);
+    loadDatosContables();
+  }, [empresaId, fechaInicio, fechaFin, empresas]);
 
   const loadEmpresas = async () => {
     try {
@@ -83,11 +68,6 @@ export default function Reportes() {
 
       if (error) throw error;
       setEmpresas(data || []);
-
-      // Seleccionar primera empresa por defecto
-      if (data && data.length > 0 && !empresaId) {
-        setEmpresaId(data[0].id);
-      }
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -100,28 +80,45 @@ export default function Reportes() {
   };
 
   const loadDatosContables = async () => {
-    if (!empresaId) return;
+    if (empresas.length === 0) return;
 
     setLoadingData(true);
     try {
-      // Cargar cuentas de la empresa
-      const { data: cuentasData, error: cuentasError } = await supabase
+      // Determinar IDs de empresas a cargar
+      const empresaIds = empresaId === "todas" 
+        ? empresas.map(e => e.id) 
+        : [empresaId];
+
+      // Cargar cuentas de las empresas seleccionadas
+      let cuentasQuery = supabase
         .from("cuentas_contables")
         .select("*")
-        .eq("empresa_id", empresaId)
         .eq("activa", true)
         .order("codigo");
 
+      if (empresaId !== "todas") {
+        cuentasQuery = cuentasQuery.eq("empresa_id", empresaId);
+      } else {
+        cuentasQuery = cuentasQuery.in("empresa_id", empresaIds);
+      }
+
+      const { data: cuentasData, error: cuentasError } = await cuentasQuery;
       if (cuentasError) throw cuentasError;
 
-      // Cargar asientos de la empresa
-      const { data: asientosData, error: asientosError } = await supabase
+      // Cargar asientos aplicados
+      let asientosQuery = supabase
         .from("asientos_contables")
         .select("id, fecha, tipo, estado, empresa_id")
-        .eq("empresa_id", empresaId)
         .eq("estado", "aplicado")
         .lte("fecha", format(fechaFin, "yyyy-MM-dd"));
 
+      if (empresaId !== "todas") {
+        asientosQuery = asientosQuery.eq("empresa_id", empresaId);
+      } else {
+        asientosQuery = asientosQuery.in("empresa_id", empresaIds);
+      }
+
+      const { data: asientosData, error: asientosError } = await asientosQuery;
       if (asientosError) throw asientosError;
 
       // Cargar movimientos de esos asientos
@@ -164,7 +161,11 @@ export default function Reportes() {
     );
   }, [cuentas, movimientos, asientos, fechaInicio, fechaFin]);
 
-  const empresaSeleccionada = empresas.find((e) => e.id === empresaId);
+  const empresaNombre = useMemo(() => {
+    if (empresaId === "todas") return "Todas las Empresas";
+    const empresa = empresas.find((e) => e.id === empresaId);
+    return empresa?.razon_social || "";
+  }, [empresaId, empresas]);
 
   if (loading) {
     return (
@@ -181,9 +182,9 @@ export default function Reportes() {
         <div className="flex items-center gap-3">
           <BarChart3 className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">Reportes Financieros</h1>
+            <h1 className="text-2xl font-bold">Estados Financieros</h1>
             <p className="text-muted-foreground">
-              Balanza, Balance General, Estado de Resultados y Flujo de Efectivo
+              Balance General, Estado de Resultados y Balanza de Comprobación
             </p>
           </div>
         </div>
@@ -201,6 +202,7 @@ export default function Reportes() {
                   <SelectValue placeholder="Seleccionar empresa" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="todas">Todas las Empresas</SelectItem>
                   {empresas.map((empresa) => (
                     <SelectItem key={empresa.id} value={empresa.id}>
                       {empresa.razon_social}
@@ -306,67 +308,13 @@ export default function Reportes() {
         </CardContent>
       </Card>
 
-      {/* Tabs de reportes */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
-          <TabsTrigger value="balanza" className="flex items-center gap-2">
-            <FileSpreadsheet className="h-4 w-4" />
-            <span className="hidden sm:inline">Balanza</span>
-          </TabsTrigger>
-          <TabsTrigger value="balance" className="flex items-center gap-2">
-            <Scale className="h-4 w-4" />
-            <span className="hidden sm:inline">Balance General</span>
-          </TabsTrigger>
-          <TabsTrigger value="resultados" className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Estado de Resultados</span>
-          </TabsTrigger>
-          <TabsTrigger value="flujo" className="flex items-center gap-2">
-            <Wallet className="h-4 w-4" />
-            <span className="hidden sm:inline">Flujo de Efectivo</span>
-          </TabsTrigger>
-        </TabsList>
-
-        {!empresaId ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              Selecciona una empresa para ver los reportes
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            <TabsContent value="balanza">
-              <BalanzaComprobacion saldos={saldos} loading={loadingData} />
-            </TabsContent>
-
-            <TabsContent value="balance">
-              <BalanceGeneral
-                saldos={saldos}
-                loading={loadingData}
-                fechaCorte={fechaFin}
-              />
-            </TabsContent>
-
-            <TabsContent value="resultados">
-              <EstadoResultados
-                saldos={saldos}
-                loading={loadingData}
-                fechaInicio={fechaInicio}
-                fechaFin={fechaFin}
-              />
-            </TabsContent>
-
-            <TabsContent value="flujo">
-              <FlujoEfectivo
-                saldos={saldos}
-                loading={loadingData}
-                fechaInicio={fechaInicio}
-                fechaFin={fechaFin}
-              />
-            </TabsContent>
-          </>
-        )}
-      </Tabs>
+      {/* Estado Financiero Unificado */}
+      <EstadoFinanciero
+        saldos={saldos}
+        loading={loadingData}
+        empresaNombre={empresaNombre}
+        fechaCorte={fechaFin}
+      />
     </div>
   );
 }
