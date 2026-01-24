@@ -199,6 +199,90 @@ export type Database = {
         }
         Relationships: []
       }
+      presupuestos: {
+        Row: {
+          activo: boolean
+          cantidad: number
+          centro_negocio_id: string | null
+          created_at: string
+          cuenta_id: string | null
+          empresa_id: string
+          id: string
+          notas: string | null
+          partida: string
+          precio_unitario: number
+          tercero_id: string | null
+          unidad_medida_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          cantidad?: number
+          centro_negocio_id?: string | null
+          created_at?: string
+          cuenta_id?: string | null
+          empresa_id: string
+          id?: string
+          notas?: string | null
+          partida: string
+          precio_unitario?: number
+          tercero_id?: string | null
+          unidad_medida_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          cantidad?: number
+          centro_negocio_id?: string | null
+          created_at?: string
+          cuenta_id?: string | null
+          empresa_id?: string
+          id?: string
+          notas?: string | null
+          partida?: string
+          precio_unitario?: number
+          tercero_id?: string | null
+          unidad_medida_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presupuestos_centro_negocio_id_fkey"
+            columns: ["centro_negocio_id"]
+            isOneToOne: false
+            referencedRelation: "centros_negocio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuestos_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_contables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuestos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuestos_tercero_id_fkey"
+            columns: ["tercero_id"]
+            isOneToOne: false
+            referencedRelation: "terceros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presupuestos_unidad_medida_id_fkey"
+            columns: ["unidad_medida_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_medida"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -314,6 +398,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      unidades_medida: {
+        Row: {
+          activa: boolean
+          codigo: string
+          created_at: string
+          id: string
+          nombre: string
+        }
+        Insert: {
+          activa?: boolean
+          codigo: string
+          created_at?: string
+          id?: string
+          nombre: string
+        }
+        Update: {
+          activa?: boolean
+          codigo?: string
+          created_at?: string
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
