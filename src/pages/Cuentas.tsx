@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -15,22 +15,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { BookOpen, Plus, Edit, Trash2, Search } from "lucide-react";
-import { z } from "zod";
+import { BookOpen, Plus, Edit, Trash2, Search, ChevronRight, ChevronDown } from "lucide-react";
+import { CuentaDialog } from "@/components/dialogs/CuentaDialog";
 
 interface Empresa {
   id: string;
@@ -50,26 +42,29 @@ interface CuentaContable {
   empresas?: Empresa;
 }
 
-const cuentaSchema = z.object({
-  empresa_id: z.string().uuid("Selecciona una empresa"),
-  codigo: z.string().min(1, "Código requerido").max(20),
-  nombre: z.string().min(2, "Nombre muy corto").max(200),
-  naturaleza: z.enum(["deudora", "acreedora"]),
-  clasificacion: z.enum(["titulo", "saldo"]),
-  cuenta_padre_id: z.string().uuid().nullable().optional(),
-  nivel: z.number().min(1).max(10),
-});
+// Get level from code format XXX-XXX-XXX-XXX
+const getCodeLevel = (code: string): number => {
+  const clean = code.replace(/[^0-9]/g, "").padEnd(12, "0");
+  if (clean.slice(3) === "000000000") return 1;
+  if (clean.slice(6) === "000000") return 2;
+  if (clean.slice(9) === "000") return 3;
+  return 4;
+};
 
-type CuentaForm = z.infer<typeof cuentaSchema>;
+const levelLabels: Record<number, string> = {
+  1: "Rubro",
+  2: "Grupo",
+  3: "Subgrupo",
+  4: "Cuenta",
+  5: "Subcuenta",
+};
 
-const emptyForm: CuentaForm = {
-  empresa_id: "",
-  codigo: "",
-  nombre: "",
-  naturaleza: "deudora",
-  clasificacion: "saldo",
-  cuenta_padre_id: null,
-  nivel: 1,
+const levelColors: Record<number, string> = {
+  1: "bg-primary/10 text-primary font-bold",
+  2: "bg-blue-50 dark:bg-blue-950/30 font-semibold",
+  3: "bg-muted/50",
+  4: "",
+  5: "text-muted-foreground",
 };
 
 export default function Cuentas() {
@@ -82,8 +77,7 @@ export default function Cuentas() {
   const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCuenta, setEditingCuenta] = useState<CuentaContable | null>(null);
-  const [form, setForm] = useState<CuentaForm>(emptyForm);
-  const [saving, setSaving] = useState(false);
+  const [expandedCodes, setExpandedCodes] = useState<Set<string>>(new Set());
 
   const fetchData = async () => {
     setLoading(true);
@@ -93,7 +87,7 @@ export default function Cuentas() {
         .from("cuentas_contables")
         .select("*, empresas(id, razon_social)")
         .order("codigo"),
-      supabase.from("empresas").select("id, razon_social").order("razon_social"),
+      supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social"),
     ]);
 
     if (cuentasRes.error) {
@@ -104,6 +98,13 @@ export default function Cuentas() {
       });
     } else {
       setCuentas(cuentasRes.data || []);
+      // Expand level 1 by default
+      const level1Codes = new Set(
+        (cuentasRes.data || [])
+          .filter(c => getCodeLevel(c.codigo) === 1)
+          .map(c => c.codigo.replace(/[^0-9]/g, "").slice(0, 3))
+      );
+      setExpandedCodes(level1Codes);
     }
 
     if (!empresasRes.error) {
@@ -117,95 +118,97 @@ export default function Cuentas() {
     fetchData();
   }, []);
 
-  const filteredCuentas = cuentas.filter((c) => {
-    const matchesSearch =
-      c.codigo.toLowerCase().includes(search.toLowerCase()) ||
-      c.nombre.toLowerCase().includes(search.toLowerCase());
-    const matchesEmpresa = filterEmpresa === "all" || c.empresa_id === filterEmpresa;
-    return matchesSearch && matchesEmpresa;
-  });
+  // Filter and organize cuentas hierarchically
+  const { filteredCuentas, stats } = useMemo(() => {
+    let filtered = cuentas;
+    
+    // Filter by empresa first
+    if (filterEmpresa !== "all") {
+      filtered = filtered.filter(c => c.empresa_id === filterEmpresa);
+    }
+    
+    // If searching, show all matching accounts
+    if (search) {
+      filtered = filtered.filter(c => 
+        c.codigo.toLowerCase().includes(search.toLowerCase()) ||
+        c.nombre.toLowerCase().includes(search.toLowerCase())
+      );
+    } else {
+      // When not searching, apply hierarchy visibility
+      filtered = filtered.filter(c => {
+        const level = getCodeLevel(c.codigo);
+        if (level === 1) return true;
+        
+        // Check if parent is expanded
+        const clean = c.codigo.replace(/[^0-9]/g, "");
+        if (level === 2) return expandedCodes.has(clean.slice(0, 3));
+        if (level === 3) return expandedCodes.has(clean.slice(0, 3)) && expandedCodes.has(clean.slice(0, 6));
+        if (level === 4) return expandedCodes.has(clean.slice(0, 3)) && expandedCodes.has(clean.slice(0, 6)) && expandedCodes.has(clean.slice(0, 9));
+        return true;
+      });
+    }
+    
+    // Calculate stats
+    const stats = {
+      total: cuentas.filter(c => filterEmpresa === "all" || c.empresa_id === filterEmpresa).length,
+      titulos: cuentas.filter(c => (filterEmpresa === "all" || c.empresa_id === filterEmpresa) && c.clasificacion === "titulo").length,
+      saldos: cuentas.filter(c => (filterEmpresa === "all" || c.empresa_id === filterEmpresa) && c.clasificacion === "saldo").length,
+    };
+    
+    return { filteredCuentas: filtered, stats };
+  }, [cuentas, filterEmpresa, search, expandedCodes]);
+
+  const toggleExpand = (codigo: string) => {
+    const clean = codigo.replace(/[^0-9]/g, "");
+    const level = getCodeLevel(codigo);
+    
+    let key = "";
+    if (level === 1) key = clean.slice(0, 3);
+    else if (level === 2) key = clean.slice(0, 6);
+    else if (level === 3) key = clean.slice(0, 9);
+    else return;
+    
+    const newExpanded = new Set(expandedCodes);
+    if (newExpanded.has(key)) {
+      newExpanded.delete(key);
+    } else {
+      newExpanded.add(key);
+    }
+    setExpandedCodes(newExpanded);
+  };
+
+  const isExpanded = (codigo: string) => {
+    const clean = codigo.replace(/[^0-9]/g, "");
+    const level = getCodeLevel(codigo);
+    
+    if (level === 1) return expandedCodes.has(clean.slice(0, 3));
+    if (level === 2) return expandedCodes.has(clean.slice(0, 6));
+    if (level === 3) return expandedCodes.has(clean.slice(0, 9));
+    return false;
+  };
+
+  const hasChildren = (codigo: string) => {
+    const clean = codigo.replace(/[^0-9]/g, "");
+    const level = getCodeLevel(codigo);
+    
+    return cuentas.some(c => {
+      if (filterEmpresa !== "all" && c.empresa_id !== filterEmpresa) return false;
+      const childClean = c.codigo.replace(/[^0-9]/g, "");
+      if (level === 1) return childClean.startsWith(clean.slice(0, 3)) && getCodeLevel(c.codigo) === 2;
+      if (level === 2) return childClean.startsWith(clean.slice(0, 6)) && getCodeLevel(c.codigo) === 3;
+      if (level === 3) return childClean.startsWith(clean.slice(0, 9)) && getCodeLevel(c.codigo) === 4;
+      return false;
+    });
+  };
 
   const openNew = () => {
     setEditingCuenta(null);
-    setForm(emptyForm);
     setDialogOpen(true);
   };
 
   const openEdit = (cuenta: CuentaContable) => {
     setEditingCuenta(cuenta);
-    setForm({
-      empresa_id: cuenta.empresa_id,
-      codigo: cuenta.codigo,
-      nombre: cuenta.nombre,
-      naturaleza: cuenta.naturaleza,
-      clasificacion: cuenta.clasificacion,
-      cuenta_padre_id: cuenta.cuenta_padre_id,
-      nivel: cuenta.nivel,
-    });
     setDialogOpen(true);
-  };
-
-  const handleSave = async () => {
-    const result = cuentaSchema.safeParse(form);
-    if (!result.success) {
-      toast({
-        title: "Error de validación",
-        description: result.error.errors[0].message,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSaving(true);
-
-    if (editingCuenta) {
-      const { error } = await supabase
-        .from("cuentas_contables")
-        .update(form)
-        .eq("id", editingCuenta.id);
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message.includes("duplicate")
-            ? "Ya existe una cuenta con este código para esta empresa"
-            : "No se pudo actualizar la cuenta",
-          variant: "destructive",
-        });
-        setSaving(false);
-        return;
-      }
-
-      toast({ title: "Cuenta actualizada" });
-    } else {
-      const { error } = await supabase.from("cuentas_contables").insert({
-        empresa_id: form.empresa_id,
-        codigo: form.codigo,
-        nombre: form.nombre,
-        naturaleza: form.naturaleza,
-        clasificacion: form.clasificacion,
-        cuenta_padre_id: form.cuenta_padre_id || null,
-        nivel: form.nivel,
-      });
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message.includes("duplicate")
-            ? "Ya existe una cuenta con este código para esta empresa"
-            : "No se pudo crear la cuenta",
-          variant: "destructive",
-        });
-        setSaving(false);
-        return;
-      }
-
-      toast({ title: "Cuenta creada" });
-    }
-
-    setSaving(false);
-    setDialogOpen(false);
-    fetchData();
   };
 
   const handleDelete = async (cuenta: CuentaContable) => {
@@ -216,7 +219,9 @@ export default function Cuentas() {
     if (error) {
       toast({
         title: "Error",
-        description: "No se pudo eliminar la cuenta",
+        description: error.message.includes("violates foreign key") 
+          ? "No se puede eliminar: la cuenta tiene movimientos asociados"
+          : "No se pudo eliminar la cuenta",
         variant: "destructive",
       });
       return;
@@ -224,6 +229,23 @@ export default function Cuentas() {
 
     toast({ title: "Cuenta eliminada" });
     fetchData();
+  };
+
+  const expandAll = () => {
+    const allKeys = new Set<string>();
+    cuentas
+      .filter(c => filterEmpresa === "all" || c.empresa_id === filterEmpresa)
+      .forEach(c => {
+        const clean = c.codigo.replace(/[^0-9]/g, "");
+        allKeys.add(clean.slice(0, 3));
+        allKeys.add(clean.slice(0, 6));
+        allKeys.add(clean.slice(0, 9));
+      });
+    setExpandedCodes(allKeys);
+  };
+
+  const collapseAll = () => {
+    setExpandedCodes(new Set());
   };
 
   const canEdit = role === "admin" || role === "contador";
@@ -244,6 +266,36 @@ export default function Cuentas() {
         )}
       </div>
 
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Cuentas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Cuentas Título</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.titulos}</div>
+            <p className="text-xs text-muted-foreground">Cuentas agrupadoras</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Cuentas de Saldo</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.saldos}</div>
+            <p className="text-xs text-muted-foreground">Cuentas de movimiento</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -251,7 +303,7 @@ export default function Cuentas() {
               <BookOpen className="h-5 w-5 text-primary" />
               Cuentas Contables
             </CardTitle>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <div className="relative w-48">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -274,6 +326,12 @@ export default function Cuentas() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button variant="outline" size="sm" onClick={expandAll}>
+                Expandir
+              </Button>
+              <Button variant="outline" size="sm" onClick={collapseAll}>
+                Colapsar
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -283,157 +341,111 @@ export default function Cuentas() {
               <p className="text-muted-foreground">Cargando...</p>
             </div>
           ) : filteredCuentas.length === 0 ? (
-            <div className="flex h-32 items-center justify-center">
+            <div className="flex h-32 flex-col items-center justify-center gap-2">
               <p className="text-muted-foreground">No hay cuentas registradas</p>
+              {canEdit && (
+                <Button variant="outline" onClick={openNew}>
+                  Crear primera cuenta
+                </Button>
+              )}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Empresa</TableHead>
-                  <TableHead>Naturaleza</TableHead>
-                  <TableHead>Clasificación</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCuentas.map((cuenta) => (
-                  <TableRow key={cuenta.id}>
-                    <TableCell className="font-mono font-medium">{cuenta.codigo}</TableCell>
-                    <TableCell>{cuenta.nombre}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {cuenta.empresas?.razon_social || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={cuenta.naturaleza === "deudora" ? "default" : "secondary"}>
-                        {cuenta.naturaleza === "deudora" ? "Deudora" : "Acreedora"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {cuenta.clasificacion === "titulo" ? "Título" : "Saldo"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {canEdit && (
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(cuenta)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {canDelete && (
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(cuenta)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
-                    </TableCell>
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[220px]">Código</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead className="w-[100px]">Nivel</TableHead>
+                    <TableHead className="w-[100px]">Naturaleza</TableHead>
+                    <TableHead className="w-[100px]">Tipo</TableHead>
+                    {canEdit && <TableHead className="w-[100px] text-right">Acciones</TableHead>}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredCuentas.map((cuenta) => {
+                    const level = getCodeLevel(cuenta.codigo);
+                    const canExpand = hasChildren(cuenta.codigo);
+                    const expanded = isExpanded(cuenta.codigo);
+                    
+                    return (
+                      <TableRow 
+                        key={cuenta.id} 
+                        className={levelColors[level] || ""}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            {canExpand ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => toggleExpand(cuenta.codigo)}
+                              >
+                                {expanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </Button>
+                            ) : (
+                              <span className="w-6" />
+                            )}
+                            <code className="text-sm font-mono">
+                              {cuenta.codigo}
+                            </code>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span style={{ paddingLeft: `${(level - 1) * 16}px` }}>
+                            {cuenta.nombre}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {level} - {levelLabels[level]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={cuenta.naturaleza === "deudora" ? "default" : "secondary"}>
+                            {cuenta.naturaleza === "deudora" ? "D" : "A"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={cuenta.clasificacion === "titulo" ? "outline" : "default"}>
+                            {cuenta.clasificacion === "titulo" ? "Título" : "Saldo"}
+                          </Badge>
+                        </TableCell>
+                        {canEdit && (
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(cuenta)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            {canDelete && (
+                              <Button variant="ghost" size="icon" onClick={() => handleDelete(cuenta)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingCuenta ? "Editar Cuenta" : "Nueva Cuenta"}</DialogTitle>
-            <DialogDescription>
-              {editingCuenta ? "Actualiza los datos de la cuenta" : "Ingresa los datos de la nueva cuenta"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Empresa *</Label>
-              <Select
-                value={form.empresa_id}
-                onValueChange={(v) => setForm({ ...form, empresa_id: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {empresas.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.razon_social}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Código *</Label>
-                <Input
-                  value={form.codigo}
-                  onChange={(e) => setForm({ ...form, codigo: e.target.value })}
-                  placeholder="1100"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Nivel</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={form.nivel}
-                  onChange={(e) => setForm({ ...form, nivel: parseInt(e.target.value) || 1 })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Nombre *</Label>
-              <Input
-                value={form.nombre}
-                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                placeholder="Ej: Bancos"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Naturaleza *</Label>
-                <Select
-                  value={form.naturaleza}
-                  onValueChange={(v) => setForm({ ...form, naturaleza: v as "deudora" | "acreedora" })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="deudora">Deudora</SelectItem>
-                    <SelectItem value="acreedora">Acreedora</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Clasificación *</Label>
-                <Select
-                  value={form.clasificacion}
-                  onValueChange={(v) => setForm({ ...form, clasificacion: v as "titulo" | "saldo" })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="titulo">Título</SelectItem>
-                    <SelectItem value="saldo">Saldo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving ? "Guardando..." : "Guardar"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CuentaDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        cuenta={editingCuenta}
+        empresas={empresas}
+        defaultEmpresaId={filterEmpresa !== "all" ? filterEmpresa : undefined}
+        onSuccess={fetchData}
+      />
     </div>
   );
 }
