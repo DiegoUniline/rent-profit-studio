@@ -24,6 +24,7 @@ import {
   Users2,
   Calculator,
   FileSpreadsheet,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -35,6 +36,7 @@ const menuItems = [
   { title: "Cuentas", icon: BookOpen, href: "/cuentas", roles: ["admin", "contador"] },
   { title: "Presupuestos", icon: Calculator, href: "/presupuestos", roles: ["admin", "contador"] },
   { title: "Asientos", icon: FileSpreadsheet, href: "/asientos", roles: ["admin", "contador"] },
+  { title: "Reportes", icon: BarChart3, href: "/reportes", roles: ["admin", "contador"] },
   { title: "Usuarios", icon: Users, href: "/usuarios", roles: ["admin"] },
   { title: "Mi Perfil", icon: User, href: "/perfil", roles: ["admin", "contador", "usuario"] },
 ];
