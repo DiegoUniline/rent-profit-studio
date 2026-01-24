@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { z } from "zod";
-import { Plus, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, AlertCircle, CheckCircle2, Copy } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmpresaDialog } from "./EmpresaDialog";
 import { CuentaDialog } from "./CuentaDialog";
@@ -62,6 +62,14 @@ interface CentroNegocio {
   empresa_id: string;
 }
 
+interface Presupuesto {
+  id: string;
+  partida: string;
+  empresa_id: string;
+  cuenta_id: string | null;
+  centro_negocio_id: string | null;
+}
+
 type TipoAsiento = "ingreso" | "egreso" | "diario";
 type EstadoAsiento = "borrador" | "aplicado" | "cancelado";
 
@@ -88,6 +96,7 @@ interface Movimiento {
   debe: number;
   haber: number;
   orden: number;
+  presupuesto_id?: string;
   isNew?: boolean;
 }
 
@@ -140,6 +149,7 @@ export function AsientoDialog({
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [terceros, setTerceros] = useState<Tercero[]>([]);
   const [centros, setCentros] = useState<CentroNegocio[]>([]);
+  const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
   const [allEmpresas, setAllEmpresas] = useState<Empresa[]>(empresas);
 
   // Dialog states for inline creation
@@ -156,6 +166,7 @@ export function AsientoDialog({
       setCuentas([]);
       setTerceros([]);
       setCentros([]);
+      setPresupuestos([]);
     }
   }, [form.empresa_id]);
 
@@ -196,7 +207,7 @@ export function AsientoDialog({
   };
 
   const loadRelatedData = async (empresaId: string) => {
-    const [cuentasRes, tercerosRes, centrosRes] = await Promise.all([
+    const [cuentasRes, tercerosRes, centrosRes, presupuestosRes] = await Promise.all([
       supabase
         .from("cuentas_contables")
         .select("id, codigo, nombre, empresa_id")
@@ -215,11 +226,18 @@ export function AsientoDialog({
         .eq("empresa_id", empresaId)
         .eq("activo", true)
         .order("nombre"),
+      supabase
+        .from("presupuestos")
+        .select("id, partida, empresa_id, cuenta_id, centro_negocio_id")
+        .eq("empresa_id", empresaId)
+        .eq("activo", true)
+        .order("partida"),
     ]);
 
     if (cuentasRes.data) setCuentas(cuentasRes.data);
     if (tercerosRes.data) setTerceros(tercerosRes.data);
     if (centrosRes.data) setCentros(centrosRes.data);
+    if (presupuestosRes.data) setPresupuestos(presupuestosRes.data);
   };
 
   const loadMovimientos = async (asientoId: string) => {
@@ -240,6 +258,7 @@ export function AsientoDialog({
           debe: Number(m.debe),
           haber: Number(m.haber),
           orden: m.orden,
+          presupuesto_id: m.presupuesto_id || "",
         }))
       );
     }
@@ -268,9 +287,27 @@ export function AsientoDialog({
         debe: 0,
         haber: 0,
         orden: movimientos.length,
+        presupuesto_id: "",
         isNew: true,
       },
     ]);
+  };
+
+  const duplicateMovimiento = (index: number) => {
+    const original = movimientos[index];
+    const duplicado: Movimiento = {
+      cuenta_id: original.cuenta_id,
+      cuenta_codigo: original.cuenta_codigo,
+      cuenta_nombre: original.cuenta_nombre,
+      partida: original.partida,
+      debe: original.debe,
+      haber: original.haber,
+      orden: movimientos.length,
+      presupuesto_id: original.presupuesto_id,
+      isNew: true,
+    };
+    setMovimientos([...movimientos, duplicado]);
+    toast({ title: "Línea duplicada", description: "Puede editar los valores de la nueva línea" });
   };
 
   const removeMovimiento = (index: number) => {
@@ -383,6 +420,7 @@ export function AsientoDialog({
         debe: m.debe,
         haber: m.haber,
         orden: idx,
+        presupuesto_id: m.presupuesto_id || null,
       }));
 
       const { error: movError } = await supabase
@@ -448,10 +486,26 @@ export function AsientoDialog({
     sublabel: c.codigo,
   }));
 
+  const presupuestoOptions = presupuestos.map((p) => ({
+    id: p.id,
+    label: p.partida,
+  }));
+
+  // Filter presupuestos by cuenta for each movimiento
+  const getPresupuestoOptionsForMovimiento = (cuentaId: string) => {
+    const filtered = presupuestos.filter(
+      (p) => !p.cuenta_id || p.cuenta_id === cuentaId
+    );
+    return filtered.map((p) => ({
+      id: p.id,
+      label: p.partida,
+    }));
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {asiento ? `Editar Asiento #${asiento.numero_asiento}` : "Nuevo Asiento Contable"}
@@ -579,15 +633,16 @@ export function AsientoDialog({
                     : "Primero seleccione una empresa"}
                 </div>
               ) : (
-                <div className="border rounded-lg overflow-hidden">
+                <div className="border rounded-lg overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[250px]">Cuenta</TableHead>
-                        <TableHead>Partida</TableHead>
-                        <TableHead className="w-[130px] text-right">Debe</TableHead>
-                        <TableHead className="w-[130px] text-right">Haber</TableHead>
-                        <TableHead className="w-[60px]"></TableHead>
+                        <TableHead className="w-[200px]">Cuenta</TableHead>
+                        <TableHead className="w-[180px]">Partida</TableHead>
+                        <TableHead className="w-[180px]">Presupuesto</TableHead>
+                        <TableHead className="w-[120px] text-right">Debe</TableHead>
+                        <TableHead className="w-[120px] text-right">Haber</TableHead>
+                        <TableHead className="w-[80px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -610,6 +665,16 @@ export function AsientoDialog({
                               value={mov.partida}
                               onChange={(e) => updateMovimiento(idx, "partida", e.target.value)}
                               placeholder="Descripción"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <SearchableSelect
+                              value={mov.presupuesto_id || ""}
+                              onValueChange={(value) => updateMovimiento(idx, "presupuesto_id", value)}
+                              options={getPresupuestoOptionsForMovimiento(mov.cuenta_id)}
+                              placeholder="Sin presupuesto"
+                              searchPlaceholder="Buscar presupuesto..."
+                              emptyMessage="No hay presupuestos"
                             />
                           </TableCell>
                           <TableCell>
@@ -637,15 +702,28 @@ export function AsientoDialog({
                             />
                           </TableCell>
                           <TableCell>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeMovimiento(idx)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => duplicateMovimiento(idx)}
+                                title="Duplicar línea"
+                                className="h-8 w-8"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeMovimiento(idx)}
+                                className="text-destructive h-8 w-8"
+                                title="Eliminar línea"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

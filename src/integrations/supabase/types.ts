@@ -24,6 +24,7 @@ export type Database = {
           id: string
           orden: number
           partida: string
+          presupuesto_id: string | null
         }
         Insert: {
           asiento_id: string
@@ -34,6 +35,7 @@ export type Database = {
           id?: string
           orden?: number
           partida: string
+          presupuesto_id?: string | null
         }
         Update: {
           asiento_id?: string
@@ -44,6 +46,7 @@ export type Database = {
           id?: string
           orden?: number
           partida?: string
+          presupuesto_id?: string | null
         }
         Relationships: [
           {
@@ -58,6 +61,13 @@ export type Database = {
             columns: ["cuenta_id"]
             isOneToOne: false
             referencedRelation: "cuentas_contables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asiento_movimientos_presupuesto_id_fkey"
+            columns: ["presupuesto_id"]
+            isOneToOne: false
+            referencedRelation: "presupuestos"
             referencedColumns: ["id"]
           },
         ]
