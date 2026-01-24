@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { EmpresaDialog } from "./EmpresaDialog";
 import { Tercero } from "@/pages/Terceros";
 
 interface Empresa {
@@ -95,9 +97,12 @@ export function TerceroDialog({
   const { toast } = useToast();
   const [form, setForm] = useState<TerceroForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [allEmpresas, setAllEmpresas] = useState<Empresa[]>(empresas);
+  const [empresaDialogOpen, setEmpresaDialogOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
+      loadEmpresas();
       if (tercero) {
         setForm({
           empresa_id: tercero.empresa_id,
@@ -124,6 +129,20 @@ export function TerceroDialog({
       }
     }
   }, [open, tercero]);
+
+  const loadEmpresas = async () => {
+    const { data } = await supabase
+      .from("empresas")
+      .select("id, razon_social")
+      .eq("activa", true)
+      .order("razon_social");
+    if (data) setAllEmpresas(data);
+  };
+
+  const handleEmpresaCreated = () => {
+    loadEmpresas();
+    setEmpresaDialogOpen(false);
+  };
 
   const handleSave = async () => {
     const result = terceroSchema.safeParse(form);
@@ -197,218 +216,227 @@ export function TerceroDialog({
     onSuccess();
   };
 
+  const empresaOptions = allEmpresas.map((e) => ({
+    id: e.id,
+    label: e.razon_social,
+  }));
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>
-            {tercero ? "Editar Tercero" : "Nuevo Tercero"}
-          </DialogTitle>
-          <DialogDescription>
-            {tercero
-              ? "Modifica los datos del tercero"
-              : "Ingresa los datos del nuevo cliente o proveedor"}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>
+              {tercero ? "Editar Tercero" : "Nuevo Tercero"}
+            </DialogTitle>
+            <DialogDescription>
+              {tercero
+                ? "Modifica los datos del tercero"
+                : "Ingresa los datos del nuevo cliente o proveedor"}
+            </DialogDescription>
+          </DialogHeader>
 
-        <ScrollArea className="max-h-[60vh] pr-4">
-          <div className="space-y-6 py-4">
-            {/* Datos Generales */}
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-3">Datos Generales</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Empresa *</Label>
-                  <Select
-                    value={form.empresa_id}
-                    onValueChange={(value) => setForm({ ...form, empresa_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {empresas.map((empresa) => (
-                        <SelectItem key={empresa.id} value={empresa.id}>
-                          {empresa.razon_social}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="space-y-6 py-4">
+              {/* Datos Generales */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">Datos Generales</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Empresa *</Label>
+                    <SearchableSelect
+                      value={form.empresa_id}
+                      onValueChange={(value) => setForm({ ...form, empresa_id: value })}
+                      options={empresaOptions}
+                      placeholder="Selecciona empresa"
+                      searchPlaceholder="Buscar empresa..."
+                      emptyMessage="No se encontraron empresas"
+                      onCreateNew={() => setEmpresaDialogOpen(true)}
+                      createLabel="Nueva empresa"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tipo *</Label>
+                    <Select
+                      value={form.tipo}
+                      onValueChange={(value) => setForm({ ...form, tipo: value as TerceroForm["tipo"] })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cliente">Cliente</SelectItem>
+                        <SelectItem value="proveedor">Proveedor</SelectItem>
+                        <SelectItem value="ambos">Cliente/Proveedor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>RFC *</Label>
+                    <Input
+                      value={form.rfc}
+                      onChange={(e) => setForm({ ...form, rfc: e.target.value.toUpperCase() })}
+                      placeholder="RFC del tercero"
+                      maxLength={13}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nombre Comercial</Label>
+                    <Input
+                      value={form.nombre_comercial}
+                      onChange={(e) => setForm({ ...form, nombre_comercial: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label>Razón Social *</Label>
+                    <Input
+                      value={form.razon_social}
+                      onChange={(e) => setForm({ ...form, razon_social: e.target.value })}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Tipo *</Label>
-                  <Select
-                    value={form.tipo}
-                    onValueChange={(value) => setForm({ ...form, tipo: value as TerceroForm["tipo"] })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cliente">Cliente</SelectItem>
-                      <SelectItem value="proveedor">Proveedor</SelectItem>
-                      <SelectItem value="ambos">Cliente/Proveedor</SelectItem>
-                    </SelectContent>
-                  </Select>
+              </div>
+
+              <Separator />
+
+              {/* Dirección */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">Dirección</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 space-y-2">
+                    <Label>Calle</Label>
+                    <Input
+                      value={form.calle}
+                      onChange={(e) => setForm({ ...form, calle: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>No. Exterior</Label>
+                    <Input
+                      value={form.numero_exterior}
+                      onChange={(e) => setForm({ ...form, numero_exterior: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>No. Interior</Label>
+                    <Input
+                      value={form.numero_interior}
+                      onChange={(e) => setForm({ ...form, numero_interior: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Colonia</Label>
+                    <Input
+                      value={form.colonia}
+                      onChange={(e) => setForm({ ...form, colonia: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Código Postal</Label>
+                    <Input
+                      value={form.codigo_postal}
+                      onChange={(e) => setForm({ ...form, codigo_postal: e.target.value })}
+                      maxLength={5}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Ciudad</Label>
+                    <Input
+                      value={form.ciudad}
+                      onChange={(e) => setForm({ ...form, ciudad: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Estado</Label>
+                    <Input
+                      value={form.estado}
+                      onChange={(e) => setForm({ ...form, estado: e.target.value })}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>RFC *</Label>
-                  <Input
-                    value={form.rfc}
-                    onChange={(e) => setForm({ ...form, rfc: e.target.value.toUpperCase() })}
-                    placeholder="RFC del tercero"
-                    maxLength={13}
-                  />
+              </div>
+
+              <Separator />
+
+              {/* Contacto */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">Contacto</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Teléfono</Label>
+                    <Input
+                      value={form.telefono}
+                      onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label>Nombre de Contacto</Label>
+                    <Input
+                      value={form.contacto_nombre}
+                      onChange={(e) => setForm({ ...form, contacto_nombre: e.target.value })}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Nombre Comercial</Label>
-                  <Input
-                    value={form.nombre_comercial}
-                    onChange={(e) => setForm({ ...form, nombre_comercial: e.target.value })}
-                  />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label>Razón Social *</Label>
-                  <Input
-                    value={form.razon_social}
-                    onChange={(e) => setForm({ ...form, razon_social: e.target.value })}
-                  />
+              </div>
+
+              <Separator />
+
+              {/* Datos Bancarios */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">Datos Bancarios</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Banco</Label>
+                    <Input
+                      value={form.banco}
+                      onChange={(e) => setForm({ ...form, banco: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Número de Cuenta</Label>
+                    <Input
+                      value={form.numero_cuenta}
+                      onChange={(e) => setForm({ ...form, numero_cuenta: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label>CLABE Interbancaria</Label>
+                    <Input
+                      value={form.clabe}
+                      onChange={(e) => setForm({ ...form, clabe: e.target.value })}
+                      maxLength={18}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
+          </ScrollArea>
 
-            <Separator />
-
-            {/* Dirección */}
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-3">Dirección</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 space-y-2">
-                  <Label>Calle</Label>
-                  <Input
-                    value={form.calle}
-                    onChange={(e) => setForm({ ...form, calle: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>No. Exterior</Label>
-                  <Input
-                    value={form.numero_exterior}
-                    onChange={(e) => setForm({ ...form, numero_exterior: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>No. Interior</Label>
-                  <Input
-                    value={form.numero_interior}
-                    onChange={(e) => setForm({ ...form, numero_interior: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Colonia</Label>
-                  <Input
-                    value={form.colonia}
-                    onChange={(e) => setForm({ ...form, colonia: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Código Postal</Label>
-                  <Input
-                    value={form.codigo_postal}
-                    onChange={(e) => setForm({ ...form, codigo_postal: e.target.value })}
-                    maxLength={5}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Ciudad</Label>
-                  <Input
-                    value={form.ciudad}
-                    onChange={(e) => setForm({ ...form, ciudad: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Estado</Label>
-                  <Input
-                    value={form.estado}
-                    onChange={(e) => setForm({ ...form, estado: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Contacto */}
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-3">Contacto</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Teléfono</Label>
-                  <Input
-                    value={form.telefono}
-                    onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label>Nombre de Contacto</Label>
-                  <Input
-                    value={form.contacto_nombre}
-                    onChange={(e) => setForm({ ...form, contacto_nombre: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Datos Bancarios */}
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-3">Datos Bancarios</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Banco</Label>
-                  <Input
-                    value={form.banco}
-                    onChange={(e) => setForm({ ...form, banco: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Número de Cuenta</Label>
-                  <Input
-                    value={form.numero_cuenta}
-                    onChange={(e) => setForm({ ...form, numero_cuenta: e.target.value })}
-                  />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label>CLABE Interbancaria</Label>
-                  <Input
-                    value={form.clabe}
-                    onChange={(e) => setForm({ ...form, clabe: e.target.value })}
-                    maxLength={18}
-                  />
-                </div>
-              </div>
-            </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Guardando..." : "Guardar"}
+            </Button>
           </div>
-        </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
-        <div className="flex justify-end gap-2 pt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Guardando..." : "Guardar"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      <EmpresaDialog
+        open={empresaDialogOpen}
+        onOpenChange={setEmpresaDialogOpen}
+        empresa={null}
+        onSuccess={handleEmpresaCreated}
+      />
+    </>
   );
 }

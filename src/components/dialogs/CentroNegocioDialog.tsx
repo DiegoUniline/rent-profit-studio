@@ -12,13 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { EmpresaDialog } from "./EmpresaDialog";
 
 interface Empresa {
   id: string;
@@ -75,9 +70,12 @@ export function CentroNegocioDialog({
   const { toast } = useToast();
   const [form, setForm] = useState<CentroForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [allEmpresas, setAllEmpresas] = useState<Empresa[]>(empresas);
+  const [empresaDialogOpen, setEmpresaDialogOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
+      loadEmpresas();
       if (centro) {
         setForm({
           empresa_id: centro.empresa_id,
@@ -91,6 +89,20 @@ export function CentroNegocioDialog({
       }
     }
   }, [open, centro]);
+
+  const loadEmpresas = async () => {
+    const { data } = await supabase
+      .from("empresas")
+      .select("id, razon_social")
+      .eq("activa", true)
+      .order("razon_social");
+    if (data) setAllEmpresas(data);
+  };
+
+  const handleEmpresaCreated = () => {
+    loadEmpresas();
+    setEmpresaDialogOpen(false);
+  };
 
   const handleSave = async () => {
     const result = centroSchema.safeParse(form);
@@ -151,86 +163,95 @@ export function CentroNegocioDialog({
     onSuccess();
   };
 
+  const empresaOptions = allEmpresas.map((e) => ({
+    id: e.id,
+    label: e.razon_social,
+  }));
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {centro ? "Editar Centro de Negocio" : "Nuevo Centro de Negocio"}
-          </DialogTitle>
-          <DialogDescription>
-            {centro
-              ? "Modifica los datos del centro de negocio"
-              : "Ingresa los datos del nuevo centro de negocio"}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {centro ? "Editar Centro de Negocio" : "Nuevo Centro de Negocio"}
+            </DialogTitle>
+            <DialogDescription>
+              {centro
+                ? "Modifica los datos del centro de negocio"
+                : "Ingresa los datos del nuevo centro de negocio"}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>Empresa *</Label>
-            <Select
-              value={form.empresa_id}
-              onValueChange={(value) => setForm({ ...form, empresa_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona una empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                {empresas.map((empresa) => (
-                  <SelectItem key={empresa.id} value={empresa.id}>
-                    {empresa.razon_social}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Empresa *</Label>
+              <SearchableSelect
+                value={form.empresa_id}
+                onValueChange={(value) => setForm({ ...form, empresa_id: value })}
+                options={empresaOptions}
+                placeholder="Selecciona una empresa"
+                searchPlaceholder="Buscar empresa..."
+                emptyMessage="No se encontraron empresas"
+                onCreateNew={() => setEmpresaDialogOpen(true)}
+                createLabel="Nueva empresa"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Código *</Label>
-            <Input
-              value={form.codigo}
-              onChange={(e) => setForm({ ...form, codigo: e.target.value })}
-              placeholder="Ej: CN001"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label>Código *</Label>
+              <Input
+                value={form.codigo}
+                onChange={(e) => setForm({ ...form, codigo: e.target.value })}
+                placeholder="Ej: CN001"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Nombre *</Label>
-            <Input
-              value={form.nombre}
-              onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-              placeholder="Nombre del centro de negocio"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label>Nombre *</Label>
+              <Input
+                value={form.nombre}
+                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                placeholder="Nombre del centro de negocio"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Tipo de Actividad</Label>
-            <Input
-              value={form.tipo_actividad}
-              onChange={(e) => setForm({ ...form, tipo_actividad: e.target.value })}
-              placeholder="Ej: Construcción, Transporte"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label>Tipo de Actividad</Label>
+              <Input
+                value={form.tipo_actividad}
+                onChange={(e) => setForm({ ...form, tipo_actividad: e.target.value })}
+                placeholder="Ej: Construcción, Transporte"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Responsable</Label>
-            <Input
-              value={form.responsable}
-              onChange={(e) => setForm({ ...form, responsable: e.target.value })}
-              placeholder="Nombre del responsable"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label>Responsable</Label>
+              <Input
+                value={form.responsable}
+                onChange={(e) => setForm({ ...form, responsable: e.target.value })}
+                placeholder="Nombre del responsable"
+              />
+            </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Guardando..." : "Guardar"}
-            </Button>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? "Guardando..." : "Guardar"}
+              </Button>
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <EmpresaDialog
+        open={empresaDialogOpen}
+        onOpenChange={setEmpresaDialogOpen}
+        empresa={null}
+        onSuccess={handleEmpresaCreated}
+      />
+    </>
   );
 }
