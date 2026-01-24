@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
@@ -17,7 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BarChart3, CalendarIcon, Loader2 } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { BarChart3, CalendarIcon, Loader2, Building2, X } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfYear } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -34,14 +44,24 @@ interface Empresa {
   razon_social: string;
 }
 
+interface CentroNegocio {
+  id: string;
+  codigo: string;
+  nombre: string;
+  empresa_id: string;
+}
+
 export default function Reportes() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [centrosNegocio, setCentrosNegocio] = useState<CentroNegocio[]>([]);
   const [empresaId, setEmpresaId] = useState<string>("todas");
+  const [centrosSeleccionados, setCentrosSeleccionados] = useState<string[]>([]);
   const [fechaInicio, setFechaInicio] = useState<Date>(startOfYear(new Date()));
   const [fechaFin, setFechaFin] = useState<Date>(endOfMonth(new Date()));
+  const [centrosPopoverOpen, setCentrosPopoverOpen] = useState(false);
 
   // Datos cargados
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
@@ -53,10 +73,15 @@ export default function Reportes() {
     loadEmpresas();
   }, []);
 
-  // Cargar datos cuando cambia empresa o fechas
+  // Cargar centros de negocio cuando cambia empresa
+  useEffect(() => {
+    loadCentrosNegocio();
+  }, [empresaId, empresas]);
+
+  // Cargar datos cuando cambian los filtros
   useEffect(() => {
     loadDatosContables();
-  }, [empresaId, fechaInicio, fechaFin, empresas]);
+  }, [empresaId, centrosSeleccionados, fechaInicio, fechaFin, empresas]);
 
   const loadEmpresas = async () => {
     try {
@@ -76,6 +101,28 @@ export default function Reportes() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCentrosNegocio = async () => {
+    try {
+      let query = supabase
+        .from("centros_negocio")
+        .select("id, codigo, nombre, empresa_id")
+        .eq("activo", true)
+        .order("codigo");
+
+      if (empresaId !== "todas") {
+        query = query.eq("empresa_id", empresaId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setCentrosNegocio(data || []);
+      // Reset selection when empresa changes
+      setCentrosSeleccionados([]);
+    } catch (error: any) {
+      console.error("Error loading centros:", error);
     }
   };
 
@@ -108,7 +155,7 @@ export default function Reportes() {
       // Cargar asientos aplicados
       let asientosQuery = supabase
         .from("asientos_contables")
-        .select("id, fecha, tipo, estado, empresa_id")
+        .select("id, fecha, tipo, estado, empresa_id, centro_negocio_id")
         .eq("estado", "aplicado")
         .lte("fecha", format(fechaFin, "yyyy-MM-dd"));
 
@@ -116,6 +163,11 @@ export default function Reportes() {
         asientosQuery = asientosQuery.eq("empresa_id", empresaId);
       } else {
         asientosQuery = asientosQuery.in("empresa_id", empresaIds);
+      }
+
+      // Filtrar por centros de negocio si hay seleccionados
+      if (centrosSeleccionados.length > 0) {
+        asientosQuery = asientosQuery.in("centro_negocio_id", centrosSeleccionados);
       }
 
       const { data: asientosData, error: asientosError } = await asientosQuery;
@@ -167,6 +219,32 @@ export default function Reportes() {
     return empresa?.razon_social || "";
   }, [empresaId, empresas]);
 
+  const centrosLabel = useMemo(() => {
+    if (centrosSeleccionados.length === 0) return "Todos los Centros";
+    if (centrosSeleccionados.length === 1) {
+      const centro = centrosNegocio.find(c => c.id === centrosSeleccionados[0]);
+      return centro ? `${centro.codigo} - ${centro.nombre}` : "1 seleccionado";
+    }
+    return `${centrosSeleccionados.length} centros seleccionados`;
+  }, [centrosSeleccionados, centrosNegocio]);
+
+  const toggleCentro = (centroId: string) => {
+    setCentrosSeleccionados(prev => {
+      if (prev.includes(centroId)) {
+        return prev.filter(id => id !== centroId);
+      }
+      return [...prev, centroId];
+    });
+  };
+
+  const selectAllCentros = () => {
+    setCentrosSeleccionados(centrosNegocio.map(c => c.id));
+  };
+
+  const clearCentros = () => {
+    setCentrosSeleccionados([]);
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -212,6 +290,74 @@ export default function Reportes() {
               </Select>
             </div>
 
+            {/* Centro de Negocios - Multi-select */}
+            <div className="space-y-2">
+              <Label>Centro de Negocios</Label>
+              <Popover open={centrosPopoverOpen} onOpenChange={setCentrosPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-[280px] justify-between font-normal"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{centrosLabel}</span>
+                    </div>
+                    {centrosSeleccionados.length > 0 && (
+                      <Badge variant="secondary" className="ml-2 shrink-0">
+                        {centrosSeleccionados.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[320px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar centro..." />
+                    <div className="flex items-center gap-2 p-2 border-b">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={selectAllCentros}
+                        className="flex-1"
+                      >
+                        Seleccionar todos
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearCentros}
+                        className="flex-1"
+                      >
+                        Limpiar
+                      </Button>
+                    </div>
+                    <CommandList>
+                      <CommandEmpty>No se encontraron centros</CommandEmpty>
+                      <CommandGroup>
+                        {centrosNegocio.map((centro) => {
+                          const isSelected = centrosSeleccionados.includes(centro.id);
+                          return (
+                            <CommandItem
+                              key={centro.id}
+                              value={`${centro.codigo} ${centro.nombre}`}
+                              onSelect={() => toggleCentro(centro.id)}
+                              className="flex items-center gap-2"
+                            >
+                              <Checkbox checked={isSelected} />
+                              <span className="font-mono text-xs text-muted-foreground">
+                                {centro.codigo}
+                              </span>
+                              <span className="truncate">{centro.nombre}</span>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
             {/* Fecha Inicio */}
             <div className="space-y-2">
               <Label>Fecha Inicio</Label>
@@ -220,7 +366,7 @@ export default function Reportes() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-[180px] justify-start text-left font-normal",
+                      "w-[160px] justify-start text-left font-normal",
                       !fechaInicio && "text-muted-foreground"
                     )}
                   >
@@ -250,7 +396,7 @@ export default function Reportes() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-[180px] justify-start text-left font-normal",
+                      "w-[160px] justify-start text-left font-normal",
                       !fechaFin && "text-muted-foreground"
                     )}
                   >
@@ -305,6 +451,39 @@ export default function Reportes() {
               </div>
             )}
           </div>
+
+          {/* Badges de centros seleccionados */}
+          {centrosSeleccionados.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="text-sm text-muted-foreground">Centros:</span>
+              {centrosSeleccionados.map((id) => {
+                const centro = centrosNegocio.find(c => c.id === id);
+                return (
+                  <Badge
+                    key={id}
+                    variant="secondary"
+                    className="flex items-center gap-1"
+                  >
+                    {centro?.codigo} - {centro?.nombre}
+                    <button
+                      onClick={() => toggleCentro(id)}
+                      className="ml-1 hover:bg-muted rounded-full p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                );
+              })}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearCentros}
+                className="h-6 text-xs"
+              >
+                Limpiar todos
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
