@@ -334,14 +334,14 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
             <div className="space-y-2">
               <Label>Cuenta Padre (opcional)</Label>
               <Select 
-                value={form.cuenta_padre_id} 
-                onValueChange={handleParentSelect}
+                value={form.cuenta_padre_id || "__none__"} 
+                onValueChange={(v) => handleParentSelect(v === "__none__" ? "" : v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar cuenta padre para sugerir código" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin cuenta padre</SelectItem>
+                  <SelectItem value="__none__">Sin cuenta padre</SelectItem>
                   {cuentasPadre.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       <span className="font-mono text-xs">{c.codigo}</span> - {c.nombre}
