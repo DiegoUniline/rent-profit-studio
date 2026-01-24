@@ -16,6 +16,7 @@ import CentrosNegocio from "./pages/CentrosNegocio";
 import Terceros from "./pages/Terceros";
 import Presupuestos from "./pages/Presupuestos";
 import Asientos from "./pages/Asientos";
+import Reportes from "./pages/Reportes";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -141,6 +142,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["admin", "contador"]}>
             <Asientos />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reportes"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "contador"]}>
+            <Reportes />
           </ProtectedRoute>
         }
       />
