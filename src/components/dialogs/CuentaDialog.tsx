@@ -75,15 +75,24 @@ const emptyForm: CuentaForm = {
   cuenta_padre_id: "",
 };
 
-// Format code with dashes based on level
+// Format code with dashes as user types - live formatting
+const formatCodeLive = (input: string): string => {
+  // Remove everything except digits
+  const digits = input.replace(/[^0-9]/g, "").slice(0, 12);
+  
+  // Add dashes as user types
+  let formatted = "";
+  for (let i = 0; i < digits.length; i++) {
+    if (i > 0 && i % 3 === 0) formatted += "-";
+    formatted += digits[i];
+  }
+  return formatted;
+};
+
+// Format code with padding for storage
 const formatAccountCode = (code: string): string => {
-  // Remove existing dashes and non-numeric chars
   const clean = code.replace(/[^0-9]/g, "");
-  
-  // Pad to 12 digits
   const padded = clean.padEnd(12, "0").slice(0, 12);
-  
-  // Format as XXX-XXX-XXX-XXX
   return `${padded.slice(0, 3)}-${padded.slice(3, 6)}-${padded.slice(6, 9)}-${padded.slice(9, 12)}`;
 };
 
@@ -97,23 +106,11 @@ const getCodeLevel = (code: string): number => {
   return 4;                                      // XXX-XXX-XXX-XXX
 };
 
-// Get parent code from current code
-const getParentCode = (code: string): string | null => {
-  const clean = code.replace(/[^0-9]/g, "").padEnd(12, "0");
-  const level = getCodeLevel(code);
-  
-  if (level === 1) return null;
-  if (level === 2) return formatAccountCode(clean.slice(0, 3));
-  if (level === 3) return formatAccountCode(clean.slice(0, 6));
-  return formatAccountCode(clean.slice(0, 9));
-};
-
 // Suggest next code based on parent
 const suggestNextCode = (parentCode: string, existingCodes: string[]): string => {
   const parentClean = parentCode.replace(/[^0-9]/g, "").padEnd(12, "0");
   const parentLevel = getCodeLevel(parentCode);
   
-  // Find existing children
   const children = existingCodes
     .map(c => c.replace(/[^0-9]/g, "").padEnd(12, "0"))
     .filter(c => {
@@ -123,7 +120,6 @@ const suggestNextCode = (parentCode: string, existingCodes: string[]): string =>
       return false;
     });
   
-  // Find max child number
   let maxNum = 0;
   children.forEach(c => {
     let num = 0;
@@ -207,18 +203,18 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
     return getCodeLevel(form.codigo);
   }, [form.codigo]);
 
-  // Handle code input with auto-formatting
+  // Handle code input with live formatting
   const handleCodeChange = (value: string) => {
-    // Allow typing, format on blur
+    const formatted = formatCodeLive(value);
     setForm({ 
       ...form, 
-      codigo: value,
-      nivel: getCodeLevel(value),
+      codigo: formatted,
+      nivel: getCodeLevel(formatted),
     });
   };
 
   const handleCodeBlur = () => {
-    if (form.codigo) {
+    if (form.codigo && form.codigo.replace(/[^0-9]/g, "").length > 0) {
       const formatted = formatAccountCode(form.codigo);
       setForm({ 
         ...form, 
@@ -329,38 +325,48 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
             </Select>
           </div>
 
-          {/* Parent account selector */}
-          {form.empresa_id && cuentasPadre.length > 0 && (
+          {/* Parent account selector - always show when empresa selected */}
+          {form.empresa_id && (
             <div className="space-y-2">
-              <Label>Cuenta Padre (opcional)</Label>
+              <Label>Cuenta Padre (para sugerir código automáticamente)</Label>
               <Select 
                 value={form.cuenta_padre_id || "__none__"} 
                 onValueChange={(v) => handleParentSelect(v === "__none__" ? "" : v)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar cuenta padre para sugerir código" />
+                  <SelectValue placeholder="Selecciona un grupo para crear subcuenta" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">Sin cuenta padre</SelectItem>
+                  <SelectItem value="__none__">
+                    <span className="text-muted-foreground">Crear cuenta de nivel 1 (Rubro)</span>
+                  </SelectItem>
                   {cuentasPadre.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      <span className="font-mono text-xs">{c.codigo}</span> - {c.nombre}
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs bg-muted px-1 rounded">{c.codigo}</span>
+                        <span>{c.nombre}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {cuentasPadre.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No hay cuentas tipo "Título" aún. La primera cuenta será nivel 1.
+                </p>
+              )}
             </div>
           )}
           
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2 col-span-2">
-              <Label>Código *</Label>
+              <Label>Código * <span className="text-xs text-muted-foreground">(solo números, guiones automáticos)</span></Label>
               <Input 
                 value={form.codigo} 
                 onChange={(e) => handleCodeChange(e.target.value)} 
                 onBlur={handleCodeBlur}
-                placeholder="100-000-000-000" 
-                className="font-mono"
+                placeholder="Escribe: 100..." 
+                className="font-mono text-lg tracking-wider"
               />
             </div>
             <div className="space-y-2">
