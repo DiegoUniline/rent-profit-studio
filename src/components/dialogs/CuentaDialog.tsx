@@ -20,6 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { z } from "zod";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { EmpresaDialog } from "./EmpresaDialog";
 
 interface Empresa {
   id: string;
@@ -142,6 +144,15 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
   const [saving, setSaving] = useState(false);
   const [cuentasPadre, setCuentasPadre] = useState<CuentaContable[]>([]);
   const [allCuentas, setAllCuentas] = useState<CuentaContable[]>([]);
+  const [allEmpresas, setAllEmpresas] = useState<Empresa[]>(empresas);
+  const [empresaDialogOpen, setEmpresaDialogOpen] = useState(false);
+
+  // Load empresas on open
+  useEffect(() => {
+    if (open) {
+      loadEmpresas();
+    }
+  }, [open]);
 
   // Load parent accounts when empresa changes
   useEffect(() => {
@@ -152,6 +163,15 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
       setAllCuentas([]);
     }
   }, [form.empresa_id]);
+
+  const loadEmpresas = async () => {
+    const { data } = await supabase
+      .from("empresas")
+      .select("id, razon_social")
+      .eq("activa", true)
+      .order("razon_social");
+    if (data) setAllEmpresas(data);
+  };
 
   const loadCuentas = async (empresaId: string) => {
     const { data } = await supabase
@@ -174,6 +194,11 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
     if (allData) {
       setAllCuentas(allData as CuentaContable[]);
     }
+  };
+
+  const handleEmpresaCreated = () => {
+    loadEmpresas();
+    setEmpresaDialogOpen(false);
   };
 
   useEffect(() => {
@@ -299,122 +324,131 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
     5: "Subcuenta",
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{cuenta ? "Editar Cuenta" : "Nueva Cuenta Contable"}</DialogTitle>
-          <DialogDescription>
-            Formato de código: XXX-XXX-XXX-XXX (ej: 100-000-000-000)
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="grid gap-4 py-4">
-          <div className="space-y-2">
-            <Label>Empresa *</Label>
-            <Select 
-              value={form.empresa_id} 
-              onValueChange={(v) => setForm({ ...form, empresa_id: v, cuenta_padre_id: "" })}
-            >
-              <SelectTrigger><SelectValue placeholder="Selecciona una empresa" /></SelectTrigger>
-              <SelectContent>
-                {empresas.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>{e.razon_social}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+  const empresaOptions = allEmpresas.map((e) => ({
+    id: e.id,
+    label: e.razon_social,
+  }));
 
-          {/* Parent account selector - always show when empresa selected */}
-          {form.empresa_id && (
-            <div className="space-y-2">
-              <Label>Cuenta Padre (para sugerir código automáticamente)</Label>
-              <Select 
-                value={form.cuenta_padre_id || "__none__"} 
-                onValueChange={(v) => handleParentSelect(v === "__none__" ? "" : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un grupo para crear subcuenta" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">
-                    <span className="text-muted-foreground">Crear cuenta de nivel 1 (Rubro)</span>
-                  </SelectItem>
-                  {cuentasPadre.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs bg-muted px-1 rounded">{c.codigo}</span>
-                        <span>{c.nombre}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {cuentasPadre.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  No hay cuentas tipo "Título" aún. La primera cuenta será nivel 1.
-                </p>
-              )}
-            </div>
-          )}
+  const cuentaPadreOptions = cuentasPadre.map((c) => ({
+    id: c.id,
+    label: c.nombre,
+    sublabel: c.codigo,
+  }));
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{cuenta ? "Editar Cuenta" : "Nueva Cuenta Contable"}</DialogTitle>
+            <DialogDescription>
+              Formato de código: XXX-XXX-XXX-XXX (ej: 100-000-000-000)
+            </DialogDescription>
+          </DialogHeader>
           
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2 col-span-2">
-              <Label>Código * <span className="text-xs text-muted-foreground">(solo números, guiones automáticos)</span></Label>
-              <Input 
-                value={form.codigo} 
-                onChange={(e) => handleCodeChange(e.target.value)} 
-                onBlur={handleCodeBlur}
-                placeholder="Escribe: 100..." 
-                className="font-mono text-lg tracking-wider"
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Empresa *</Label>
+              <SearchableSelect
+                value={form.empresa_id}
+                onValueChange={(v) => setForm({ ...form, empresa_id: v, cuenta_padre_id: "" })}
+                options={empresaOptions}
+                placeholder="Selecciona una empresa"
+                searchPlaceholder="Buscar empresa..."
+                emptyMessage="No se encontraron empresas"
+                onCreateNew={() => setEmpresaDialogOpen(true)}
+                createLabel="Nueva empresa"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Nivel</Label>
-              <div className="flex items-center h-10 px-3 border rounded-md bg-muted">
-                <Badge variant="outline">{calculatedLevel} - {levelLabels[calculatedLevel]}</Badge>
+
+            {/* Parent account selector - always show when empresa selected */}
+            {form.empresa_id && (
+              <div className="space-y-2">
+                <Label>Cuenta Padre (para sugerir código automáticamente)</Label>
+                <SearchableSelect
+                  value={form.cuenta_padre_id || ""}
+                  onValueChange={handleParentSelect}
+                  options={[
+                    { id: "", label: "Crear cuenta de nivel 1 (Rubro)" },
+                    ...cuentaPadreOptions,
+                  ]}
+                  placeholder="Selecciona un grupo para crear subcuenta"
+                  searchPlaceholder="Buscar cuenta padre..."
+                  emptyMessage="No se encontraron cuentas"
+                />
+                {cuentasPadre.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No hay cuentas tipo "Título" aún. La primera cuenta será nivel 1.
+                  </p>
+                )}
+              </div>
+            )}
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2 col-span-2">
+                <Label>Código * <span className="text-xs text-muted-foreground">(solo números, guiones automáticos)</span></Label>
+                <Input 
+                  value={form.codigo} 
+                  onChange={(e) => handleCodeChange(e.target.value)} 
+                  onBlur={handleCodeBlur}
+                  placeholder="Escribe: 100..." 
+                  className="font-mono text-lg tracking-wider"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Nivel</Label>
+                <div className="flex items-center h-10 px-3 border rounded-md bg-muted">
+                  <Badge variant="outline">{calculatedLevel} - {levelLabels[calculatedLevel]}</Badge>
+                </div>
               </div>
             </div>
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Nombre *</Label>
-            <Input 
-              value={form.nombre} 
-              onChange={(e) => setForm({ ...form, nombre: e.target.value })} 
-              placeholder="Ej: Activo Circulante, Bancos, etc." 
-            />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
+            
             <div className="space-y-2">
-              <Label>Naturaleza *</Label>
-              <Select value={form.naturaleza} onValueChange={(v) => setForm({ ...form, naturaleza: v as "deudora" | "acreedora" })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="deudora">Deudora</SelectItem>
-                  <SelectItem value="acreedora">Acreedora</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Nombre *</Label>
+              <Input 
+                value={form.nombre} 
+                onChange={(e) => setForm({ ...form, nombre: e.target.value })} 
+                placeholder="Ej: Activo Circulante, Bancos, etc." 
+              />
             </div>
-            <div className="space-y-2">
-              <Label>Clasificación *</Label>
-              <Select value={form.clasificacion} onValueChange={(v) => setForm({ ...form, clasificacion: v as "titulo" | "saldo" })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="titulo">Título (agrupadora)</SelectItem>
-                  <SelectItem value="saldo">Saldo (de movimiento)</SelectItem>
-                </SelectContent>
-              </Select>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Naturaleza *</Label>
+                <Select value={form.naturaleza} onValueChange={(v) => setForm({ ...form, naturaleza: v as "deudora" | "acreedora" })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="deudora">Deudora</SelectItem>
+                    <SelectItem value="acreedora">Acreedora</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Clasificación *</Label>
+                <Select value={form.clasificacion} onValueChange={(v) => setForm({ ...form, clasificacion: v as "titulo" | "saldo" })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="titulo">Título (agrupadora)</SelectItem>
+                    <SelectItem value="saldo">Saldo (de movimiento)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
 
-          <div className="mt-4 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? "Guardando..." : "Guardar"}</Button>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+              <Button onClick={handleSave} disabled={saving}>{saving ? "Guardando..." : "Guardar"}</Button>
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <EmpresaDialog
+        open={empresaDialogOpen}
+        onOpenChange={setEmpresaDialogOpen}
+        empresa={null}
+        onSuccess={handleEmpresaCreated}
+      />
+    </>
   );
 }

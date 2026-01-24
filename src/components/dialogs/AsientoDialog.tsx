@@ -28,9 +28,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { z } from "zod";
 import { Plus, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmpresaDialog } from "./EmpresaDialog";
 import { CuentaDialog } from "./CuentaDialog";
 import { TerceroDialog } from "./TerceroDialog";
@@ -424,11 +424,29 @@ export function AsientoDialog({
     setCentroDialogOpen(false);
   };
 
-  const tipoLabels: Record<TipoAsiento, string> = {
-    ingreso: "Ingreso",
-    egreso: "Egreso",
-    diario: "Diario",
-  };
+  // Options for SearchableSelect
+  const empresaOptions = allEmpresas.map((e) => ({
+    id: e.id,
+    label: e.razon_social,
+  }));
+
+  const terceroOptions = terceros.map((t) => ({
+    id: t.id,
+    label: t.razon_social,
+    sublabel: t.rfc,
+  }));
+
+  const centroOptions = centros.map((c) => ({
+    id: c.id,
+    label: c.nombre,
+    sublabel: c.codigo,
+  }));
+
+  const cuentaOptions = cuentas.map((c) => ({
+    id: c.id,
+    label: c.nombre,
+    sublabel: c.codigo,
+  }));
 
   return (
     <>
@@ -446,38 +464,23 @@ export function AsientoDialog({
               {/* Empresa */}
               <div className="space-y-2">
                 <Label>Empresa *</Label>
-                <div className="flex gap-2">
-                  <Select
-                    value={form.empresa_id}
-                    onValueChange={(value) =>
-                      setForm({
-                        ...form,
-                        empresa_id: value,
-                        tercero_id: "",
-                        centro_negocio_id: "",
-                      })
-                    }
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Seleccionar empresa" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allEmpresas.map((e) => (
-                        <SelectItem key={e.id} value={e.id}>
-                          {e.razon_social}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setEmpresaDialogOpen(true)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                <SearchableSelect
+                  value={form.empresa_id}
+                  onValueChange={(value) =>
+                    setForm({
+                      ...form,
+                      empresa_id: value,
+                      tercero_id: "",
+                      centro_negocio_id: "",
+                    })
+                  }
+                  options={empresaOptions}
+                  placeholder="Seleccionar empresa"
+                  searchPlaceholder="Buscar empresa..."
+                  emptyMessage="No se encontraron empresas"
+                  onCreateNew={() => setEmpresaDialogOpen(true)}
+                  createLabel="Nueva empresa"
+                />
               </div>
 
               {/* Fecha */}
@@ -511,65 +514,33 @@ export function AsientoDialog({
               {/* Tercero */}
               <div className="space-y-2">
                 <Label>Tercero</Label>
-                <div className="flex gap-2">
-                  <Select
-                    value={form.tercero_id}
-                    onValueChange={(value) => setForm({ ...form, tercero_id: value })}
-                    disabled={!form.empresa_id}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder={form.empresa_id ? "Seleccionar" : "Primero seleccione empresa"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {terceros.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.razon_social}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setTerceroDialogOpen(true)}
-                    disabled={!form.empresa_id}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                <SearchableSelect
+                  value={form.tercero_id}
+                  onValueChange={(value) => setForm({ ...form, tercero_id: value })}
+                  options={terceroOptions}
+                  placeholder={form.empresa_id ? "Seleccionar tercero" : "Primero seleccione empresa"}
+                  searchPlaceholder="Buscar tercero..."
+                  emptyMessage="No se encontraron terceros"
+                  disabled={!form.empresa_id}
+                  onCreateNew={() => setTerceroDialogOpen(true)}
+                  createLabel="Nuevo tercero"
+                />
               </div>
 
               {/* Centro de Negocios */}
               <div className="space-y-2 col-span-2">
                 <Label>Centro de Negocios</Label>
-                <div className="flex gap-2">
-                  <Select
-                    value={form.centro_negocio_id}
-                    onValueChange={(value) => setForm({ ...form, centro_negocio_id: value })}
-                    disabled={!form.empresa_id}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder={form.empresa_id ? "Seleccionar" : "Primero seleccione empresa"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {centros.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.codigo} - {c.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setCentroDialogOpen(true)}
-                    disabled={!form.empresa_id}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+                <SearchableSelect
+                  value={form.centro_negocio_id}
+                  onValueChange={(value) => setForm({ ...form, centro_negocio_id: value })}
+                  options={centroOptions}
+                  placeholder={form.empresa_id ? "Seleccionar centro" : "Primero seleccione empresa"}
+                  searchPlaceholder="Buscar centro..."
+                  emptyMessage="No se encontraron centros"
+                  disabled={!form.empresa_id}
+                  onCreateNew={() => setCentroDialogOpen(true)}
+                  createLabel="Nuevo centro"
+                />
               </div>
 
               {/* Observaciones */}
@@ -612,7 +583,7 @@ export function AsientoDialog({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[200px]">Cuenta</TableHead>
+                        <TableHead className="w-[250px]">Cuenta</TableHead>
                         <TableHead>Partida</TableHead>
                         <TableHead className="w-[130px] text-right">Debe</TableHead>
                         <TableHead className="w-[130px] text-right">Haber</TableHead>
@@ -623,32 +594,16 @@ export function AsientoDialog({
                       {movimientos.map((mov, idx) => (
                         <TableRow key={idx}>
                           <TableCell>
-                            <div className="flex gap-1">
-                              <Select
-                                value={mov.cuenta_id}
-                                onValueChange={(value) => updateMovimiento(idx, "cuenta_id", value)}
-                              >
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Cuenta" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {cuentas.map((c) => (
-                                    <SelectItem key={c.id} value={c.id}>
-                                      {c.codigo} - {c.nombre}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="shrink-0"
-                                onClick={() => setCuentaDialogOpen(true)}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
+                            <SearchableSelect
+                              value={mov.cuenta_id}
+                              onValueChange={(value) => updateMovimiento(idx, "cuenta_id", value)}
+                              options={cuentaOptions}
+                              placeholder="Cuenta"
+                              searchPlaceholder="Buscar cuenta..."
+                              emptyMessage="No hay cuentas"
+                              onCreateNew={() => setCuentaDialogOpen(true)}
+                              createLabel="Nueva cuenta"
+                            />
                           </TableCell>
                           <TableCell>
                             <Input
