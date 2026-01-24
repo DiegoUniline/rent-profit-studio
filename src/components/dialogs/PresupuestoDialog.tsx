@@ -1,0 +1,612 @@
+import { useState, useEffect, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { z } from "zod";
+import { Plus } from "lucide-react";
+import { EmpresaDialog } from "./EmpresaDialog";
+import { CuentaDialog } from "./CuentaDialog";
+import { TerceroDialog } from "./TerceroDialog";
+import { CentroNegocioDialog } from "./CentroNegocioDialog";
+import { UnidadMedidaDialog } from "./UnidadMedidaDialog";
+
+interface Empresa {
+  id: string;
+  razon_social: string;
+}
+
+interface CuentaContable {
+  id: string;
+  codigo: string;
+  nombre: string;
+  empresa_id: string;
+}
+
+interface Tercero {
+  id: string;
+  razon_social: string;
+  rfc: string;
+  empresa_id: string;
+}
+
+interface CentroNegocio {
+  id: string;
+  codigo: string;
+  nombre: string;
+  empresa_id: string;
+}
+
+interface UnidadMedida {
+  id: string;
+  codigo: string;
+  nombre: string;
+  activa: boolean;
+}
+
+interface Presupuesto {
+  id: string;
+  empresa_id: string;
+  cuenta_id: string | null;
+  tercero_id: string | null;
+  centro_negocio_id: string | null;
+  unidad_medida_id: string | null;
+  partida: string;
+  cantidad: number;
+  precio_unitario: number;
+  notas: string | null;
+  activo: boolean;
+}
+
+interface PresupuestoDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  presupuesto: Presupuesto | null;
+  empresas: Empresa[];
+  onSuccess: () => void;
+}
+
+const presupuestoSchema = z.object({
+  empresa_id: z.string().min(1, "La empresa es requerida"),
+  partida: z.string().min(1, "La partida es requerida"),
+  cantidad: z.number().positive("La cantidad debe ser mayor a 0"),
+  precio_unitario: z.number().min(0, "El precio no puede ser negativo"),
+});
+
+interface PresupuestoForm {
+  empresa_id: string;
+  cuenta_id: string;
+  tercero_id: string;
+  centro_negocio_id: string;
+  unidad_medida_id: string;
+  partida: string;
+  cantidad: string;
+  precio_unitario: string;
+  notas: string;
+}
+
+const emptyForm: PresupuestoForm = {
+  empresa_id: "",
+  cuenta_id: "",
+  tercero_id: "",
+  centro_negocio_id: "",
+  unidad_medida_id: "",
+  partida: "",
+  cantidad: "1",
+  precio_unitario: "0",
+  notas: "",
+};
+
+export function PresupuestoDialog({
+  open,
+  onOpenChange,
+  presupuesto,
+  empresas,
+  onSuccess,
+}: PresupuestoDialogProps) {
+  const { toast } = useToast();
+  const [form, setForm] = useState<PresupuestoForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
+  
+  // Related data states
+  const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
+  const [terceros, setTerceros] = useState<Tercero[]>([]);
+  const [centros, setCentros] = useState<CentroNegocio[]>([]);
+  const [unidades, setUnidades] = useState<UnidadMedida[]>([]);
+  const [allEmpresas, setAllEmpresas] = useState<Empresa[]>(empresas);
+
+  // Dialog states for inline creation
+  const [empresaDialogOpen, setEmpresaDialogOpen] = useState(false);
+  const [cuentaDialogOpen, setCuentaDialogOpen] = useState(false);
+  const [terceroDialogOpen, setTerceroDialogOpen] = useState(false);
+  const [centroDialogOpen, setCentroDialogOpen] = useState(false);
+  const [unidadDialogOpen, setUnidadDialogOpen] = useState(false);
+
+  // Load related data when empresa changes
+  useEffect(() => {
+    if (form.empresa_id) {
+      loadRelatedData(form.empresa_id);
+    } else {
+      setCuentas([]);
+      setTerceros([]);
+      setCentros([]);
+    }
+  }, [form.empresa_id]);
+
+  // Load unidades on open
+  useEffect(() => {
+    if (open) {
+      loadUnidades();
+      loadEmpresas();
+    }
+  }, [open]);
+
+  // Hydrate form when editing
+  useEffect(() => {
+    if (open) {
+      if (presupuesto) {
+        setForm({
+          empresa_id: presupuesto.empresa_id,
+          cuenta_id: presupuesto.cuenta_id || "",
+          tercero_id: presupuesto.tercero_id || "",
+          centro_negocio_id: presupuesto.centro_negocio_id || "",
+          unidad_medida_id: presupuesto.unidad_medida_id || "",
+          partida: presupuesto.partida,
+          cantidad: String(presupuesto.cantidad),
+          precio_unitario: String(presupuesto.precio_unitario),
+          notas: presupuesto.notas || "",
+        });
+      } else {
+        setForm(emptyForm);
+      }
+    }
+  }, [open, presupuesto]);
+
+  const loadEmpresas = async () => {
+    const { data } = await supabase
+      .from("empresas")
+      .select("id, razon_social")
+      .eq("activa", true)
+      .order("razon_social");
+    if (data) setAllEmpresas(data);
+  };
+
+  const loadRelatedData = async (empresaId: string) => {
+    const [cuentasRes, tercerosRes, centrosRes] = await Promise.all([
+      supabase
+        .from("cuentas_contables")
+        .select("id, codigo, nombre, empresa_id")
+        .eq("empresa_id", empresaId)
+        .eq("activa", true)
+        .order("codigo"),
+      supabase
+        .from("terceros")
+        .select("id, razon_social, rfc, empresa_id")
+        .eq("empresa_id", empresaId)
+        .eq("activo", true)
+        .order("razon_social"),
+      supabase
+        .from("centros_negocio")
+        .select("id, codigo, nombre, empresa_id")
+        .eq("empresa_id", empresaId)
+        .eq("activo", true)
+        .order("nombre"),
+    ]);
+
+    if (cuentasRes.data) setCuentas(cuentasRes.data);
+    if (tercerosRes.data) setTerceros(tercerosRes.data);
+    if (centrosRes.data) setCentros(centrosRes.data);
+  };
+
+  const loadUnidades = async () => {
+    const { data } = await supabase
+      .from("unidades_medida")
+      .select("*")
+      .eq("activa", true)
+      .order("codigo");
+    if (data) setUnidades(data);
+  };
+
+  const presupuestoCalculado = useMemo(() => {
+    const cantidad = parseFloat(form.cantidad) || 0;
+    const precio = parseFloat(form.precio_unitario) || 0;
+    return cantidad * precio;
+  }, [form.cantidad, form.precio_unitario]);
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+    }).format(value);
+  };
+
+  const handleSave = async () => {
+    const cantidad = parseFloat(form.cantidad) || 0;
+    const precio_unitario = parseFloat(form.precio_unitario) || 0;
+
+    const result = presupuestoSchema.safeParse({
+      empresa_id: form.empresa_id,
+      partida: form.partida,
+      cantidad,
+      precio_unitario,
+    });
+
+    if (!result.success) {
+      toast({
+        title: "Error de validación",
+        description: result.error.errors[0].message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const data = {
+        empresa_id: form.empresa_id,
+        cuenta_id: form.cuenta_id || null,
+        tercero_id: form.tercero_id || null,
+        centro_negocio_id: form.centro_negocio_id || null,
+        unidad_medida_id: form.unidad_medida_id || null,
+        partida: form.partida,
+        cantidad,
+        precio_unitario,
+        notas: form.notas || null,
+      };
+
+      if (presupuesto) {
+        const { error } = await supabase
+          .from("presupuestos")
+          .update(data)
+          .eq("id", presupuesto.id);
+        if (error) throw error;
+        toast({ title: "Presupuesto actualizado" });
+      } else {
+        const { error } = await supabase
+          .from("presupuestos")
+          .insert(data);
+        if (error) throw error;
+        toast({ title: "Presupuesto creado" });
+      }
+
+      onOpenChange(false);
+      onSuccess();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEmpresaCreated = () => {
+    loadEmpresas();
+    setEmpresaDialogOpen(false);
+  };
+
+  const handleCuentaCreated = () => {
+    if (form.empresa_id) loadRelatedData(form.empresa_id);
+    setCuentaDialogOpen(false);
+  };
+
+  const handleTerceroCreated = () => {
+    if (form.empresa_id) loadRelatedData(form.empresa_id);
+    setTerceroDialogOpen(false);
+  };
+
+  const handleCentroCreated = () => {
+    if (form.empresa_id) loadRelatedData(form.empresa_id);
+    setCentroDialogOpen(false);
+  };
+
+  const handleUnidadCreated = (newUnidad?: UnidadMedida) => {
+    loadUnidades();
+    if (newUnidad) {
+      setForm({ ...form, unidad_medida_id: newUnidad.id });
+    }
+    setUnidadDialogOpen(false);
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {presupuesto ? "Editar Presupuesto" : "Nuevo Presupuesto"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Empresa */}
+            <div className="space-y-2">
+              <Label htmlFor="empresa_id">Empresa *</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={form.empresa_id}
+                  onValueChange={(value) =>
+                    setForm({ ...form, empresa_id: value, cuenta_id: "", tercero_id: "", centro_negocio_id: "" })
+                  }
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Seleccionar empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allEmpresas.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.razon_social}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setEmpresaDialogOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Partida */}
+            <div className="space-y-2">
+              <Label htmlFor="partida">Partida *</Label>
+              <Input
+                id="partida"
+                value={form.partida}
+                onChange={(e) => setForm({ ...form, partida: e.target.value })}
+                placeholder="Descripción de la partida"
+              />
+            </div>
+
+            {/* Cuenta */}
+            <div className="space-y-2">
+              <Label htmlFor="cuenta_id">Cuenta Contable</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={form.cuenta_id}
+                  onValueChange={(value) => setForm({ ...form, cuenta_id: value })}
+                  disabled={!form.empresa_id}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder={form.empresa_id ? "Seleccionar cuenta" : "Primero seleccione empresa"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cuentas.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.codigo} - {c.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCuentaDialogOpen(true)}
+                  disabled={!form.empresa_id}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Tercero */}
+            <div className="space-y-2">
+              <Label htmlFor="tercero_id">Tercero</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={form.tercero_id}
+                  onValueChange={(value) => setForm({ ...form, tercero_id: value })}
+                  disabled={!form.empresa_id}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder={form.empresa_id ? "Seleccionar tercero" : "Primero seleccione empresa"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {terceros.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.razon_social} ({t.rfc})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setTerceroDialogOpen(true)}
+                  disabled={!form.empresa_id}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Centro de Negocios */}
+            <div className="space-y-2">
+              <Label htmlFor="centro_negocio_id">Centro de Negocios</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={form.centro_negocio_id}
+                  onValueChange={(value) => setForm({ ...form, centro_negocio_id: value })}
+                  disabled={!form.empresa_id}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder={form.empresa_id ? "Seleccionar centro" : "Primero seleccione empresa"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {centros.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.codigo} - {c.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCentroDialogOpen(true)}
+                  disabled={!form.empresa_id}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Unidad de Medida + Cantidad + Precio */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="unidad_medida_id">Unidad de Medida</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={form.unidad_medida_id}
+                    onValueChange={(value) => setForm({ ...form, unidad_medida_id: value })}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Unidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unidades.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.codigo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setUnidadDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cantidad">Cantidad *</Label>
+                <Input
+                  id="cantidad"
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  value={form.cantidad}
+                  onChange={(e) => setForm({ ...form, cantidad: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="precio_unitario">Precio Unitario *</Label>
+                <Input
+                  id="precio_unitario"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.precio_unitario}
+                  onChange={(e) => setForm({ ...form, precio_unitario: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Presupuesto calculado */}
+            <div className="rounded-lg bg-muted p-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-muted-foreground">
+                  Presupuesto (Cantidad × Precio)
+                </span>
+                <span className="text-2xl font-bold text-primary">
+                  {formatCurrency(presupuestoCalculado)}
+                </span>
+              </div>
+            </div>
+
+            {/* Notas */}
+            <div className="space-y-2">
+              <Label htmlFor="notas">Notas</Label>
+              <Textarea
+                id="notas"
+                value={form.notas}
+                onChange={(e) => setForm({ ...form, notas: e.target.value })}
+                placeholder="Notas adicionales..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialogs for inline creation */}
+      <EmpresaDialog
+        open={empresaDialogOpen}
+        onOpenChange={setEmpresaDialogOpen}
+        empresa={null}
+        onSuccess={handleEmpresaCreated}
+      />
+
+      <CuentaDialog
+        open={cuentaDialogOpen}
+        onOpenChange={setCuentaDialogOpen}
+        cuenta={null}
+        empresas={allEmpresas}
+        defaultEmpresaId={form.empresa_id}
+        onSuccess={handleCuentaCreated}
+      />
+
+      <TerceroDialog
+        open={terceroDialogOpen}
+        onOpenChange={setTerceroDialogOpen}
+        tercero={null}
+        empresas={allEmpresas}
+        onSuccess={handleTerceroCreated}
+      />
+
+      <CentroNegocioDialog
+        open={centroDialogOpen}
+        onOpenChange={setCentroDialogOpen}
+        centro={null}
+        empresas={allEmpresas}
+        onSuccess={handleCentroCreated}
+      />
+
+      <UnidadMedidaDialog
+        open={unidadDialogOpen}
+        onOpenChange={setUnidadDialogOpen}
+        unidad={null}
+        onSuccess={handleUnidadCreated}
+      />
+    </>
+  );
+}
