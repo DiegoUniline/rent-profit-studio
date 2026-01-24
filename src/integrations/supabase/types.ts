@@ -14,6 +14,127 @@ export type Database = {
   }
   public: {
     Tables: {
+      asiento_movimientos: {
+        Row: {
+          asiento_id: string
+          created_at: string
+          cuenta_id: string
+          debe: number
+          haber: number
+          id: string
+          orden: number
+          partida: string
+        }
+        Insert: {
+          asiento_id: string
+          created_at?: string
+          cuenta_id: string
+          debe?: number
+          haber?: number
+          id?: string
+          orden?: number
+          partida: string
+        }
+        Update: {
+          asiento_id?: string
+          created_at?: string
+          cuenta_id?: string
+          debe?: number
+          haber?: number
+          id?: string
+          orden?: number
+          partida?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asiento_movimientos_asiento_id_fkey"
+            columns: ["asiento_id"]
+            isOneToOne: false
+            referencedRelation: "asientos_contables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asiento_movimientos_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "cuentas_contables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asientos_contables: {
+        Row: {
+          centro_negocio_id: string | null
+          created_at: string
+          created_by: string | null
+          empresa_id: string
+          estado: Database["public"]["Enums"]["estado_asiento"]
+          fecha: string
+          id: string
+          numero_asiento: number
+          observaciones: string | null
+          tercero_id: string | null
+          tipo: Database["public"]["Enums"]["tipo_asiento"]
+          total_debe: number
+          total_haber: number
+          updated_at: string
+        }
+        Insert: {
+          centro_negocio_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          empresa_id: string
+          estado?: Database["public"]["Enums"]["estado_asiento"]
+          fecha?: string
+          id?: string
+          numero_asiento?: number
+          observaciones?: string | null
+          tercero_id?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_asiento"]
+          total_debe?: number
+          total_haber?: number
+          updated_at?: string
+        }
+        Update: {
+          centro_negocio_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          empresa_id?: string
+          estado?: Database["public"]["Enums"]["estado_asiento"]
+          fecha?: string
+          id?: string
+          numero_asiento?: number
+          observaciones?: string | null
+          tercero_id?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_asiento"]
+          total_debe?: number
+          total_haber?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asientos_contables_centro_negocio_id_fkey"
+            columns: ["centro_negocio_id"]
+            isOneToOne: false
+            referencedRelation: "centros_negocio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asientos_contables_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asientos_contables_tercero_id_fkey"
+            columns: ["tercero_id"]
+            isOneToOne: false
+            referencedRelation: "terceros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       centros_negocio: {
         Row: {
           activo: boolean
@@ -464,7 +585,9 @@ export type Database = {
     Enums: {
       app_role: "admin" | "contador" | "usuario"
       clasificacion_cuenta: "titulo" | "saldo"
+      estado_asiento: "borrador" | "aplicado" | "cancelado"
       naturaleza_cuenta: "deudora" | "acreedora"
+      tipo_asiento: "ingreso" | "egreso" | "diario"
       tipo_persona: "fisica" | "moral"
     }
     CompositeTypes: {
@@ -595,7 +718,9 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "contador", "usuario"],
       clasificacion_cuenta: ["titulo", "saldo"],
+      estado_asiento: ["borrador", "aplicado", "cancelado"],
       naturaleza_cuenta: ["deudora", "acreedora"],
+      tipo_asiento: ["ingreso", "egreso", "diario"],
       tipo_persona: ["fisica", "moral"],
     },
   },
