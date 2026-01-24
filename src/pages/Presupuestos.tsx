@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -36,6 +37,9 @@ import {
   Building,
   FileText,
   Power,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
 } from "lucide-react";
 import { PresupuestoDialog } from "@/components/dialogs/PresupuestoDialog";
 
@@ -68,6 +72,20 @@ interface CentroNegocio {
   nombre: string;
 }
 
+interface MovimientoConAsiento {
+  id: string;
+  presupuesto_id: string;
+  debe: number;
+  haber: number;
+  cuenta_id: string;
+  asientos_contables: {
+    estado: string;
+  };
+  cuentas_contables: {
+    codigo: string;
+  } | null;
+}
+
 interface Presupuesto {
   id: string;
   empresa_id: string;
@@ -86,13 +104,58 @@ interface Presupuesto {
   terceros?: Tercero;
   centros_negocio?: CentroNegocio;
   unidades_medida?: UnidadMedida;
+  // Calculated fields
+  ejercido?: number;
+  porEjercer?: number;
+  porcentaje?: number;
 }
+
+// Function to determine if account is "deudora" based on codigo
+const esNaturalezaDeudora = (codigo: string): boolean => {
+  if (!codigo) return true;
+  return (
+    codigo.startsWith("100") ||
+    codigo.startsWith("500") ||
+    codigo.startsWith("600") ||
+    codigo.startsWith("1") && !codigo.startsWith("1") // Activo general
+  );
+};
+
+// Calculate ejercido based on account nature
+const calcularEjercido = (
+  presupuestoId: string,
+  cuentaCodigo: string | undefined,
+  movimientos: MovimientoConAsiento[]
+): number => {
+  const movimientosMatch = movimientos.filter(
+    (m) => m.presupuesto_id === presupuestoId && m.asientos_contables?.estado === "aplicado"
+  );
+
+  if (movimientosMatch.length === 0) return 0;
+
+  const codigoCuenta = cuentaCodigo || movimientosMatch[0]?.cuentas_contables?.codigo || "";
+  
+  // For cuentas 100, 500, 600 (Activo, Costos, Gastos) -> sum debe
+  // For cuentas 200, 300, 400 (Pasivo, Capital, Ingresos) -> sum haber
+  const esDeudora = 
+    codigoCuenta.startsWith("100") || 
+    codigoCuenta.startsWith("500") || 
+    codigoCuenta.startsWith("600") ||
+    codigoCuenta.startsWith("1");
+
+  if (esDeudora) {
+    return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
+  } else {
+    return movimientosMatch.reduce((sum, m) => sum + Number(m.haber), 0);
+  }
+};
 
 export default function Presupuestos() {
   const { role } = useAuth();
   const { toast } = useToast();
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [movimientos, setMovimientos] = useState<MovimientoConAsiento[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterCompany, setFilterCompany] = useState<string>("all");
@@ -109,7 +172,7 @@ export default function Presupuestos() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [presupuestosRes, empresasRes] = await Promise.all([
+      const [presupuestosRes, empresasRes, movimientosRes] = await Promise.all([
         supabase
           .from("presupuestos")
           .select(`
@@ -126,13 +189,27 @@ export default function Presupuestos() {
           .select("id, razon_social")
           .eq("activa", true)
           .order("razon_social"),
+        supabase
+          .from("asiento_movimientos")
+          .select(`
+            id, 
+            presupuesto_id, 
+            debe, 
+            haber,
+            cuenta_id,
+            asientos_contables!inner(estado),
+            cuentas_contables(codigo)
+          `)
+          .not("presupuesto_id", "is", null),
       ]);
 
       if (presupuestosRes.error) throw presupuestosRes.error;
       if (empresasRes.error) throw empresasRes.error;
+      if (movimientosRes.error) throw movimientosRes.error;
 
       setPresupuestos(presupuestosRes.data || []);
       setEmpresas(empresasRes.data || []);
+      setMovimientos((movimientosRes.data || []) as unknown as MovimientoConAsiento[]);
       
       // Expand all empresas by default
       const empresaIds = new Set((presupuestosRes.data || []).map(p => p.empresa_id));
@@ -195,9 +272,26 @@ export default function Presupuestos() {
     }).format(value);
   };
 
+  // Enrich presupuestos with calculated fields
+  const presupuestosConEjercido = useMemo(() => {
+    return presupuestos.map((p) => {
+      const presupuestado = p.cantidad * p.precio_unitario;
+      const ejercido = calcularEjercido(p.id, p.cuentas_contables?.codigo, movimientos);
+      const porEjercer = presupuestado - ejercido;
+      const porcentaje = presupuestado > 0 ? (ejercido / presupuestado) * 100 : 0;
+      
+      return {
+        ...p,
+        ejercido,
+        porEjercer,
+        porcentaje,
+      };
+    });
+  }, [presupuestos, movimientos]);
+
   // Filter presupuestos
   const filteredPresupuestos = useMemo(() => {
-    return presupuestos.filter((p) => {
+    return presupuestosConEjercido.filter((p) => {
       const matchesSearch =
         p.partida.toLowerCase().includes(search.toLowerCase()) ||
         p.notas?.toLowerCase().includes(search.toLowerCase()) ||
@@ -205,11 +299,17 @@ export default function Presupuestos() {
       const matchesCompany = filterCompany === "all" || p.empresa_id === filterCompany;
       return matchesSearch && matchesCompany;
     });
-  }, [presupuestos, search, filterCompany]);
+  }, [presupuestosConEjercido, search, filterCompany]);
 
   // Group by empresa
   const groupedByEmpresa = useMemo(() => {
-    const groups: Record<string, { empresa: Empresa; presupuestos: Presupuesto[]; total: number }> = {};
+    const groups: Record<string, { 
+      empresa: Empresa; 
+      presupuestos: Presupuesto[]; 
+      totalPresupuestado: number;
+      totalEjercido: number;
+      totalPorEjercer: number;
+    }> = {};
     
     filteredPresupuestos.forEach((p) => {
       const empresaId = p.empresa_id;
@@ -217,12 +317,17 @@ export default function Presupuestos() {
         groups[empresaId] = {
           empresa: p.empresas || { id: empresaId, razon_social: "Sin empresa" },
           presupuestos: [],
-          total: 0,
+          totalPresupuestado: 0,
+          totalEjercido: 0,
+          totalPorEjercer: 0,
         };
       }
       groups[empresaId].presupuestos.push(p);
       if (p.activo) {
-        groups[empresaId].total += p.cantidad * p.precio_unitario;
+        const presupuestado = p.cantidad * p.precio_unitario;
+        groups[empresaId].totalPresupuestado += presupuestado;
+        groups[empresaId].totalEjercido += p.ejercido || 0;
+        groups[empresaId].totalPorEjercer += p.porEjercer || 0;
       }
     });
     
@@ -234,15 +339,34 @@ export default function Presupuestos() {
   // Calculate totals
   const totals = useMemo(() => {
     const activePresupuestos = filteredPresupuestos.filter(p => p.activo);
-    const totalGlobal = activePresupuestos.reduce(
+    const totalPresupuestado = activePresupuestos.reduce(
       (sum, p) => sum + p.cantidad * p.precio_unitario,
       0
     );
+    const totalEjercido = activePresupuestos.reduce(
+      (sum, p) => sum + (p.ejercido || 0),
+      0
+    );
+    const totalPorEjercer = totalPresupuestado - totalEjercido;
+    const porcentajeGlobal = totalPresupuestado > 0 ? (totalEjercido / totalPresupuestado) * 100 : 0;
     const totalPartidas = activePresupuestos.length;
     const empresasCount = new Set(activePresupuestos.map(p => p.empresa_id)).size;
     
-    return { totalGlobal, totalPartidas, empresasCount };
+    return { totalPresupuestado, totalEjercido, totalPorEjercer, porcentajeGlobal, totalPartidas, empresasCount };
   }, [filteredPresupuestos]);
+
+  // Get status color based on percentage
+  const getStatusColor = (porcentaje: number) => {
+    if (porcentaje > 100) return "destructive";
+    if (porcentaje >= 80) return "warning";
+    return "default";
+  };
+
+  const getProgressColor = (porcentaje: number) => {
+    if (porcentaje > 100) return "bg-destructive";
+    if (porcentaje >= 80) return "bg-yellow-500";
+    return "bg-primary";
+  };
 
   if (loading) {
     return (
@@ -271,7 +395,7 @@ export default function Presupuestos() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Presupuestado</CardTitle>
@@ -279,23 +403,46 @@ export default function Presupuestos() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {formatCurrency(totals.totalGlobal)}
+              {formatCurrency(totals.totalPresupuestado)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Suma de partidas activas
+              {totals.totalPartidas} partidas activas
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Partidas Activas</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Ejercido</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totals.totalPartidas}</div>
+            <div className="text-2xl font-bold text-green-600">
+              {formatCurrency(totals.totalEjercido)}
+            </div>
+            <div className="flex items-center gap-2">
+              <Progress 
+                value={Math.min(totals.porcentajeGlobal, 100)} 
+                className="h-2 flex-1"
+              />
+              <span className="text-xs text-muted-foreground">
+                {totals.porcentajeGlobal.toFixed(1)}%
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Por Ejercer</CardTitle>
+            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${totals.totalPorEjercer < 0 ? 'text-destructive' : ''}`}>
+              {formatCurrency(totals.totalPorEjercer)}
+            </div>
             <p className="text-xs text-muted-foreground">
-              De {filteredPresupuestos.length} totales
+              {totals.totalPorEjercer < 0 ? 'Sobregiro' : 'Disponible'}
             </p>
           </CardContent>
         </Card>
@@ -358,144 +505,200 @@ export default function Presupuestos() {
             </CardContent>
           </Card>
         ) : (
-          groupedByEmpresa.map((group) => (
-            <Card key={group.empresa.id}>
-              <Collapsible
-                open={expandedEmpresas.has(group.empresa.id)}
-                onOpenChange={() => toggleEmpresa(group.empresa.id)}
-              >
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {expandedEmpresas.has(group.empresa.id) ? (
-                          <ChevronDown className="h-5 w-5" />
-                        ) : (
-                          <ChevronRight className="h-5 w-5" />
-                        )}
-                        <div>
-                          <CardTitle className="text-lg">
-                            {group.empresa.razon_social}
-                          </CardTitle>
-                          <p className="text-sm text-muted-foreground">
-                            {group.presupuestos.length} partida(s)
-                          </p>
+          groupedByEmpresa.map((group) => {
+            const porcentajeGrupo = group.totalPresupuestado > 0 
+              ? (group.totalEjercido / group.totalPresupuestado) * 100 
+              : 0;
+            
+            return (
+              <Card key={group.empresa.id}>
+                <Collapsible
+                  open={expandedEmpresas.has(group.empresa.id)}
+                  onOpenChange={() => toggleEmpresa(group.empresa.id)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {expandedEmpresas.has(group.empresa.id) ? (
+                            <ChevronDown className="h-5 w-5" />
+                          ) : (
+                            <ChevronRight className="h-5 w-5" />
+                          )}
+                          <div>
+                            <CardTitle className="text-lg">
+                              {group.empresa.razon_social}
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                              {group.presupuestos.length} partida(s)
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <div className="text-right">
+                            <div className="text-sm text-muted-foreground">Presupuestado</div>
+                            <div className="text-lg font-bold text-primary">
+                              {formatCurrency(group.totalPresupuestado)}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm text-muted-foreground">Ejercido</div>
+                            <div className="text-lg font-bold text-green-600">
+                              {formatCurrency(group.totalEjercido)}
+                            </div>
+                          </div>
+                          <div className="text-right min-w-[100px]">
+                            <div className="text-sm text-muted-foreground">Avance</div>
+                            <div className="flex items-center gap-2">
+                              <Progress 
+                                value={Math.min(porcentajeGrupo, 100)} 
+                                className="h-2 w-16"
+                              />
+                              <span className={`text-sm font-medium ${porcentajeGrupo > 100 ? 'text-destructive' : ''}`}>
+                                {porcentajeGrupo.toFixed(0)}%
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-xl font-bold text-primary">
-                          {formatCurrency(group.total)}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Total activo
-                        </p>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <CardContent className="pt-0">
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Partida</TableHead>
-                            <TableHead>Cuenta</TableHead>
-                            <TableHead>Tercero</TableHead>
-                            <TableHead>Centro</TableHead>
-                            <TableHead className="text-right">Cantidad</TableHead>
-                            <TableHead className="text-right">P. Unit.</TableHead>
-                            <TableHead className="text-right">Presupuesto</TableHead>
-                            <TableHead>Estado</TableHead>
-                            {canEdit && <TableHead className="text-right">Acciones</TableHead>}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {group.presupuestos.map((p) => (
-                            <TableRow key={p.id} className={!p.activo ? "opacity-50" : ""}>
-                              <TableCell>
-                                <div>
-                                  <div className="font-medium">{p.partida}</div>
-                                  {p.unidades_medida && (
-                                    <div className="text-xs text-muted-foreground">
-                                      {p.unidades_medida.codigo}
-                                    </div>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {p.cuentas_contables ? (
-                                  <span className="text-sm">
-                                    {p.cuentas_contables.codigo}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {p.terceros ? (
-                                  <span className="text-sm">
-                                    {p.terceros.razon_social}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {p.centros_negocio ? (
-                                  <span className="text-sm">
-                                    {p.centros_negocio.codigo}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right font-mono">
-                                {p.cantidad.toLocaleString("es-MX")}
-                              </TableCell>
-                              <TableCell className="text-right font-mono">
-                                {formatCurrency(p.precio_unitario)}
-                              </TableCell>
-                              <TableCell className="text-right font-mono font-medium">
-                                {formatCurrency(p.cantidad * p.precio_unitario)}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={p.activo ? "default" : "secondary"}>
-                                  {p.activo ? "Activo" : "Inactivo"}
-                                </Badge>
-                              </TableCell>
-                              {canEdit && (
-                                <TableCell className="text-right">
-                                  <div className="flex justify-end gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => openEdit(p)}
-                                      title="Editar"
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleToggleActivo(p)}
-                                      title={p.activo ? "Desactivar" : "Activar"}
-                                    >
-                                      <Power className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              )}
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="pt-0">
+                      <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Partida</TableHead>
+                              <TableHead>Cuenta</TableHead>
+                              <TableHead>Tercero</TableHead>
+                              <TableHead>Centro</TableHead>
+                              <TableHead className="text-right">Presupuesto</TableHead>
+                              <TableHead className="text-right">Ejercido</TableHead>
+                              <TableHead className="text-right">Por Ejercer</TableHead>
+                              <TableHead className="w-[120px]">Avance</TableHead>
+                              <TableHead>Estado</TableHead>
+                              {canEdit && <TableHead className="text-right">Acciones</TableHead>}
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </CollapsibleContent>
-              </Collapsible>
-            </Card>
-          ))
+                          </TableHeader>
+                          <TableBody>
+                            {group.presupuestos.map((p) => {
+                              const presupuestado = p.cantidad * p.precio_unitario;
+                              const ejercido = p.ejercido || 0;
+                              const porEjercer = p.porEjercer || 0;
+                              const porcentaje = p.porcentaje || 0;
+                              
+                              return (
+                                <TableRow key={p.id} className={!p.activo ? "opacity-50" : ""}>
+                                  <TableCell>
+                                    <div>
+                                      <div className="font-medium">{p.partida}</div>
+                                      {p.unidades_medida && (
+                                        <div className="text-xs text-muted-foreground">
+                                          {p.cantidad.toLocaleString("es-MX")} {p.unidades_medida.codigo}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    {p.cuentas_contables ? (
+                                      <span className="text-sm">
+                                        {p.cuentas_contables.codigo}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {p.terceros ? (
+                                      <span className="text-sm">
+                                        {p.terceros.razon_social}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {p.centros_negocio ? (
+                                      <span className="text-sm">
+                                        {p.centros_negocio.codigo}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {formatCurrency(presupuestado)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-green-600">
+                                    {formatCurrency(ejercido)}
+                                  </TableCell>
+                                  <TableCell className={`text-right font-mono ${porEjercer < 0 ? 'text-destructive' : ''}`}>
+                                    {formatCurrency(porEjercer)}
+                                    {porEjercer < 0 && (
+                                      <AlertTriangle className="h-3 w-3 inline ml-1 text-destructive" />
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                                        <div 
+                                          className={`h-full transition-all ${getProgressColor(porcentaje)}`}
+                                          style={{ width: `${Math.min(porcentaje, 100)}%` }}
+                                        />
+                                      </div>
+                                      <span className={`text-xs font-medium min-w-[40px] ${porcentaje > 100 ? 'text-destructive' : ''}`}>
+                                        {porcentaje.toFixed(0)}%
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    {porcentaje > 100 ? (
+                                      <Badge variant="destructive">Sobregiro</Badge>
+                                    ) : porcentaje >= 80 ? (
+                                      <Badge variant="outline" className="border-yellow-500 text-yellow-600">
+                                        Alerta
+                                      </Badge>
+                                    ) : p.activo ? (
+                                      <Badge variant="default">Activo</Badge>
+                                    ) : (
+                                      <Badge variant="secondary">Inactivo</Badge>
+                                    )}
+                                  </TableCell>
+                                  {canEdit && (
+                                    <TableCell className="text-right">
+                                      <div className="flex justify-end gap-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => openEdit(p)}
+                                          title="Editar"
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleToggleActivo(p)}
+                                          title={p.activo ? "Desactivar" : "Activar"}
+                                        >
+                                          <Power className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  )}
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </CollapsibleContent>
+                </Collapsible>
+              </Card>
+            );
+          })
         )}
       </div>
 
