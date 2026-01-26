@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { BookOpen, Plus, Edit, Trash2, Search } from "lucide-react";
 import { CuentaDialog } from "@/components/dialogs/CuentaDialog";
+import { formatCurrency } from "@/lib/accounting-utils";
 
 interface Empresa {
   id: string;
@@ -68,26 +69,35 @@ const levelColors: Record<number, string> = {
   5: "text-muted-foreground",
 };
 
+interface SaldoCuenta {
+  cuenta_id: string;
+  saldo: number;
+}
+
 export default function Cuentas() {
   const { role } = useAuth();
   const { toast } = useToast();
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [saldos, setSaldos] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
   const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCuenta, setEditingCuenta] = useState<CuentaContable | null>(null);
+
   const fetchData = async () => {
     setLoading(true);
     
-    const [cuentasRes, empresasRes] = await Promise.all([
+    const [cuentasRes, empresasRes, movimientosRes, asientosRes] = await Promise.all([
       supabase
         .from("cuentas_contables")
         .select("*, empresas(id, razon_social)")
         .order("codigo"),
       supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social"),
+      supabase.from("asiento_movimientos").select("cuenta_id, debe, haber, asiento_id"),
+      supabase.from("asientos_contables").select("id, estado").eq("estado", "aplicado"),
     ]);
 
     if (cuentasRes.error) {
@@ -102,6 +112,33 @@ export default function Cuentas() {
 
     if (!empresasRes.error) {
       setEmpresas(empresasRes.data || []);
+    }
+
+    // Calculate balances from applied movements
+    if (!movimientosRes.error && !asientosRes.error && cuentasRes.data) {
+      const asientosAplicados = new Set(asientosRes.data?.map(a => a.id) || []);
+      const cuentasMap = new Map(cuentasRes.data.map(c => [c.id, c]));
+      const saldosMap = new Map<string, number>();
+
+      (movimientosRes.data || []).forEach(mov => {
+        if (asientosAplicados.has(mov.asiento_id)) {
+          const cuenta = cuentasMap.get(mov.cuenta_id);
+          if (cuenta) {
+            const currentSaldo = saldosMap.get(mov.cuenta_id) || 0;
+            const debe = Number(mov.debe) || 0;
+            const haber = Number(mov.haber) || 0;
+            
+            // Calculate based on account nature
+            if (cuenta.naturaleza === 'deudora') {
+              saldosMap.set(mov.cuenta_id, currentSaldo + debe - haber);
+            } else {
+              saldosMap.set(mov.cuenta_id, currentSaldo + haber - debe);
+            }
+          }
+        }
+      });
+
+      setSaldos(saldosMap);
     }
 
     setLoading(false);
@@ -288,12 +325,15 @@ export default function Cuentas() {
                     <TableHead>Nombre</TableHead>
                     <TableHead className="w-[100px]">Naturaleza</TableHead>
                     <TableHead className="w-[100px]">Tipo</TableHead>
+                    <TableHead className="w-[130px] text-right">Saldo</TableHead>
                     {canEdit && <TableHead className="w-[100px] text-right">Acciones</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                 {filteredCuentas.map((cuenta) => {
                     const level = getCodeLevel(cuenta.codigo);
+                    const saldo = saldos.get(cuenta.id) || 0;
+                    const showSaldo = cuenta.clasificacion === "saldo";
                     
                     return (
                       <TableRow 
@@ -322,6 +362,15 @@ export default function Cuentas() {
                           <Badge variant={cuenta.clasificacion === "titulo" ? "outline" : "default"}>
                             {cuenta.clasificacion === "titulo" ? "Título" : "Saldo"}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {showSaldo ? (
+                            <span className={saldo < 0 ? "text-destructive" : ""}>
+                              {formatCurrency(saldo)}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         {canEdit && (
                           <TableCell className="text-right">
