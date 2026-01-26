@@ -208,12 +208,18 @@ export function FlujoEfectivoPresupuesto({
     return flujos;
   }, [presupuestos, mesesFiltrados, numMeses]);
 
-  // Filtrar flujos
-  const flujosFiltrados = useMemo(() => {
-    if (filtroTipo === "todos") return flujosMensuales;
-    if (filtroTipo === "entradas") return flujosMensuales.filter(f => f.tipo === "entrada");
+  // Separar flujos por tipo
+  const flujosEntradas = useMemo(() => {
+    return flujosMensuales.filter(f => f.tipo === "entrada");
+  }, [flujosMensuales]);
+
+  const flujosSalidas = useMemo(() => {
     return flujosMensuales.filter(f => f.tipo === "salida");
-  }, [flujosMensuales, filtroTipo]);
+  }, [flujosMensuales]);
+
+  // Filtrar flujos según el filtro seleccionado
+  const mostrarEntradas = filtroTipo === "todos" || filtroTipo === "entradas";
+  const mostrarSalidas = filtroTipo === "todos" || filtroTipo === "salidas";
 
   // Calcular totales por mes
   const totalesMensuales = useMemo(() => {
@@ -483,9 +489,8 @@ export function FlujoEfectivoPresupuesto({
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="sticky left-0 z-10 bg-muted/50 min-w-[200px]">Partida</TableHead>
-                    <TableHead className="sticky left-[200px] z-10 bg-muted/50 min-w-[120px]">Cuenta</TableHead>
-                    <TableHead className="min-w-[80px] text-center">Tipo</TableHead>
+                    <TableHead className="sticky left-0 z-10 bg-muted/50 min-w-[250px]">Concepto</TableHead>
+                    <TableHead className="min-w-[100px]">Cuenta</TableHead>
                     <TableHead className="min-w-[80px] text-center">Frecuencia</TableHead>
                     {mesesFiltrados.map((mes, i) => (
                       <TableHead key={i} className="min-w-[100px] text-right">
@@ -495,97 +500,153 @@ export function FlujoEfectivoPresupuesto({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {flujosFiltrados.length === 0 ? (
+                  {flujosEntradas.length === 0 && flujosSalidas.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4 + mesesFiltrados.length} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={3 + mesesFiltrados.length} className="text-center py-8 text-muted-foreground">
                         No hay presupuestos con fechas configuradas
                       </TableCell>
                     </TableRow>
                   ) : (
                     <>
-                      {flujosFiltrados.map((flujo) => (
-                        <TableRow key={flujo.presupuestoId}>
-                          <TableCell className="sticky left-0 z-10 bg-background font-medium">
-                            {flujo.partida}
-                          </TableCell>
-                          <TableCell className="sticky left-[200px] z-10 bg-background font-mono text-xs">
-                            {flujo.codigoCuenta}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant={flujo.tipo === "entrada" ? "default" : "destructive"} className="text-xs">
-                              {flujo.tipo === "entrada" ? "Entrada" : "Salida"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center text-xs">
-                            {flujo.frecuencia}
-                          </TableCell>
-                          {flujo.meses.map((monto, i) => (
-                            <TableCell key={i} className={cn(
-                              "text-right font-mono text-sm",
-                              monto === 0 && "text-muted-foreground"
-                            )}>
-                              {monto !== 0 ? formatCurrency(monto) : "-"}
+                      {/* SECCIÓN ENTRADAS */}
+                      {mostrarEntradas && (
+                        <>
+                          <TableRow className="bg-green-100/50 dark:bg-green-950/40">
+                            <TableCell colSpan={3 + mesesFiltrados.length} className="sticky left-0 z-10 bg-green-100/50 dark:bg-green-950/40 font-bold text-green-800 dark:text-green-300">
+                              <div className="flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4" />
+                                ENTRADAS DE EFECTIVO
+                              </div>
                             </TableCell>
+                          </TableRow>
+                          {flujosEntradas.map((flujo) => (
+                            <TableRow key={flujo.presupuestoId} className="hover:bg-green-50/50 dark:hover:bg-green-950/20">
+                              <TableCell className="sticky left-0 z-10 bg-background pl-6">
+                                {flujo.partida}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs text-muted-foreground">
+                                {flujo.codigoCuenta}
+                              </TableCell>
+                              <TableCell className="text-center text-xs">
+                                {flujo.frecuencia}
+                              </TableCell>
+                              {flujo.meses.map((monto, i) => (
+                                <TableCell key={i} className={cn(
+                                  "text-right font-mono text-sm",
+                                  monto === 0 && "text-muted-foreground"
+                                )}>
+                                  {monto !== 0 ? formatCurrency(monto) : "-"}
+                                </TableCell>
+                              ))}
+                            </TableRow>
                           ))}
-                        </TableRow>
-                      ))}
-                      
-                      {/* Fila de totales entradas */}
-                      <TableRow className="bg-green-50 dark:bg-green-950/30 font-semibold">
-                        <TableCell className="sticky left-0 z-10 bg-green-50 dark:bg-green-950/30" colSpan={4}>
-                          Total Entradas
-                        </TableCell>
-                        {totalesMensuales.entradas.map((monto, i) => (
-                          <TableCell key={i} className="text-right font-mono text-green-700 dark:text-green-400">
-                            {monto !== 0 ? formatCurrency(monto) : "-"}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-
-                      {/* Fila de totales salidas */}
-                      <TableRow className="bg-red-50 dark:bg-red-950/30 font-semibold">
-                        <TableCell className="sticky left-0 z-10 bg-red-50 dark:bg-red-950/30" colSpan={4}>
-                          Total Salidas
-                        </TableCell>
-                        {totalesMensuales.salidas.map((monto, i) => (
-                          <TableCell key={i} className="text-right font-mono text-red-700 dark:text-red-400">
-                            {monto !== 0 ? formatCurrency(monto) : "-"}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-
-                      {/* Fila de flujo neto */}
-                      <TableRow className="bg-blue-50 dark:bg-blue-950/30 font-semibold">
-                        <TableCell className="sticky left-0 z-10 bg-blue-50 dark:bg-blue-950/30" colSpan={4}>
-                          Flujo Neto
-                        </TableCell>
-                        {totalesMensuales.entradas.map((entrada, i) => {
-                          const neto = entrada - totalesMensuales.salidas[i];
-                          return (
-                            <TableCell key={i} className={cn(
-                              "text-right font-mono",
-                              neto >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
-                            )}>
-                              {neto !== 0 ? formatCurrency(neto) : "-"}
+                          {/* Subtotal Entradas */}
+                          <TableRow className="bg-green-50 dark:bg-green-950/30 font-semibold border-t-2 border-green-200 dark:border-green-800">
+                            <TableCell className="sticky left-0 z-10 bg-green-50 dark:bg-green-950/30 pl-4" colSpan={3}>
+                              Total Entradas
                             </TableCell>
-                          );
-                        })}
-                      </TableRow>
+                            {totalesMensuales.entradas.map((monto, i) => (
+                              <TableCell key={i} className="text-right font-mono text-green-700 dark:text-green-400">
+                                {monto !== 0 ? formatCurrency(monto) : "-"}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        </>
+                      )}
 
-                      {/* Fila de saldo acumulado */}
-                      <TableRow className="bg-primary/10 font-bold text-lg">
-                        <TableCell className="sticky left-0 z-10 bg-primary/10" colSpan={4}>
-                          Saldo Acumulado
-                        </TableCell>
-                        {totalesMensuales.saldos.map((saldo, i) => (
-                          <TableCell key={i} className={cn(
-                            "text-right font-mono",
-                            saldo >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
-                          )}>
-                            {formatCurrency(saldo)}
-                          </TableCell>
-                        ))}
-                      </TableRow>
+                      {/* SECCIÓN SALIDAS */}
+                      {mostrarSalidas && (
+                        <>
+                          <TableRow className="bg-red-100/50 dark:bg-red-950/40">
+                            <TableCell colSpan={3 + mesesFiltrados.length} className="sticky left-0 z-10 bg-red-100/50 dark:bg-red-950/40 font-bold text-red-800 dark:text-red-300">
+                              <div className="flex items-center gap-2">
+                                <TrendingDown className="h-4 w-4" />
+                                SALIDAS DE EFECTIVO
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {flujosSalidas.map((flujo) => (
+                            <TableRow key={flujo.presupuestoId} className="hover:bg-red-50/50 dark:hover:bg-red-950/20">
+                              <TableCell className="sticky left-0 z-10 bg-background pl-6">
+                                {flujo.partida}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs text-muted-foreground">
+                                {flujo.codigoCuenta}
+                              </TableCell>
+                              <TableCell className="text-center text-xs">
+                                {flujo.frecuencia}
+                              </TableCell>
+                              {flujo.meses.map((monto, i) => (
+                                <TableCell key={i} className={cn(
+                                  "text-right font-mono text-sm",
+                                  monto === 0 && "text-muted-foreground"
+                                )}>
+                                  {monto !== 0 ? formatCurrency(monto) : "-"}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                          {/* Subtotal Salidas */}
+                          <TableRow className="bg-red-50 dark:bg-red-950/30 font-semibold border-t-2 border-red-200 dark:border-red-800">
+                            <TableCell className="sticky left-0 z-10 bg-red-50 dark:bg-red-950/30 pl-4" colSpan={3}>
+                              Total Salidas
+                            </TableCell>
+                            {totalesMensuales.salidas.map((monto, i) => (
+                              <TableCell key={i} className="text-right font-mono text-red-700 dark:text-red-400">
+                                {monto !== 0 ? formatCurrency(monto) : "-"}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        </>
+                      )}
+
+                      {/* SECCIÓN FLUJO DE EFECTIVO */}
+                      {filtroTipo === "todos" && (
+                        <>
+                          {/* Separador visual */}
+                          <TableRow className="bg-muted/30">
+                            <TableCell colSpan={3 + mesesFiltrados.length} className="sticky left-0 z-10 bg-muted/30 font-bold">
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4" />
+                                FLUJO DE EFECTIVO
+                              </div>
+                            </TableCell>
+                          </TableRow>
+
+                          {/* Fila de flujo neto */}
+                          <TableRow className="bg-blue-50 dark:bg-blue-950/30 font-semibold">
+                            <TableCell className="sticky left-0 z-10 bg-blue-50 dark:bg-blue-950/30 pl-6" colSpan={3}>
+                              Flujo Neto del Período
+                            </TableCell>
+                            {totalesMensuales.entradas.map((entrada, i) => {
+                              const neto = entrada - totalesMensuales.salidas[i];
+                              return (
+                                <TableCell key={i} className={cn(
+                                  "text-right font-mono",
+                                  neto >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
+                                )}>
+                                  {neto !== 0 ? formatCurrency(neto) : "-"}
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+
+                          {/* Fila de saldo acumulado */}
+                          <TableRow className="bg-primary/10 font-bold text-base border-t-2 border-primary/30">
+                            <TableCell className="sticky left-0 z-10 bg-primary/10 pl-6" colSpan={3}>
+                              Saldo Acumulado
+                            </TableCell>
+                            {totalesMensuales.saldos.map((saldo, i) => (
+                              <TableCell key={i} className={cn(
+                                "text-right font-mono",
+                                saldo >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
+                              )}>
+                                {formatCurrency(saldo)}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        </>
+                      )}
                     </>
                   )}
                 </TableBody>
