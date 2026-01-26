@@ -99,6 +99,9 @@ interface Presupuesto {
   notas: string | null;
   activo: boolean;
   created_at: string;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  frecuencia: "semanal" | "mensual" | "bimestral" | "trimestral" | "semestral" | "anual" | null;
   empresas?: Empresa;
   cuentas_contables?: CuentaContable;
   terceros?: Tercero;

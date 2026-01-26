@@ -38,6 +38,8 @@ import {
   calcularSaldosCuentas,
 } from "@/lib/accounting-utils";
 import { EstadoFinanciero } from "@/components/reportes/EstadoFinanciero";
+import { FlujoEfectivoPresupuesto } from "@/components/reportes/FlujoEfectivoPresupuesto";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Empresa {
   id: string;
@@ -62,11 +64,13 @@ export default function Reportes() {
   const [fechaInicio, setFechaInicio] = useState<Date>(startOfYear(new Date()));
   const [fechaFin, setFechaFin] = useState<Date>(endOfMonth(new Date()));
   const [centrosPopoverOpen, setCentrosPopoverOpen] = useState(false);
+  const [tabActiva, setTabActiva] = useState<string>("financieros");
 
   // Datos cargados
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [asientos, setAsientos] = useState<AsientoContable[]>([]);
+  const [presupuestos, setPresupuestos] = useState<any[]>([]);
 
   // Cargar empresas al iniciar
   useEffect(() => {
@@ -81,6 +85,7 @@ export default function Reportes() {
   // Cargar datos cuando cambian los filtros
   useEffect(() => {
     loadDatosContables();
+    loadPresupuestos();
   }, [empresaId, centrosSeleccionados, fechaInicio, fechaFin, empresas]);
 
   const loadEmpresas = async () => {
@@ -201,6 +206,65 @@ export default function Reportes() {
     }
   };
 
+  const loadPresupuestos = async () => {
+    if (empresas.length === 0) return;
+
+    try {
+      const empresaIds = empresaId === "todas" 
+        ? empresas.map(e => e.id) 
+        : [empresaId];
+
+      let query = supabase
+        .from("presupuestos")
+        .select(`
+          id,
+          partida,
+          cantidad,
+          precio_unitario,
+          fecha_inicio,
+          fecha_fin,
+          frecuencia,
+          centro_negocio_id,
+          cuentas_contables:cuenta_id (codigo, nombre),
+          terceros:tercero_id (razon_social),
+          centros_negocio:centro_negocio_id (codigo, nombre)
+        `)
+        .eq("activo", true);
+
+      if (empresaId !== "todas") {
+        query = query.eq("empresa_id", empresaId);
+      } else {
+        query = query.in("empresa_id", empresaIds);
+      }
+
+      // Filtrar por centros de negocio si hay seleccionados
+      if (centrosSeleccionados.length > 0) {
+        query = query.in("centro_negocio_id", centrosSeleccionados);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Transform data to match component interface
+      const presupuestosTransformados = (data || []).map((p: any) => ({
+        id: p.id,
+        partida: p.partida,
+        cantidad: p.cantidad,
+        precio_unitario: p.precio_unitario,
+        fecha_inicio: p.fecha_inicio,
+        fecha_fin: p.fecha_fin,
+        frecuencia: p.frecuencia,
+        cuenta: p.cuentas_contables,
+        tercero: p.terceros,
+        centro_negocio: p.centros_negocio,
+      }));
+
+      setPresupuestos(presupuestosTransformados);
+    } catch (error: any) {
+      console.error("Error loading presupuestos:", error);
+    }
+  };
+
   // Calcular saldos
   const saldos = useMemo(() => {
     if (!cuentas.length) return [];
@@ -260,9 +324,9 @@ export default function Reportes() {
         <div className="flex items-center gap-3">
           <BarChart3 className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">Estados Financieros</h1>
+            <h1 className="text-2xl font-bold">Reportes Financieros</h1>
             <p className="text-muted-foreground">
-              Balance General, Estado de Resultados y Balanza de Comprobación
+              Estados Financieros y Flujo de Efectivo Presupuestal
             </p>
           </div>
         </div>
@@ -487,13 +551,30 @@ export default function Reportes() {
         </CardContent>
       </Card>
 
-      {/* Estado Financiero Unificado */}
-      <EstadoFinanciero
-        saldos={saldos}
-        loading={loadingData}
-        empresaNombre={empresaNombre}
-        fechaCorte={fechaFin}
-      />
+      {/* Tabs de reportes */}
+      <Tabs value={tabActiva} onValueChange={setTabActiva} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="financieros">Estados Financieros</TabsTrigger>
+          <TabsTrigger value="flujo">Flujo de Efectivo (Presupuestos)</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="financieros" className="mt-4">
+          <EstadoFinanciero
+            saldos={saldos}
+            loading={loadingData}
+            empresaNombre={empresaNombre}
+            fechaCorte={fechaFin}
+          />
+        </TabsContent>
+        
+        <TabsContent value="flujo" className="mt-4">
+          <FlujoEfectivoPresupuesto
+            presupuestos={presupuestos}
+            loading={loadingData}
+            empresaNombre={empresaNombre}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
