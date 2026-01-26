@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -75,6 +76,7 @@ export default function Cuentas() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
+  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCuenta, setEditingCuenta] = useState<CuentaContable | null>(null);
   const [expandedCodes, setExpandedCodes] = useState<Set<string>>(new Set());
@@ -127,6 +129,9 @@ export default function Cuentas() {
       filtered = filtered.filter(c => c.empresa_id === filterEmpresa);
     }
     
+    // Filter by estado
+    filtered = filtered.filter(c => filterEstado === "activos" ? c.activa : !c.activa);
+    
     // If searching, show all matching accounts
     if (search) {
       filtered = filtered.filter(c => 
@@ -149,14 +154,18 @@ export default function Cuentas() {
     }
     
     // Calculate stats
+    const baseCuentas = cuentas.filter(c => 
+      (filterEmpresa === "all" || c.empresa_id === filterEmpresa) &&
+      (filterEstado === "activos" ? c.activa : !c.activa)
+    );
     const stats = {
-      total: cuentas.filter(c => filterEmpresa === "all" || c.empresa_id === filterEmpresa).length,
-      titulos: cuentas.filter(c => (filterEmpresa === "all" || c.empresa_id === filterEmpresa) && c.clasificacion === "titulo").length,
-      saldos: cuentas.filter(c => (filterEmpresa === "all" || c.empresa_id === filterEmpresa) && c.clasificacion === "saldo").length,
+      total: baseCuentas.length,
+      titulos: baseCuentas.filter(c => c.clasificacion === "titulo").length,
+      saldos: baseCuentas.filter(c => c.clasificacion === "saldo").length,
     };
     
     return { filteredCuentas: filtered, stats };
-  }, [cuentas, filterEmpresa, search, expandedCodes]);
+  }, [cuentas, filterEmpresa, filterEstado, search, expandedCodes]);
 
   const toggleExpand = (codigo: string) => {
     const clean = codigo.replace(/[^0-9]/g, "");
@@ -332,6 +341,12 @@ export default function Cuentas() {
               <Button variant="outline" size="sm" onClick={collapseAll}>
                 Colapsar
               </Button>
+              <Tabs value={filterEstado} onValueChange={(v) => setFilterEstado(v as "activos" | "baja")}>
+                <TabsList>
+                  <TabsTrigger value="activos">Activos</TabsTrigger>
+                  <TabsTrigger value="baja">Baja</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
           </div>
         </CardHeader>

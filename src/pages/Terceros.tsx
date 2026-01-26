@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -76,6 +77,7 @@ export default function Terceros() {
   const [search, setSearch] = useState("");
   const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
   const [filterTipo, setFilterTipo] = useState<string>("all");
+  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editingTercero, setEditingTercero] = useState<Tercero | null>(null);
@@ -169,7 +171,8 @@ export default function Terceros() {
     const matchesEmpresa =
       filterEmpresa === "all" || tercero.empresa_id === filterEmpresa;
     const matchesTipo = filterTipo === "all" || tercero.tipo === filterTipo;
-    return matchesSearch && matchesEmpresa && matchesTipo;
+    const matchesEstado = filterEstado === "activos" ? tercero.activo : !tercero.activo;
+    return matchesSearch && matchesEmpresa && matchesTipo && matchesEstado;
   });
 
   return (
@@ -189,10 +192,18 @@ export default function Terceros() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users2 className="h-5 w-5 text-primary" />
-            Lista de Terceros
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Users2 className="h-5 w-5 text-primary" />
+              Lista de Terceros
+            </CardTitle>
+            <Tabs value={filterEstado} onValueChange={(v) => setFilterEstado(v as "activos" | "baja")}>
+              <TabsList>
+                <TabsTrigger value="activos">Activos</TabsTrigger>
+                <TabsTrigger value="baja">Baja</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="mb-4 flex flex-col gap-4 sm:flex-row">
