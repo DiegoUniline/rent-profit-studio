@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,13 +11,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FilterSelect } from "@/components/ui/filter-select";
+import { DateInput } from "@/components/ui/date-input";
 import {
   Command,
   CommandEmpty,
@@ -27,7 +21,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { BarChart3, CalendarIcon, Loader2, Building2, X } from "lucide-react";
+import { BarChart3, Loader2, Building2, X } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfYear } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -339,19 +333,15 @@ export default function Reportes() {
             {/* Empresa */}
             <div className="space-y-2">
               <Label>Empresa</Label>
-              <Select value={empresaId} onValueChange={setEmpresaId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccionar empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas las Empresas</SelectItem>
-                  {empresas.map((empresa) => (
-                    <SelectItem key={empresa.id} value={empresa.id}>
-                      {empresa.razon_social}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FilterSelect
+                value={empresaId}
+                onValueChange={setEmpresaId}
+                options={empresas.map((e) => ({ value: e.id, label: e.razon_social }))}
+                placeholder="Seleccionar empresa"
+                searchPlaceholder="Buscar empresa..."
+                allOption={{ value: "todas", label: "Todas las Empresas" }}
+                className="w-full"
+              />
             </div>
 
             {/* Centro de Negocios - Multi-select */}
@@ -425,67 +415,21 @@ export default function Reportes() {
             {/* Fecha Inicio */}
             <div className="space-y-2">
               <Label>Fecha Inicio</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !fechaInicio && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                    <span className="truncate">
-                      {fechaInicio
-                        ? format(fechaInicio, "dd MMM yyyy", { locale: es })
-                        : "Seleccionar"}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={fechaInicio}
-                    onSelect={(date) => date && setFechaInicio(date)}
-                    initialFocus
-                    locale={es}
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
+              <DateInput
+                value={fechaInicio}
+                onChange={(date) => date && setFechaInicio(date)}
+                placeholder="Inicio"
+              />
             </div>
 
             {/* Fecha Fin */}
             <div className="space-y-2">
               <Label>Fecha Fin</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !fechaFin && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                    <span className="truncate">
-                      {fechaFin
-                        ? format(fechaFin, "dd MMM yyyy", { locale: es })
-                        : "Seleccionar"}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={fechaFin}
-                    onSelect={(date) => date && setFechaFin(date)}
-                    initialFocus
-                    locale={es}
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
+              <DateInput
+                value={fechaFin}
+                onChange={(date) => date && setFechaFin(date)}
+                placeholder="Fin"
+              />
             </div>
           </div>
 

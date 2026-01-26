@@ -6,13 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FilterSelect } from "@/components/ui/filter-select";
 import {
   Table,
   TableBody,
@@ -170,19 +164,15 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-3">
           <Filter className="h-4 w-4 text-muted-foreground" />
-          <Select value={filterEmpresa} onValueChange={setFilterEmpresa}>
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder="Filtrar por empresa" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las empresas</SelectItem>
-              {empresas.map((e) => (
-                <SelectItem key={e.id} value={e.id}>
-                  {e.razon_social}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterSelect
+            value={filterEmpresa}
+            onValueChange={setFilterEmpresa}
+            options={empresas.map((e) => ({ value: e.id, label: e.razon_social }))}
+            placeholder="Filtrar por empresa"
+            searchPlaceholder="Buscar empresa..."
+            allOption={{ value: "all", label: "Todas las empresas" }}
+            className="w-64"
+          />
         </div>
       </div>
 

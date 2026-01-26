@@ -15,13 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { Briefcase, Plus, Edit, Power, Search } from "lucide-react";
 import { CentroNegocioDialog } from "@/components/dialogs/CentroNegocioDialog";
 
@@ -181,19 +175,15 @@ export default function CentrosNegocio() {
                 className="pl-10"
               />
             </div>
-            <Select value={filterEmpresa} onValueChange={setFilterEmpresa}>
-              <SelectTrigger className="w-full sm:w-[250px]">
-                <SelectValue placeholder="Filtrar por empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las empresas</SelectItem>
-                {empresas.map((empresa) => (
-                  <SelectItem key={empresa.id} value={empresa.id}>
-                    {empresa.razon_social}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              value={filterEmpresa}
+              onValueChange={setFilterEmpresa}
+              options={empresas.map((e) => ({ value: e.id, label: e.razon_social }))}
+              placeholder="Filtrar por empresa"
+              searchPlaceholder="Buscar empresa..."
+              allOption={{ value: "all", label: "Todas las empresas" }}
+              className="w-full sm:w-[250px]"
+            />
           </div>
 
           {loading ? (
