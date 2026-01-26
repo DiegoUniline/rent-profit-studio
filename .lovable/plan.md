@@ -1,91 +1,156 @@
 
+# Plan de Correcciones para Modulo Programacion
 
-# Mejoras al Modulo de Programacion Financiera
+## Problemas Identificados
 
-## Resumen
-Se agregaran tres funcionalidades al modulo de Programacion:
-1. **Mostrar saldos de cuentas de banco y cartera** en tarjetas KPI
-2. **Vincular presupuestos** a las programaciones de ingreso/egreso
-3. **Rastrear estado de pago** para saber que presupuesto se pago o no
+1. **Overflow en el dialogo**: El componente `SearchableSelect` no soporta refs correctamente, causando problemas de posicionamiento de los dropdowns
+2. **Grafica sin colores**: Las variables CSS para colores de graficas (`--chart-1`, `--chart-2`, `--chart-3`) no estan definidas en el sistema de diseno
+3. **Falta indicador de estado**: El usuario necesita diferenciar visualmente entre Programado y Ejecutado
 
-## Funcionalidades Detalladas
+---
 
-### 1. Saldos de Banco y Cartera
-Se agregaran tarjetas adicionales en la vista de Programacion mostrando:
-- **Saldo de Bancos**: Suma de cuentas con codigo `100-001` o nombre contiene "banco"
-- **Saldo de Cartera**: Cuentas de clientes (tipicamente `100-002` o nombre contiene "caja", "clientes")
-- Ambos se calcularan desde asientos aplicados
+## Solucion 1: Corregir Overflow del Dialogo
 
+### Problema
+El `SearchableSelect` usa un `Popover` que puede desbordarse fuera del dialogo cuando hay muchos elementos.
+
+### Solucion
+- Agregar `overflow-y-auto` y `max-h-[80vh]` al contenido del dialogo
+- Ajustar el `PopoverContent` en `SearchableSelect` para posicionarse correctamente con `sideOffset` y limitar su altura
+
+### Cambios
+| Archivo | Modificacion |
+|---------|--------------|
+| `src/components/dialogs/ProgramacionDialog.tsx` | Agregar `className="max-h-[80vh] overflow-y-auto"` al contenedor de contenido |
+| `src/components/ui/searchable-select.tsx` | Limitar altura del `CommandList` con `max-h-[200px]` y agregar `forwardRef` para compatibilidad |
+
+---
+
+## Solucion 2: Agregar Colores a la Grafica de Proyeccion
+
+### Problema
+La grafica usa variables CSS (`--chart-1`, `--chart-2`, `--chart-3`) que no existen en `index.css`.
+
+### Solucion
+Agregar variables de colores para graficas al sistema de diseno.
+
+### Cambios
+| Archivo | Modificacion |
+|---------|--------------|
+| `src/index.css` | Agregar variables `--chart-1` a `--chart-5` en `:root` y `.dark` |
+
+### Paleta de colores propuesta
 ```text
-+--------------------------------------------------+
-|  PROGRAMACION FINANCIERA                    [+]  |
-+--------------------------------------------------+
-| [Banco: $XX,XXX] [Cartera: $XX,XXX]              |
-| [Ingresos Prog] [Egresos Prog] [Balance]         |
-+--------------------------------------------------+
+chart-1: Rojo/Rosa (egresos)     → 0 84% 60%
+chart-2: Verde esmeralda (ingresos) → 160 84% 45%
+chart-3: Azul (balance)          → 199 89% 48%
+chart-4: Ambar (advertencia)     → 38 92% 50%
+chart-5: Morado (otros)          → 270 70% 60%
 ```
 
-### 2. Vincular Presupuesto a Programacion
-- Agregar columna `presupuesto_id` a la tabla `programaciones`
-- En el dialogo de programacion, agregar SearchableSelect para seleccionar presupuesto
-- Filtrar presupuestos por empresa seleccionada
-- Mostrar el presupuesto vinculado en la tabla de programaciones
+---
 
-### 3. Rastrear Estado de Pago
-El sistema ya tiene la logica para esto:
-- Cuando `estado = 'ejecutado'` significa que se pago/cobro
-- Cuando existe `asiento_id` hay referencia al movimiento contable
-- Se mostrara visualmente que presupuestos tienen programaciones pagadas vs pendientes
+## Solucion 3: Pestanas de Estado Programado/Ejecutado
+
+### Problema
+El usuario quiere ver facilmente que items estan programados vs ejecutados.
+
+### Solucion
+Agregar pestanas secundarias dentro de "Programaciones" para filtrar por estado:
+- **Pendientes** (default): Solo items con estado "pendiente"
+- **Ejecutados**: Items con estado "ejecutado"  
+- **Todos**: Sin filtro de estado
+
+### Cambios
+| Archivo | Modificacion |
+|---------|--------------|
+| `src/pages/Programacion.tsx` | Reemplazar el dropdown de filtro de estado por `Tabs` visuales mas prominentes |
+
+### Estructura visual propuesta
+```text
++----------------------------------------------------------+
+|  PROGRAMACION FINANCIERA                            [+]  |
++----------------------------------------------------------+
+| [Programaciones]  [Proyeccion]                           |
++----------------------------------------------------------+
+| [Pendientes ●12] [Ejecutados ●5] [Cancelados ●2]         |
++----------------------------------------------------------+
+| Filtros: [Empresa ▼] [Tipo ▼]                            |
++----------------------------------------------------------+
+| Tabla...                                                  |
++----------------------------------------------------------+
+```
+
+---
 
 ## Seccion Tecnica
 
-### Migracion de Base de Datos
-```sql
--- Agregar columna presupuesto_id a programaciones
-ALTER TABLE public.programaciones 
-ADD COLUMN IF NOT EXISTS presupuesto_id UUID REFERENCES presupuestos(id);
-
--- Crear indice para consultas
-CREATE INDEX IF NOT EXISTS idx_programaciones_presupuesto 
-ON programaciones(presupuesto_id);
-```
-
-### Calculo de Saldos Bancarios
+### Cambio en SearchableSelect (forwardRef)
 ```typescript
-// Identificar cuentas de banco y cartera
-const cuentasBanco = cuentas.filter(c => 
-  c.codigo.startsWith("100-001") || 
-  c.nombre.toLowerCase().includes("banco")
-);
-
-const cuentasCartera = cuentas.filter(c =>
-  c.codigo.startsWith("100-002") ||
-  c.nombre.toLowerCase().includes("cliente") ||
-  c.nombre.toLowerCase().includes("caja")
+export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelectProps>(
+  ({ value, onValueChange, options, ... }, ref) => {
+    // ... existing code
+    return (
+      <div ref={ref} className={cn("flex gap-2", className)}>
+        {/* existing JSX */}
+      </div>
+    );
+  }
 );
 ```
 
-### Estructura Actualizada del Dialogo
-El formulario de programacion incluira:
-- SearchableSelect de Presupuesto (filtrado por empresa)
-- Al seleccionar presupuesto: auto-llenar monto del presupuesto pendiente
-- Mostrar badge de presupuesto en la tabla principal
+### Variables CSS para graficas
+```css
+:root {
+  --chart-1: 0 84% 60%;      /* Rojo - egresos */
+  --chart-2: 160 84% 45%;    /* Verde - ingresos */
+  --chart-3: 199 89% 48%;    /* Azul - balance */
+  --chart-4: 38 92% 50%;     /* Ambar */
+  --chart-5: 270 70% 60%;    /* Morado */
+}
+```
+
+### Tabs de estado (fragmento)
+```typescript
+<div className="flex gap-2 mb-4">
+  <Button 
+    variant={filterEstado === "pendiente" ? "default" : "outline"}
+    onClick={() => setFilterEstado("pendiente")}
+  >
+    Pendientes
+    <Badge variant="secondary" className="ml-2">{countPendientes}</Badge>
+  </Button>
+  <Button 
+    variant={filterEstado === "ejecutado" ? "default" : "outline"}
+    onClick={() => setFilterEstado("ejecutado")}
+  >
+    Ejecutados
+    <Badge variant="secondary" className="ml-2">{countEjecutados}</Badge>
+  </Button>
+  <Button 
+    variant={filterEstado === "all" ? "default" : "outline"}
+    onClick={() => setFilterEstado("all")}
+  >
+    Todos
+  </Button>
+</div>
+```
+
+---
 
 ## Archivos a Modificar
 
-| Archivo | Cambios |
-|---------|---------|
-| `supabase/migrations/xxx.sql` | Agregar `presupuesto_id` a programaciones |
-| `src/pages/Programacion.tsx` | Agregar tarjetas de saldos bancarios, columna de presupuesto en tabla |
-| `src/components/dialogs/ProgramacionDialog.tsx` | Agregar SearchableSelect para presupuesto |
-| `src/integrations/supabase/types.ts` | Se actualizara automaticamente |
+| Archivo | Tipo de Cambio |
+|---------|----------------|
+| `src/index.css` | Agregar variables CSS para colores de graficas |
+| `src/components/ui/searchable-select.tsx` | Agregar `forwardRef` y limitar altura de lista |
+| `src/components/dialogs/ProgramacionDialog.tsx` | Agregar scroll al contenido del dialogo |
+| `src/pages/Programacion.tsx` | Agregar botones de filtro por estado con contadores |
+
+---
 
 ## Orden de Implementacion
-1. Crear migracion para agregar `presupuesto_id`
-2. Actualizar `ProgramacionDialog.tsx` con selector de presupuesto
-3. Actualizar `Programacion.tsx`:
-   - Agregar fetch de cuentas y movimientos para calcular saldos
-   - Agregar tarjetas de Banco y Cartera
-   - Agregar columna de presupuesto en la tabla
-   - Mostrar indicador de pago en presupuestos relacionados
-
+1. Agregar variables de color CSS en `index.css`
+2. Corregir `SearchableSelect` con `forwardRef` y limite de altura
+3. Ajustar scroll en `ProgramacionDialog`
+4. Implementar botones de filtro de estado en `Programacion.tsx`
