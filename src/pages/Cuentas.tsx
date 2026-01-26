@@ -373,7 +373,6 @@ export default function Cuentas() {
                   <TableRow>
                     <TableHead className="w-[220px]">Código</TableHead>
                     <TableHead>Nombre</TableHead>
-                    <TableHead className="w-[100px]">Nivel</TableHead>
                     <TableHead className="w-[100px]">Naturaleza</TableHead>
                     <TableHead className="w-[100px]">Tipo</TableHead>
                     {canEdit && <TableHead className="w-[100px] text-right">Acciones</TableHead>}
@@ -414,14 +413,12 @@ export default function Cuentas() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span style={{ paddingLeft: `${(level - 1) * 16}px` }}>
+                          <span 
+                            className="inline-block"
+                            style={{ paddingLeft: `${(level - 1) * 24}px` }}
+                          >
                             {cuenta.nombre}
                           </span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {level} - {levelLabels[level]}
-                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant={cuenta.naturaleza === "deudora" ? "default" : "secondary"}>
