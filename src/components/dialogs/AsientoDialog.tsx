@@ -372,6 +372,19 @@ export function AsientoDialog({
       return;
     }
 
+    // For "diario" type, at least one movimiento must have a presupuesto assigned
+    if (form.tipo === "diario") {
+      const hasPresupuesto = movimientos.some((m) => m.presupuesto_id && m.presupuesto_id !== "");
+      if (!hasPresupuesto) {
+        toast({
+          title: "Error",
+          description: "Las pólizas de diario requieren al menos un movimiento con presupuesto asignado",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const asientoData = {
