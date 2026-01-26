@@ -659,8 +659,7 @@ export function AsientoDialog({
                     <TableHeader>
                       <TableRow>
                         <TableHead className="min-w-[160px]">Cuenta</TableHead>
-                        <TableHead className="w-8"></TableHead>
-                        <TableHead className="min-w-[180px]">Partida / Presupuesto</TableHead>
+                        <TableHead className="min-w-[200px]">PARTIDA</TableHead>
                         <TableHead className="w-[100px] text-right">Debe</TableHead>
                         <TableHead className="w-[100px] text-right">Haber</TableHead>
                         <TableHead className="w-[70px]"></TableHead>
@@ -681,23 +680,14 @@ export function AsientoDialog({
                               createLabel="Nueva cuenta"
                             />
                           </TableCell>
-                          <TableCell className="p-1 text-center">
+                          <TableCell className="p-1">
                             <SearchableSelect
                               value={mov.presupuesto_id || ""}
                               onValueChange={(value) => updateMovimiento(idx, "presupuesto_id", value)}
                               options={getPresupuestoOptionsForMovimiento(mov.cuenta_id)}
-                              placeholder="+"
+                              placeholder="Seleccionar partida..."
                               searchPlaceholder="Buscar presupuesto..."
                               emptyMessage="No hay presupuestos"
-                              className="w-10"
-                            />
-                          </TableCell>
-                          <TableCell className="p-1">
-                            <Input
-                              value={mov.partida}
-                              onChange={(e) => updateMovimiento(idx, "partida", e.target.value)}
-                              placeholder="Descripción"
-                              className="h-9"
                             />
                           </TableCell>
                           <TableCell className="p-1">
