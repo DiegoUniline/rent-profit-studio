@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { format, addMonths, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
+import { format, addMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { parseLocalDate } from "@/lib/date-utils";
 import { es } from "date-fns/locale";
 import {
   BarChart,
@@ -47,7 +48,7 @@ export function ProyeccionProgramacion({ programaciones }: ProyeccionProgramacio
     return months.map(({ mes, start, end }) => {
       const monthProgramaciones = programaciones.filter((p) => {
         if (p.estado === "cancelado") return false;
-        const fecha = parseISO(p.fecha_programada);
+        const fecha = parseLocalDate(p.fecha_programada);
         return isWithinInterval(fecha, { start, end });
       });
 

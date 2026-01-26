@@ -5,6 +5,7 @@ import { Plus, Play, Copy, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, Bui
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { formatDateNumeric, parseLocalDate } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -191,11 +192,11 @@ export default function Programacion() {
       if (filterCentroNegocio !== "all" && p.centro_negocio_id !== filterCentroNegocio) return false;
       if (filterTercero !== "all" && p.tercero_id !== filterTercero) return false;
       if (filterFechaDesde) {
-        const fechaProg = new Date(p.fecha_programada + "T00:00:00");
+        const fechaProg = parseLocalDate(p.fecha_programada);
         if (fechaProg < filterFechaDesde) return false;
       }
       if (filterFechaHasta) {
-        const fechaProg = new Date(p.fecha_programada + "T00:00:00");
+        const fechaProg = parseLocalDate(p.fecha_programada);
         if (fechaProg > filterFechaHasta) return false;
       }
       return true;
@@ -567,7 +568,7 @@ export default function Programacion() {
                     filteredProgramaciones.map((prog) => (
                       <TableRow key={prog.id}>
                         <TableCell className="font-medium">
-                          {format(new Date(prog.fecha_programada + "T00:00:00"), "dd/MM/yyyy")}
+                          {formatDateNumeric(prog.fecha_programada)}
                         </TableCell>
                         <TableCell>{prog.empresas?.razon_social}</TableCell>
                         <TableCell>{getTipoBadge(prog.tipo)}</TableCell>
