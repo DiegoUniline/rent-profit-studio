@@ -19,9 +19,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { z } from "zod";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmpresaDialog } from "./EmpresaDialog";
+import { formatCurrency } from "@/lib/accounting-utils";
 
 interface Empresa {
   id: string;
@@ -146,7 +148,7 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
   const [allCuentas, setAllCuentas] = useState<CuentaContable[]>([]);
   const [allEmpresas, setAllEmpresas] = useState<Empresa[]>(empresas);
   const [empresaDialogOpen, setEmpresaDialogOpen] = useState(false);
-
+  const [saldoCuenta, setSaldoCuenta] = useState<number | null>(null);
   // Load empresas on open
   useEffect(() => {
     if (open) {
@@ -201,6 +203,33 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
     setEmpresaDialogOpen(false);
   };
 
+  // Load account balance when editing
+  const loadSaldoCuenta = async (cuentaId: string, naturaleza: "deudora" | "acreedora") => {
+    const [movimientosRes, asientosRes] = await Promise.all([
+      supabase.from("asiento_movimientos").select("debe, haber, asiento_id").eq("cuenta_id", cuentaId),
+      supabase.from("asientos_contables").select("id").eq("estado", "aplicado"),
+    ]);
+
+    if (!movimientosRes.error && !asientosRes.error) {
+      const asientosAplicados = new Set(asientosRes.data?.map(a => a.id) || []);
+      let saldo = 0;
+
+      (movimientosRes.data || []).forEach(mov => {
+        if (asientosAplicados.has(mov.asiento_id)) {
+          const debe = Number(mov.debe) || 0;
+          const haber = Number(mov.haber) || 0;
+          if (naturaleza === 'deudora') {
+            saldo += debe - haber;
+          } else {
+            saldo += haber - debe;
+          }
+        }
+      });
+
+      setSaldoCuenta(saldo);
+    }
+  };
+
   useEffect(() => {
     if (open) {
       if (cuenta) {
@@ -213,11 +242,18 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
           nivel: cuenta.nivel,
           cuenta_padre_id: cuenta.cuenta_padre_id || "",
         });
+        // Load balance for saldo-type accounts
+        if (cuenta.clasificacion === "saldo") {
+          loadSaldoCuenta(cuenta.id, cuenta.naturaleza);
+        } else {
+          setSaldoCuenta(null);
+        }
       } else {
         setForm({
           ...emptyForm,
           empresa_id: defaultEmpresaId || "",
         });
+        setSaldoCuenta(null);
       }
     }
   }, [cuenta, open, defaultEmpresaId]);
@@ -345,6 +381,20 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
               Formato de código: XXX-XXX-XXX-XXX (ej: 100-000-000-000)
             </DialogDescription>
           </DialogHeader>
+
+          {/* Show balance card when editing a saldo account */}
+          {cuenta && cuenta.clasificacion === "saldo" && saldoCuenta !== null && (
+            <Card className="bg-muted/50 border-primary/20">
+              <CardContent className="py-3 px-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Saldo actual de la cuenta:</span>
+                  <span className={`text-lg font-bold font-mono ${saldoCuenta < 0 ? "text-destructive" : "text-primary"}`}>
+                    {formatCurrency(saldoCuenta)}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
