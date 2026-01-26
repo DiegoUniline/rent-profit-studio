@@ -363,10 +363,57 @@ export default function Programacion() {
             </Card>
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-wrap gap-4">
+          {/* Estado Tabs */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex gap-1 bg-muted p-1 rounded-lg">
+              <Button
+                variant={filterEstado === "pendiente" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setFilterEstado("pendiente")}
+                className="h-8"
+              >
+                Pendientes
+                <Badge variant="secondary" className="ml-2 bg-yellow-100 text-yellow-700">
+                  {programaciones.filter(p => p.estado === "pendiente").length}
+                </Badge>
+              </Button>
+              <Button
+                variant={filterEstado === "ejecutado" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setFilterEstado("ejecutado")}
+                className="h-8"
+              >
+                Ejecutados
+                <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700">
+                  {programaciones.filter(p => p.estado === "ejecutado").length}
+                </Badge>
+              </Button>
+              <Button
+                variant={filterEstado === "cancelado" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setFilterEstado("cancelado")}
+                className="h-8"
+              >
+                Cancelados
+                <Badge variant="secondary" className="ml-2 bg-red-100 text-red-700">
+                  {programaciones.filter(p => p.estado === "cancelado").length}
+                </Badge>
+              </Button>
+              <Button
+                variant={filterEstado === "all" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setFilterEstado("all")}
+                className="h-8"
+              >
+                Todos
+              </Button>
+            </div>
+
+            <div className="h-6 w-px bg-border mx-2" />
+
+            {/* Filters */}
             <Select value={filterEmpresa} onValueChange={setFilterEmpresa}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[180px] h-8">
                 <SelectValue placeholder="Empresa" />
               </SelectTrigger>
               <SelectContent>
@@ -380,25 +427,13 @@ export default function Programacion() {
             </Select>
 
             <Select value={filterTipo} onValueChange={setFilterTipo}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-[130px] h-8">
                 <SelectValue placeholder="Tipo" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="ingreso">Ingresos</SelectItem>
                 <SelectItem value="egreso">Egresos</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={filterEstado} onValueChange={setFilterEstado}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="ejecutado">Ejecutado</SelectItem>
-                <SelectItem value="cancelado">Cancelado</SelectItem>
               </SelectContent>
             </Select>
           </div>

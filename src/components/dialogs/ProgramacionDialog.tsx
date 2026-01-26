@@ -189,12 +189,12 @@ export function ProgramacionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 py-4 overflow-y-auto pr-2">
           <div className="grid gap-2">
             <Label>Empresa *</Label>
             <SearchableSelect
