@@ -123,6 +123,8 @@ export default function Asientos() {
   const [viewingAsiento, setViewingAsiento] = useState<AsientoContable | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingAsiento, setDeletingAsiento] = useState<AsientoContable | null>(null);
+  const [isCopyMode, setIsCopyMode] = useState(false);
+  const [copyMovimientos, setCopyMovimientos] = useState<any[]>([]);
 
   const canEdit = role === "admin" || role === "contador";
   const canDelete = role === "admin";
@@ -212,58 +214,32 @@ export default function Asientos() {
       // Fetch the movimientos of the original asiento
       const { data: movimientos, error: movError } = await supabase
         .from("asiento_movimientos")
-        .select("cuenta_id, partida, debe, haber, orden, presupuesto_id")
+        .select("*, cuentas_contables(codigo, nombre)")
         .eq("asiento_id", asiento.id)
         .order("orden");
 
       if (movError) throw movError;
 
-      // Create a new asiento (copy) with today's date and estado borrador
-      const { data: newAsiento, error: asientoError } = await supabase
-        .from("asientos_contables")
-        .insert({
-          empresa_id: asiento.empresa_id,
-          fecha: new Date().toISOString().split("T")[0],
-          tipo: asiento.tipo,
-          tercero_id: asiento.tercero_id,
-          centro_negocio_id: asiento.centro_negocio_id,
-          observaciones: asiento.observaciones ? `Copia de #${asiento.numero_asiento} - ${asiento.observaciones}` : `Copia de asiento #${asiento.numero_asiento}`,
-          estado: "borrador",
-          total_debe: asiento.total_debe,
-          total_haber: asiento.total_haber,
-        })
-        .select()
-        .single();
+      // Prepare movimientos for the dialog
+      const preparedMovimientos = (movimientos || []).map((m: any, idx: number) => ({
+        cuenta_id: m.cuenta_id,
+        cuenta_codigo: m.cuentas_contables?.codigo,
+        cuenta_nombre: m.cuentas_contables?.nombre,
+        partida: m.partida,
+        debe: Number(m.debe),
+        haber: Number(m.haber),
+        orden: idx,
+        presupuesto_id: m.presupuesto_id || "",
+      }));
 
-      if (asientoError) throw asientoError;
-
-      // Copy movimientos to the new asiento
-      if (movimientos && movimientos.length > 0) {
-        const newMovimientos = movimientos.map((m) => ({
-          asiento_id: newAsiento.id,
-          cuenta_id: m.cuenta_id,
-          partida: m.partida,
-          debe: m.debe,
-          haber: m.haber,
-          orden: m.orden,
-          presupuesto_id: m.presupuesto_id,
-        }));
-
-        const { error: insertError } = await supabase
-          .from("asiento_movimientos")
-          .insert(newMovimientos);
-
-        if (insertError) throw insertError;
-      }
-
-      toast({ 
-        title: "Asiento copiado", 
-        description: `Se creó el asiento #${newAsiento.numero_asiento} como borrador` 
-      });
-      fetchData();
+      // Open dialog in copy mode
+      setEditingAsiento(asiento);
+      setCopyMovimientos(preparedMovimientos);
+      setIsCopyMode(true);
+      setDialogOpen(true);
     } catch (error: any) {
       toast({
-        title: "Error al copiar",
+        title: "Error al cargar datos para copiar",
         description: error.message,
         variant: "destructive",
       });
@@ -272,11 +248,15 @@ export default function Asientos() {
 
   const openNew = () => {
     setEditingAsiento(null);
+    setCopyMovimientos([]);
+    setIsCopyMode(false);
     setDialogOpen(true);
   };
 
   const openEdit = (asiento: AsientoContable) => {
     setEditingAsiento(asiento);
+    setCopyMovimientos([]);
+    setIsCopyMode(false);
     setDialogOpen(true);
   };
 
@@ -575,10 +555,18 @@ export default function Asientos() {
       {/* Dialogs */}
       <AsientoDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        asiento={editingAsiento}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setIsCopyMode(false);
+            setCopyMovimientos([]);
+          }
+        }}
+        asiento={isCopyMode ? editingAsiento : editingAsiento}
         empresas={empresas}
         onSuccess={fetchData}
+        initialMovimientos={isCopyMode ? copyMovimientos : undefined}
+        isCopy={isCopyMode}
       />
 
       <AsientoViewDialog
