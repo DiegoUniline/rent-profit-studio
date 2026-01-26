@@ -12,6 +12,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { z } from "zod";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmpresaDialog } from "./EmpresaDialog";
@@ -65,6 +82,9 @@ interface Presupuesto {
   precio_unitario: number;
   notas: string | null;
   activo: boolean;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  frecuencia: "semanal" | "mensual" | "bimestral" | "trimestral" | "semestral" | "anual" | null;
 }
 
 interface PresupuestoDialogProps {
@@ -92,6 +112,9 @@ interface PresupuestoForm {
   cantidad: string;
   precio_unitario: string;
   notas: string;
+  fecha_inicio: Date | undefined;
+  fecha_fin: Date | undefined;
+  frecuencia: "semanal" | "mensual" | "bimestral" | "trimestral" | "semestral" | "anual";
 }
 
 const emptyForm: PresupuestoForm = {
@@ -104,6 +127,9 @@ const emptyForm: PresupuestoForm = {
   cantidad: "1",
   precio_unitario: "0",
   notas: "",
+  fecha_inicio: undefined,
+  fecha_fin: undefined,
+  frecuencia: "mensual",
 };
 
 export function PresupuestoDialog({
@@ -164,6 +190,9 @@ export function PresupuestoDialog({
           cantidad: String(presupuesto.cantidad),
           precio_unitario: String(presupuesto.precio_unitario),
           notas: presupuesto.notas || "",
+          fecha_inicio: presupuesto.fecha_inicio ? new Date(presupuesto.fecha_inicio) : undefined,
+          fecha_fin: presupuesto.fecha_fin ? new Date(presupuesto.fecha_fin) : undefined,
+          frecuencia: presupuesto.frecuencia || "mensual",
         });
       } else {
         setForm(emptyForm);
@@ -261,6 +290,9 @@ export function PresupuestoDialog({
         cantidad,
         precio_unitario,
         notas: form.notas || null,
+        fecha_inicio: form.fecha_inicio ? format(form.fecha_inicio, "yyyy-MM-dd") : null,
+        fecha_fin: form.fecha_fin ? format(form.fecha_fin, "yyyy-MM-dd") : null,
+        frecuencia: form.frecuencia,
       };
 
       if (presupuesto) {
@@ -474,6 +506,101 @@ export function PresupuestoDialog({
                   value={form.precio_unitario}
                   onChange={(e) => setForm({ ...form, precio_unitario: e.target.value })}
                 />
+              </div>
+            </div>
+
+            {/* Sección de Fechas y Frecuencia para Flujo de Efectivo */}
+            <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+              <h4 className="font-medium text-sm text-muted-foreground">
+                Configuración para Flujo de Efectivo
+              </h4>
+              
+              <div className="grid grid-cols-3 gap-4">
+                {/* Fecha Inicio */}
+                <div className="space-y-2">
+                  <Label>Fecha Inicio</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !form.fecha_inicio && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {form.fecha_inicio
+                          ? format(form.fecha_inicio, "dd MMM yyyy", { locale: es })
+                          : "Seleccionar"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={form.fecha_inicio}
+                        onSelect={(date) => setForm({ ...form, fecha_inicio: date })}
+                        initialFocus
+                        locale={es}
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Fecha Fin */}
+                <div className="space-y-2">
+                  <Label>Fecha Fin</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !form.fecha_fin && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {form.fecha_fin
+                          ? format(form.fecha_fin, "dd MMM yyyy", { locale: es })
+                          : "Seleccionar"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={form.fecha_fin}
+                        onSelect={(date) => setForm({ ...form, fecha_fin: date })}
+                        initialFocus
+                        locale={es}
+                        disabled={(date) => form.fecha_inicio ? date < form.fecha_inicio : false}
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Frecuencia */}
+                <div className="space-y-2">
+                  <Label>Frecuencia</Label>
+                  <Select
+                    value={form.frecuencia}
+                    onValueChange={(value: PresupuestoForm["frecuencia"]) =>
+                      setForm({ ...form, frecuencia: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Frecuencia" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="semanal">Semanal</SelectItem>
+                      <SelectItem value="mensual">Mensual</SelectItem>
+                      <SelectItem value="bimestral">Bimestral</SelectItem>
+                      <SelectItem value="trimestral">Trimestral</SelectItem>
+                      <SelectItem value="semestral">Semestral</SelectItem>
+                      <SelectItem value="anual">Anual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 

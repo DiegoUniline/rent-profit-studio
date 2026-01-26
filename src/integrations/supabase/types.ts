@@ -338,6 +338,11 @@ export type Database = {
           created_at: string
           cuenta_id: string | null
           empresa_id: string
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          frecuencia:
+            | Database["public"]["Enums"]["frecuencia_presupuesto"]
+            | null
           id: string
           notas: string | null
           partida: string
@@ -353,6 +358,11 @@ export type Database = {
           created_at?: string
           cuenta_id?: string | null
           empresa_id: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          frecuencia?:
+            | Database["public"]["Enums"]["frecuencia_presupuesto"]
+            | null
           id?: string
           notas?: string | null
           partida: string
@@ -368,6 +378,11 @@ export type Database = {
           created_at?: string
           cuenta_id?: string | null
           empresa_id?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          frecuencia?:
+            | Database["public"]["Enums"]["frecuencia_presupuesto"]
+            | null
           id?: string
           notas?: string | null
           partida?: string
@@ -596,6 +611,13 @@ export type Database = {
       app_role: "admin" | "contador" | "usuario"
       clasificacion_cuenta: "titulo" | "saldo"
       estado_asiento: "borrador" | "aplicado" | "cancelado"
+      frecuencia_presupuesto:
+        | "semanal"
+        | "mensual"
+        | "bimestral"
+        | "trimestral"
+        | "semestral"
+        | "anual"
       naturaleza_cuenta: "deudora" | "acreedora"
       tipo_asiento: "ingreso" | "egreso" | "diario"
       tipo_persona: "fisica" | "moral"
@@ -729,6 +751,14 @@ export const Constants = {
       app_role: ["admin", "contador", "usuario"],
       clasificacion_cuenta: ["titulo", "saldo"],
       estado_asiento: ["borrador", "aplicado", "cancelado"],
+      frecuencia_presupuesto: [
+        "semanal",
+        "mensual",
+        "bimestral",
+        "trimestral",
+        "semestral",
+        "anual",
+      ],
       naturaleza_cuenta: ["deudora", "acreedora"],
       tipo_asiento: ["ingreso", "egreso", "diario"],
       tipo_persona: ["fisica", "moral"],
