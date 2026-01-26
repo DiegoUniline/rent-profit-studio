@@ -40,13 +40,11 @@ interface CentroNegocioDialogProps {
 
 const centroSchema = z.object({
   empresa_id: z.string().min(1, "La empresa es requerida"),
-  codigo: z.string().min(1, "El código es requerido"),
   nombre: z.string().min(1, "El nombre es requerido"),
 });
 
 interface CentroForm {
   empresa_id: string;
-  codigo: string;
   nombre: string;
   tipo_actividad: string;
   responsable: string;
@@ -54,10 +52,28 @@ interface CentroForm {
 
 const emptyForm: CentroForm = {
   empresa_id: "",
-  codigo: "",
   nombre: "",
   tipo_actividad: "",
   responsable: "",
+};
+
+const generateNextCode = async (empresaId: string): Promise<string> => {
+  const { data } = await supabase
+    .from("centros_negocio")
+    .select("codigo")
+    .eq("empresa_id", empresaId)
+    .order("codigo", { ascending: false })
+    .limit(1);
+
+  if (data && data.length > 0) {
+    const lastCode = data[0].codigo;
+    const match = lastCode.match(/CN(\d+)/);
+    if (match) {
+      const nextNum = parseInt(match[1], 10) + 1;
+      return `CN${String(nextNum).padStart(3, "0")}`;
+    }
+  }
+  return "CN001";
 };
 
 export function CentroNegocioDialog({
@@ -79,7 +95,6 @@ export function CentroNegocioDialog({
       if (centro) {
         setForm({
           empresa_id: centro.empresa_id,
-          codigo: centro.codigo,
           nombre: centro.nombre,
           tipo_actividad: centro.tipo_actividad || "",
           responsable: centro.responsable || "",
@@ -117,22 +132,30 @@ export function CentroNegocioDialog({
 
     setSaving(true);
 
-    const data = {
-      empresa_id: form.empresa_id,
-      codigo: form.codigo,
-      nombre: form.nombre,
-      tipo_actividad: form.tipo_actividad || null,
-      responsable: form.responsable || null,
-    };
-
     let error;
     if (centro) {
+      // Update: don't change the code
+      const updateData = {
+        empresa_id: form.empresa_id,
+        nombre: form.nombre,
+        tipo_actividad: form.tipo_actividad || null,
+        responsable: form.responsable || null,
+      };
       ({ error } = await supabase
         .from("centros_negocio")
-        .update(data)
+        .update(updateData)
         .eq("id", centro.id));
     } else {
-      ({ error } = await supabase.from("centros_negocio").insert(data));
+      // Insert: generate automatic code
+      const codigo = await generateNextCode(form.empresa_id);
+      const insertData = {
+        empresa_id: form.empresa_id,
+        codigo,
+        nombre: form.nombre,
+        tipo_actividad: form.tipo_actividad || null,
+        responsable: form.responsable || null,
+      };
+      ({ error } = await supabase.from("centros_negocio").insert(insertData));
     }
 
     setSaving(false);
@@ -198,14 +221,16 @@ export function CentroNegocioDialog({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Código *</Label>
-              <Input
-                value={form.codigo}
-                onChange={(e) => setForm({ ...form, codigo: e.target.value })}
-                placeholder="Ej: CN001"
-              />
-            </div>
+            {centro && (
+              <div className="space-y-2">
+                <Label>Código</Label>
+                <Input
+                  value={centro.codigo}
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Nombre *</Label>
