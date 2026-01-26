@@ -1,51 +1,56 @@
 
-# Plan: Agregar Foreign Key para Proteger Cuentas con Movimientos
 
-## Problema Actual
-La tabla `asiento_movimientos` tiene una columna `cuenta_id` que debería referenciar a `cuentas_contables`, pero **no existe una foreign key** que impida eliminar cuentas que tienen movimientos asociados.
+# Consolidar Columna PARTIDA en Asientos Contables
 
-Esto significa que actualmente se puede eliminar una cuenta y los movimientos quedarían huérfanos, causando errores en reportes.
+## Resumen
+Simplificar la tabla de movimientos eliminando la columna redundante del botón "+" e integrando la selección de presupuesto directamente en la columna PARTIDA.
 
----
+## Cambios a Realizar
 
-## Solución Propuesta
+### Estructura Actual vs Nueva
 
-### 1. Migración de Base de Datos
+```text
+ACTUAL:
+| Cuenta | [+] | Partida / Presupuesto | Debe | Haber | Acciones |
 
-Agregar una foreign key constraint con `ON DELETE RESTRICT`:
-
-```sql
--- Add foreign key from asiento_movimientos to cuentas_contables
-ALTER TABLE public.asiento_movimientos
-ADD CONSTRAINT asiento_movimientos_cuenta_id_fkey
-FOREIGN KEY (cuenta_id) 
-REFERENCES public.cuentas_contables(id)
-ON DELETE RESTRICT;
+NUEVA:
+| Cuenta | PARTIDA | Debe | Haber | Acciones |
 ```
 
-La opcion `ON DELETE RESTRICT` significa:
-- Si intentas borrar una cuenta que tiene movimientos, la base de datos rechazara la operacion
-- El codigo existente ya maneja este error y muestra el mensaje: "No se puede eliminar: la cuenta tiene movimientos asociados"
+### Modificaciones en AsientoDialog.tsx
 
----
+**1. Encabezado de tabla (líneas 660-667)**
+- Eliminar la columna vacía `<TableHead className="w-8"></TableHead>`
+- Renombrar "Partida / Presupuesto" a solo "PARTIDA"
 
-## Verificacion Previa Necesaria
+**2. Celdas de cada fila (líneas 684-702)**
+- Eliminar la celda con el SearchableSelect del botón "+" 
+- Convertir la celda de PARTIDA en un SearchableSelect que muestre los presupuestos disponibles
+- Agregar botón "+" para crear nuevo presupuesto
+- Cuando se selecciona un presupuesto, se llena automáticamente la partida (esta lógica ya existe)
 
-Antes de aplicar la migracion, debemos verificar que no existan movimientos con `cuenta_id` huerfanos:
+### Comportamiento Esperado
+1. La columna PARTIDA mostrará un selector desplegable con los presupuestos filtrados por cuenta
+2. Al seleccionar un presupuesto, la descripción de la partida se llena automáticamente
+3. El botón "+" al lado permitirá crear un nuevo presupuesto si es necesario
+4. La interfaz será más limpia y sin columnas cortadas o confusas
 
-```sql
-SELECT am.id, am.cuenta_id 
-FROM asiento_movimientos am
-LEFT JOIN cuentas_contables cc ON am.cuenta_id = cc.id
-WHERE cc.id IS NULL;
+## Sección Técnica
+
+### Código del SearchableSelect para PARTIDA
+```tsx
+<SearchableSelect
+  value={mov.presupuesto_id || ""}
+  onValueChange={(value) => updateMovimiento(idx, "presupuesto_id", value)}
+  options={getPresupuestoOptionsForMovimiento(mov.cuenta_id)}
+  placeholder="Seleccionar partida..."
+  searchPlaceholder="Buscar presupuesto..."
+  emptyMessage="No hay presupuestos"
+  onCreateNew={() => setPresupuestoDialogOpen(true)}
+  createLabel="Nuevo presupuesto"
+/>
 ```
 
-Si hay registros huerfanos, habra que limpiarlos primero.
+### Archivo a Modificar
+- `src/components/dialogs/AsientoDialog.tsx`
 
----
-
-## Resultado Esperado
-
-- Las cuentas con movimientos estaran protegidas contra eliminacion accidental
-- El mensaje de error ya existente se mostrara correctamente
-- Los reportes financieros mantendran integridad de datos
