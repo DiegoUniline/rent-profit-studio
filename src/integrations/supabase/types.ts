@@ -345,6 +345,7 @@ export type Database = {
             | null
           id: string
           notas: string | null
+          orden: number | null
           partida: string
           precio_unitario: number
           tercero_id: string | null
@@ -365,6 +366,7 @@ export type Database = {
             | null
           id?: string
           notas?: string | null
+          orden?: number | null
           partida: string
           precio_unitario?: number
           tercero_id?: string | null
@@ -385,6 +387,7 @@ export type Database = {
             | null
           id?: string
           notas?: string | null
+          orden?: number | null
           partida?: string
           precio_unitario?: number
           tercero_id?: string | null
