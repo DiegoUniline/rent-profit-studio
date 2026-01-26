@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Plus, Play, Copy, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, Building2, Landmark } from "lucide-react";
+import { Plus, Play, Copy, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, Building2, Landmark, CalendarIcon, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,6 +34,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { ProgramacionDialog } from "@/components/dialogs/ProgramacionDialog";
 import { ProyeccionProgramacion } from "@/components/reportes/ProyeccionProgramacion";
 
@@ -68,6 +75,19 @@ interface AsientoMovimiento {
   haber: number;
 }
 
+interface CentroNegocio {
+  id: string;
+  codigo: string;
+  nombre: string;
+  empresa_id: string;
+}
+
+interface Tercero {
+  id: string;
+  razon_social: string;
+  empresa_id: string;
+}
+
 export default function Programacion() {
   const { toast } = useToast();
   const [programaciones, setProgramaciones] = useState<Programacion[]>([]);
@@ -82,7 +102,15 @@ export default function Programacion() {
   const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
   const [filterTipo, setFilterTipo] = useState<string>("all");
   const [filterEstado, setFilterEstado] = useState<string>("pendiente");
+  const [filterCentroNegocio, setFilterCentroNegocio] = useState<string>("all");
+  const [filterTercero, setFilterTercero] = useState<string>("all");
+  const [filterFechaDesde, setFilterFechaDesde] = useState<Date | undefined>(undefined);
+  const [filterFechaHasta, setFilterFechaHasta] = useState<Date | undefined>(undefined);
+  
+  // Catalogs for filters
   const [empresas, setEmpresas] = useState<{ id: string; razon_social: string }[]>([]);
+  const [centrosNegocio, setCentrosNegocio] = useState<CentroNegocio[]>([]);
+  const [terceros, setTerceros] = useState<Tercero[]>([]);
 
   // Saldos bancarios
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
@@ -90,7 +118,7 @@ export default function Programacion() {
 
   useEffect(() => {
     fetchData();
-    fetchEmpresas();
+    fetchCatalogs();
     fetchCuentasYMovimientos();
   }, []);
 
@@ -115,13 +143,15 @@ export default function Programacion() {
     setLoading(false);
   };
 
-  const fetchEmpresas = async () => {
-    const { data } = await supabase
-      .from("empresas")
-      .select("id, razon_social")
-      .eq("activa", true)
-      .order("razon_social");
-    if (data) setEmpresas(data);
+  const fetchCatalogs = async () => {
+    const [empresasRes, centrosRes, tercerosRes] = await Promise.all([
+      supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social"),
+      supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("activo", true).order("codigo"),
+      supabase.from("terceros").select("id, razon_social, empresa_id").eq("activo", true).order("razon_social"),
+    ]);
+    if (empresasRes.data) setEmpresas(empresasRes.data);
+    if (centrosRes.data) setCentrosNegocio(centrosRes.data);
+    if (tercerosRes.data) setTerceros(tercerosRes.data);
   };
 
   const fetchCuentasYMovimientos = async () => {
@@ -153,14 +183,46 @@ export default function Programacion() {
     }
   };
 
+  // Filter centros and terceros by selected empresa
+  const filteredCentrosNegocio = useMemo(() => {
+    if (filterEmpresa === "all") return centrosNegocio;
+    return centrosNegocio.filter(c => c.empresa_id === filterEmpresa);
+  }, [centrosNegocio, filterEmpresa]);
+
+  const filteredTerceros = useMemo(() => {
+    if (filterEmpresa === "all") return terceros;
+    return terceros.filter(t => t.empresa_id === filterEmpresa);
+  }, [terceros, filterEmpresa]);
+
   const filteredProgramaciones = useMemo(() => {
     return programaciones.filter((p) => {
       if (filterEmpresa !== "all" && p.empresa_id !== filterEmpresa) return false;
       if (filterTipo !== "all" && p.tipo !== filterTipo) return false;
       if (filterEstado !== "all" && p.estado !== filterEstado) return false;
+      if (filterCentroNegocio !== "all" && p.centro_negocio_id !== filterCentroNegocio) return false;
+      if (filterTercero !== "all" && p.tercero_id !== filterTercero) return false;
+      if (filterFechaDesde) {
+        const fechaProg = new Date(p.fecha_programada + "T00:00:00");
+        if (fechaProg < filterFechaDesde) return false;
+      }
+      if (filterFechaHasta) {
+        const fechaProg = new Date(p.fecha_programada + "T00:00:00");
+        if (fechaProg > filterFechaHasta) return false;
+      }
       return true;
     });
-  }, [programaciones, filterEmpresa, filterTipo, filterEstado]);
+  }, [programaciones, filterEmpresa, filterTipo, filterEstado, filterCentroNegocio, filterTercero, filterFechaDesde, filterFechaHasta]);
+
+  const clearFilters = () => {
+    setFilterEmpresa("all");
+    setFilterTipo("all");
+    setFilterCentroNegocio("all");
+    setFilterTercero("all");
+    setFilterFechaDesde(undefined);
+    setFilterFechaHasta(undefined);
+  };
+
+  const hasActiveFilters = filterEmpresa !== "all" || filterTipo !== "all" || filterCentroNegocio !== "all" || filterTercero !== "all" || filterFechaDesde || filterFechaHasta;
 
   // Calcular saldos de banco y cartera
   const saldosBancarios = useMemo(() => {
@@ -412,7 +474,11 @@ export default function Programacion() {
             <div className="h-6 w-px bg-border mx-2" />
 
             {/* Filters */}
-            <Select value={filterEmpresa} onValueChange={setFilterEmpresa}>
+            <Select value={filterEmpresa} onValueChange={(val) => {
+              setFilterEmpresa(val);
+              setFilterCentroNegocio("all");
+              setFilterTercero("all");
+            }}>
               <SelectTrigger className="w-[180px] h-8">
                 <SelectValue placeholder="Empresa" />
               </SelectTrigger>
@@ -421,6 +487,34 @@ export default function Programacion() {
                 {empresas.map((e) => (
                   <SelectItem key={e.id} value={e.id}>
                     {e.razon_social}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterCentroNegocio} onValueChange={setFilterCentroNegocio}>
+              <SelectTrigger className="w-[200px] h-8">
+                <SelectValue placeholder="Centro de Negocio" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los centros</SelectItem>
+                {filteredCentrosNegocio.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.codigo} - {c.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterTercero} onValueChange={setFilterTercero}>
+              <SelectTrigger className="w-[180px] h-8">
+                <SelectValue placeholder="Tercero" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los terceros</SelectItem>
+                {filteredTerceros.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.razon_social}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -436,6 +530,64 @@ export default function Programacion() {
                 <SelectItem value="egreso">Egresos</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* Date Filters */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "h-8 justify-start text-left font-normal",
+                    !filterFechaDesde && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-3 w-3" />
+                  {filterFechaDesde ? format(filterFechaDesde, "dd/MM/yy") : "Desde"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={filterFechaDesde}
+                  onSelect={setFilterFechaDesde}
+                  locale={es}
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "h-8 justify-start text-left font-normal",
+                    !filterFechaHasta && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-3 w-3" />
+                  {filterFechaHasta ? format(filterFechaHasta, "dd/MM/yy") : "Hasta"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={filterFechaHasta}
+                  onSelect={setFilterFechaHasta}
+                  locale={es}
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2">
+                <X className="h-4 w-4 mr-1" />
+                Limpiar
+              </Button>
+            )}
           </div>
 
           {/* Table */}
