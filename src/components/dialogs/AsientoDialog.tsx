@@ -327,6 +327,14 @@ export function AsientoDialog({
       }
     }
     
+    // Auto-fill partida from presupuesto when selected
+    if (field === "presupuesto_id" && value) {
+      const presupuesto = presupuestos.find((p) => p.id === value);
+      if (presupuesto) {
+        updated[index].partida = presupuesto.partida;
+      }
+    }
+    
     setMovimientos(updated);
   };
 
@@ -650,9 +658,9 @@ export function AsientoDialog({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="min-w-[140px]">Cuenta</TableHead>
-                        <TableHead className="min-w-[120px]">Partida</TableHead>
-                        <TableHead className="min-w-[120px]">Presupuesto</TableHead>
+                        <TableHead className="min-w-[160px]">Cuenta</TableHead>
+                        <TableHead className="w-8"></TableHead>
+                        <TableHead className="min-w-[180px]">Partida / Presupuesto</TableHead>
                         <TableHead className="w-[100px] text-right">Debe</TableHead>
                         <TableHead className="w-[100px] text-right">Haber</TableHead>
                         <TableHead className="w-[70px]"></TableHead>
@@ -673,22 +681,23 @@ export function AsientoDialog({
                               createLabel="Nueva cuenta"
                             />
                           </TableCell>
+                          <TableCell className="p-1 text-center">
+                            <SearchableSelect
+                              value={mov.presupuesto_id || ""}
+                              onValueChange={(value) => updateMovimiento(idx, "presupuesto_id", value)}
+                              options={getPresupuestoOptionsForMovimiento(mov.cuenta_id)}
+                              placeholder="+"
+                              searchPlaceholder="Buscar presupuesto..."
+                              emptyMessage="No hay presupuestos"
+                              className="w-10"
+                            />
+                          </TableCell>
                           <TableCell className="p-1">
                             <Input
                               value={mov.partida}
                               onChange={(e) => updateMovimiento(idx, "partida", e.target.value)}
                               placeholder="Descripción"
                               className="h-9"
-                            />
-                          </TableCell>
-                          <TableCell className="p-1">
-                            <SearchableSelect
-                              value={mov.presupuesto_id || ""}
-                              onValueChange={(value) => updateMovimiento(idx, "presupuesto_id", value)}
-                              options={getPresupuestoOptionsForMovimiento(mov.cuenta_id)}
-                              placeholder="Sin presupuesto"
-                              searchPlaceholder="Buscar presupuesto..."
-                              emptyMessage="No hay presupuestos"
                             />
                           </TableCell>
                           <TableCell className="p-1">
