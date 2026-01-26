@@ -216,18 +216,22 @@ export default function Programacion() {
 
   // Calcular saldos de banco y cartera
   const saldosBancarios = useMemo(() => {
-    // Identificar cuentas de banco (100-001 o nombre contiene "banco")
-    const cuentasBanco = cuentas.filter(c =>
-      c.codigo.startsWith("100-001") ||
-      c.nombre.toLowerCase().includes("banco")
+    // Filtrar por empresa si hay filtro activo
+    const cuentasFiltradas = filterEmpresa === "all" 
+      ? cuentas 
+      : cuentas.filter(c => c.empresa_id === filterEmpresa);
+
+    // Identificar cuentas de banco (100-001-001 = Caja y Bancos, excluyendo cartera)
+    // Solo cuentas que empiecen con 100-001-001 y contengan "banco" en el nombre
+    const cuentasBanco = cuentasFiltradas.filter(c =>
+      c.codigo.startsWith("100-001-001") &&
+      (c.nombre.toLowerCase().includes("banco") || c.nombre.toLowerCase().includes("banorte") || c.nombre.toLowerCase().includes("banamex") || c.nombre.toLowerCase().includes("hsbc") || c.nombre.toLowerCase().includes("santander"))
     );
 
-    // Identificar cuentas de cartera (100-002 o nombre contiene "cliente", "caja")
-    const cuentasCartera = cuentas.filter(c =>
-      c.codigo.startsWith("100-002") ||
-      c.nombre.toLowerCase().includes("cliente") ||
-      c.nombre.toLowerCase().includes("caja") ||
-      c.nombre.toLowerCase().includes("cartera")
+    // Identificar cuentas de cartera/clientes (100-001-002 = Clientes, o nombre contiene "cartera")
+    const cuentasCartera = cuentasFiltradas.filter(c =>
+      c.codigo.startsWith("100-001-002") || // Clientes
+      c.nombre.toLowerCase().includes("cartera") // Cuentas con "cartera" en el nombre
     );
 
     const calcularSaldo = (cuentasIds: string[]) => {
@@ -240,7 +244,7 @@ export default function Programacion() {
     const saldoCartera = calcularSaldo(cuentasCartera.map(c => c.id));
 
     return { banco: saldoBanco, cartera: saldoCartera };
-  }, [cuentas, movimientos]);
+  }, [cuentas, movimientos, filterEmpresa]);
 
   // KPIs
   const kpis = useMemo(() => {
