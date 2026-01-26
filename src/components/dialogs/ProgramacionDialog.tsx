@@ -40,6 +40,15 @@ interface Programacion {
   monto: number;
   observaciones: string | null;
   estado: "pendiente" | "ejecutado" | "cancelado";
+  presupuesto_id: string | null;
+}
+
+interface Presupuesto {
+  id: string;
+  partida: string;
+  empresa_id: string;
+  cantidad: number;
+  precio_unitario: number;
 }
 
 interface ProgramacionDialogProps {
@@ -62,6 +71,7 @@ export function ProgramacionDialog({
   const [empresas, setEmpresas] = useState<{ id: string; razon_social: string }[]>([]);
   const [centros, setCentros] = useState<{ id: string; codigo: string; nombre: string; empresa_id: string }[]>([]);
   const [terceros, setTerceros] = useState<{ id: string; razon_social: string; empresa_id: string }[]>([]);
+  const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
 
   const [empresaId, setEmpresaId] = useState("");
   const [tipo, setTipo] = useState<"ingreso" | "egreso">("egreso");
@@ -70,6 +80,7 @@ export function ProgramacionDialog({
   const [terceroId, setTerceroId] = useState("");
   const [monto, setMonto] = useState("");
   const [observaciones, setObservaciones] = useState("");
+  const [presupuestoId, setPresupuestoId] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -86,6 +97,7 @@ export function ProgramacionDialog({
             ? `Copia de: ${programacion.observaciones || ""}`
             : programacion.observaciones || ""
         );
+        setPresupuestoId(programacion.presupuesto_id || "");
       } else {
         resetForm();
       }
@@ -100,21 +112,25 @@ export function ProgramacionDialog({
     setTerceroId("");
     setMonto("");
     setObservaciones("");
+    setPresupuestoId("");
   };
 
   const fetchCatalogs = async () => {
-    const [empresasRes, centrosRes, tercerosRes] = await Promise.all([
+    const [empresasRes, centrosRes, tercerosRes, presupuestosRes] = await Promise.all([
       supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social"),
       supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("activo", true).order("codigo"),
       supabase.from("terceros").select("id, razon_social, empresa_id").eq("activo", true).order("razon_social"),
+      supabase.from("presupuestos").select("id, partida, empresa_id, cantidad, precio_unitario").eq("activo", true).order("partida"),
     ]);
     if (empresasRes.data) setEmpresas(empresasRes.data);
     if (centrosRes.data) setCentros(centrosRes.data);
     if (tercerosRes.data) setTerceros(tercerosRes.data);
+    if (presupuestosRes.data) setPresupuestos(presupuestosRes.data);
   };
 
   const filteredCentros = centros.filter((c) => c.empresa_id === empresaId);
   const filteredTerceros = terceros.filter((t) => t.empresa_id === empresaId);
+  const filteredPresupuestos = presupuestos.filter((p) => p.empresa_id === empresaId);
 
   const handleSave = async () => {
     if (!empresaId || !monto || parseFloat(monto) <= 0) {
@@ -136,6 +152,7 @@ export function ProgramacionDialog({
         tercero_id: terceroId || null,
         monto: parseFloat(monto),
         observaciones: observaciones || null,
+        presupuesto_id: presupuestoId || null,
       };
 
       if (programacion && !isCopy) {
@@ -187,6 +204,7 @@ export function ProgramacionDialog({
                 setEmpresaId(val);
                 setCentroNegocioId("");
                 setTerceroId("");
+                setPresupuestoId("");
               }}
               placeholder="Seleccionar empresa..."
             />
@@ -258,6 +276,27 @@ export function ProgramacionDialog({
               value={terceroId}
               onValueChange={setTerceroId}
               placeholder="Seleccionar tercero..."
+              disabled={!empresaId}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Presupuesto</Label>
+            <SearchableSelect
+              options={filteredPresupuestos.map((p) => ({
+                id: p.id,
+                label: p.partida,
+                sublabel: `$${(p.cantidad * p.precio_unitario).toLocaleString("es-MX")}`,
+              }))}
+              value={presupuestoId}
+              onValueChange={(val) => {
+                setPresupuestoId(val);
+                const pres = presupuestos.find((p) => p.id === val);
+                if (pres && !monto) {
+                  setMonto((pres.cantidad * pres.precio_unitario).toString());
+                }
+              }}
+              placeholder="Vincular a presupuesto..."
               disabled={!empresaId}
             />
           </div>

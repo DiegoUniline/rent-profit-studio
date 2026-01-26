@@ -477,6 +477,7 @@ export type Database = {
           id: string
           monto: number
           observaciones: string | null
+          presupuesto_id: string | null
           tercero_id: string | null
           tipo: Database["public"]["Enums"]["tipo_programacion"]
           updated_at: string
@@ -492,6 +493,7 @@ export type Database = {
           id?: string
           monto?: number
           observaciones?: string | null
+          presupuesto_id?: string | null
           tercero_id?: string | null
           tipo: Database["public"]["Enums"]["tipo_programacion"]
           updated_at?: string
@@ -507,6 +509,7 @@ export type Database = {
           id?: string
           monto?: number
           observaciones?: string | null
+          presupuesto_id?: string | null
           tercero_id?: string | null
           tipo?: Database["public"]["Enums"]["tipo_programacion"]
           updated_at?: string
@@ -531,6 +534,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programaciones_presupuesto_id_fkey"
+            columns: ["presupuesto_id"]
+            isOneToOne: false
+            referencedRelation: "presupuestos"
             referencedColumns: ["id"]
           },
           {
