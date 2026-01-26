@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -36,11 +36,13 @@ import {
   ChevronRight,
   Calculator,
   Building,
-  FileText,
   Power,
   TrendingUp,
   TrendingDown,
   AlertTriangle,
+  GripVertical,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { PresupuestoDialog } from "@/components/dialogs/PresupuestoDialog";
 
@@ -103,6 +105,7 @@ interface Presupuesto {
   fecha_inicio: string | null;
   fecha_fin: string | null;
   frecuencia: "semanal" | "mensual" | "bimestral" | "trimestral" | "semestral" | "anual" | null;
+  orden: number;
   empresas?: Empresa;
   cuentas_contables?: CuentaContable;
   terceros?: Tercero;
@@ -188,7 +191,7 @@ export default function Presupuestos() {
             centros_negocio(id, codigo, nombre),
             unidades_medida(id, codigo, nombre)
           `)
-          .order("created_at", { ascending: false }),
+          .order("orden", { ascending: true }),
         supabase
           .from("empresas")
           .select("id, razon_social")
@@ -307,7 +310,7 @@ export default function Presupuestos() {
     });
   }, [presupuestosConEjercido, search, filterCompany, filterEstado]);
 
-  // Group by empresa
+  // Group by empresa - sort by orden within each group
   const groupedByEmpresa = useMemo(() => {
     const groups: Record<string, { 
       empresa: Empresa; 
@@ -337,10 +340,68 @@ export default function Presupuestos() {
       }
     });
     
+    // Sort presupuestos within each group by orden
+    Object.values(groups).forEach(group => {
+      group.presupuestos.sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    });
+    
     return Object.values(groups).sort((a, b) => 
       a.empresa.razon_social.localeCompare(b.empresa.razon_social)
     );
   }, [filteredPresupuestos]);
+
+  // Function to move a presupuesto up or down within its company group
+  const handleMovePresupuesto = useCallback(async (presupuestoId: string, direction: 'up' | 'down') => {
+    // Find the empresa group and the presupuesto
+    let targetGroup: typeof groupedByEmpresa[0] | null = null;
+    let presupuestoIndex = -1;
+    
+    for (const group of groupedByEmpresa) {
+      const idx = group.presupuestos.findIndex(p => p.id === presupuestoId);
+      if (idx !== -1) {
+        targetGroup = group;
+        presupuestoIndex = idx;
+        break;
+      }
+    }
+    
+    if (!targetGroup || presupuestoIndex === -1) return;
+    
+    const presupuestosList = targetGroup.presupuestos;
+    const swapIndex = direction === 'up' ? presupuestoIndex - 1 : presupuestoIndex + 1;
+    
+    // Check bounds
+    if (swapIndex < 0 || swapIndex >= presupuestosList.length) return;
+    
+    const currentItem = presupuestosList[presupuestoIndex];
+    const swapItem = presupuestosList[swapIndex];
+    
+    // Swap orden values in database
+    try {
+      const currentOrden = currentItem.orden || presupuestoIndex;
+      const swapOrden = swapItem.orden || swapIndex;
+      
+      await Promise.all([
+        supabase.from("presupuestos").update({ orden: swapOrden }).eq("id", currentItem.id),
+        supabase.from("presupuestos").update({ orden: currentOrden }).eq("id", swapItem.id),
+      ]);
+      
+      // Optimistic update
+      setPresupuestos(prev => prev.map(p => {
+        if (p.id === currentItem.id) return { ...p, orden: swapOrden };
+        if (p.id === swapItem.id) return { ...p, orden: currentOrden };
+        return p;
+      }));
+      
+      toast({ title: "Orden actualizado" });
+    } catch (error: any) {
+      toast({
+        title: "Error al reordenar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  }, [groupedByEmpresa, toast]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -581,6 +642,7 @@ export default function Presupuestos() {
                         <Table>
                           <TableHeader>
                             <TableRow>
+                              {canEdit && <TableHead className="w-[60px]">Orden</TableHead>}
                               <TableHead>Partida</TableHead>
                               <TableHead>Cuenta</TableHead>
                               <TableHead>Tercero</TableHead>
@@ -594,14 +656,42 @@ export default function Presupuestos() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {group.presupuestos.map((p) => {
+                            {group.presupuestos.map((p, index) => {
                               const presupuestado = p.cantidad * p.precio_unitario;
                               const ejercido = p.ejercido || 0;
                               const porEjercer = p.porEjercer || 0;
                               const porcentaje = p.porcentaje || 0;
+                              const isFirst = index === 0;
+                              const isLast = index === group.presupuestos.length - 1;
                               
                               return (
                                 <TableRow key={p.id} className={!p.activo ? "opacity-50" : ""}>
+                                  {canEdit && (
+                                    <TableCell>
+                                      <div className="flex items-center gap-0.5">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6"
+                                          onClick={() => handleMovePresupuesto(p.id, 'up')}
+                                          disabled={isFirst}
+                                          title="Mover arriba"
+                                        >
+                                          <ArrowUp className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6"
+                                          onClick={() => handleMovePresupuesto(p.id, 'down')}
+                                          disabled={isLast}
+                                          title="Mover abajo"
+                                        >
+                                          <ArrowDown className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  )}
                                   <TableCell>
                                     <div>
                                       <div className="font-medium">{p.partida}</div>
