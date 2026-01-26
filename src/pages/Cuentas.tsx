@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, Plus, Edit, Trash2, Search, ChevronRight, ChevronDown } from "lucide-react";
+import { BookOpen, Plus, Edit, Trash2, Search } from "lucide-react";
 import { CuentaDialog } from "@/components/dialogs/CuentaDialog";
 
 interface Empresa {
@@ -79,8 +79,6 @@ export default function Cuentas() {
   const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCuenta, setEditingCuenta] = useState<CuentaContable | null>(null);
-  const [expandedCodes, setExpandedCodes] = useState<Set<string>>(new Set());
-
   const fetchData = async () => {
     setLoading(true);
     
@@ -100,13 +98,6 @@ export default function Cuentas() {
       });
     } else {
       setCuentas(cuentasRes.data || []);
-      // Expand level 1 by default
-      const level1Codes = new Set(
-        (cuentasRes.data || [])
-          .filter(c => getCodeLevel(c.codigo) === 1)
-          .map(c => c.codigo.replace(/[^0-9]/g, "").slice(0, 3))
-      );
-      setExpandedCodes(level1Codes);
     }
 
     if (!empresasRes.error) {
@@ -132,26 +123,14 @@ export default function Cuentas() {
     // Filter by estado
     filtered = filtered.filter(c => filterEstado === "activos" ? c.activa : !c.activa);
     
-    // If searching, show all matching accounts
+    // Filter by search if provided
     if (search) {
       filtered = filtered.filter(c => 
         c.codigo.toLowerCase().includes(search.toLowerCase()) ||
         c.nombre.toLowerCase().includes(search.toLowerCase())
       );
-    } else {
-      // When not searching, apply hierarchy visibility
-      filtered = filtered.filter(c => {
-        const level = getCodeLevel(c.codigo);
-        if (level === 1) return true;
-        
-        // Check if parent is expanded
-        const clean = c.codigo.replace(/[^0-9]/g, "");
-        if (level === 2) return expandedCodes.has(clean.slice(0, 3));
-        if (level === 3) return expandedCodes.has(clean.slice(0, 3)) && expandedCodes.has(clean.slice(0, 6));
-        if (level === 4) return expandedCodes.has(clean.slice(0, 3)) && expandedCodes.has(clean.slice(0, 6)) && expandedCodes.has(clean.slice(0, 9));
-        return true;
-      });
     }
+    // Always show all accounts - no collapse/expand logic
     
     // Calculate stats
     const baseCuentas = cuentas.filter(c => 
@@ -165,52 +144,8 @@ export default function Cuentas() {
     };
     
     return { filteredCuentas: filtered, stats };
-  }, [cuentas, filterEmpresa, filterEstado, search, expandedCodes]);
+  }, [cuentas, filterEmpresa, filterEstado, search]);
 
-  const toggleExpand = (codigo: string) => {
-    const clean = codigo.replace(/[^0-9]/g, "");
-    const level = getCodeLevel(codigo);
-    
-    let key = "";
-    if (level === 1) key = clean.slice(0, 3);
-    else if (level === 2) key = clean.slice(0, 6);
-    else if (level === 3) key = clean.slice(0, 9);
-    else return;
-    
-    const newExpanded = new Set(expandedCodes);
-    if (newExpanded.has(key)) {
-      newExpanded.delete(key);
-    } else {
-      newExpanded.add(key);
-    }
-    setExpandedCodes(newExpanded);
-  };
-
-  const isExpanded = (codigo: string) => {
-    const clean = codigo.replace(/[^0-9]/g, "");
-    const level = getCodeLevel(codigo);
-    
-    if (level === 1) return expandedCodes.has(clean.slice(0, 3));
-    if (level === 2) return expandedCodes.has(clean.slice(0, 6));
-    if (level === 3) return expandedCodes.has(clean.slice(0, 9));
-    return false;
-  };
-
-  const hasChildren = (codigo: string) => {
-    const clean = codigo.replace(/[^0-9]/g, "");
-    const level = getCodeLevel(codigo);
-    
-    return cuentas.some(c => {
-      if (filterEmpresa !== "all" && c.empresa_id !== filterEmpresa) return false;
-      // Also filter by estado to match visible children
-      if (filterEstado === "activos" ? !c.activa : c.activa) return false;
-      const childClean = c.codigo.replace(/[^0-9]/g, "");
-      if (level === 1) return childClean.startsWith(clean.slice(0, 3)) && getCodeLevel(c.codigo) === 2;
-      if (level === 2) return childClean.startsWith(clean.slice(0, 6)) && getCodeLevel(c.codigo) === 3;
-      if (level === 3) return childClean.startsWith(clean.slice(0, 9)) && getCodeLevel(c.codigo) === 4;
-      return false;
-    });
-  };
 
   const openNew = () => {
     setEditingCuenta(null);
@@ -242,22 +177,6 @@ export default function Cuentas() {
     fetchData();
   };
 
-  const expandAll = () => {
-    const allKeys = new Set<string>();
-    cuentas
-      .filter(c => filterEmpresa === "all" || c.empresa_id === filterEmpresa)
-      .forEach(c => {
-        const clean = c.codigo.replace(/[^0-9]/g, "");
-        allKeys.add(clean.slice(0, 3));
-        allKeys.add(clean.slice(0, 6));
-        allKeys.add(clean.slice(0, 9));
-      });
-    setExpandedCodes(allKeys);
-  };
-
-  const collapseAll = () => {
-    setExpandedCodes(new Set());
-  };
 
   const canEdit = role === "admin" || role === "contador";
   const canDelete = role === "admin";
@@ -337,12 +256,6 @@ export default function Cuentas() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm" onClick={expandAll}>
-                Expandir
-              </Button>
-              <Button variant="outline" size="sm" onClick={collapseAll}>
-                Colapsar
-              </Button>
               <Tabs value={filterEstado} onValueChange={(v) => setFilterEstado(v as "activos" | "baja")}>
                 <TabsList>
                   <TabsTrigger value="activos">Activos</TabsTrigger>
@@ -379,10 +292,8 @@ export default function Cuentas() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCuentas.map((cuenta) => {
+                {filteredCuentas.map((cuenta) => {
                     const level = getCodeLevel(cuenta.codigo);
-                    const canExpand = hasChildren(cuenta.codigo);
-                    const expanded = isExpanded(cuenta.codigo);
                     
                     return (
                       <TableRow 
@@ -390,27 +301,9 @@ export default function Cuentas() {
                         className={levelColors[level] || ""}
                       >
                         <TableCell>
-                          <div className="flex items-center gap-1">
-                            {canExpand ? (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => toggleExpand(cuenta.codigo)}
-                              >
-                                {expanded ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </Button>
-                            ) : (
-                              <span className="w-6" />
-                            )}
-                            <code className="text-sm font-mono">
-                              {cuenta.codigo}
-                            </code>
-                          </div>
+                          <code className="text-sm font-mono">
+                            {cuenta.codigo}
+                          </code>
                         </TableCell>
                         <TableCell>
                           <span 
