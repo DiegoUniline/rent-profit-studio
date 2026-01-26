@@ -1,51 +1,83 @@
 
-# Plan: Botones de acción lado a lado en Cuentas Contables
+# Plan: Visualización de Nivel por Indentación
 
-## Problema identificado
-Los botones de **Editar** y **Eliminar** en la tabla de cuentas contables se muestran apilados verticalmente (uno debajo del otro), lo que hace que cada fila ocupe más espacio vertical del necesario.
+## Objetivo
+Cambiar la visualización del catálogo de cuentas para que el nivel jerárquico se muestre a través de la **indentación visual** del nombre, eliminando la columna separada de "Nivel" con badges. Esto hará la tabla más compacta y similar al sistema anterior.
 
-## Solución propuesta
-Envolver los botones en un contenedor flex que los alinee horizontalmente, reduciendo la altura de las filas y haciendo la tabla más compacta.
+## Referencia Visual
+Basado en la imagen proporcionada:
+```text
+100-000-000  activo
+100-001-000     fijo
+100-001-001        maquinaria                    20,000
+```
 
 ---
 
-## Cambio a realizar
+## Cambios a Realizar
 
 ### Archivo: `src/pages/Cuentas.tsx`
 
-**Antes:**
+#### 1. Eliminar columna "Nivel" del encabezado
+
+**Antes (línea 376):**
 ```tsx
-<TableCell className="text-right">
-  <Button variant="ghost" size="icon" onClick={() => openEdit(cuenta)}>
-    <Edit className="h-4 w-4" />
-  </Button>
-  {canDelete && (
-    <Button variant="ghost" size="icon" onClick={() => handleDelete(cuenta)}>
-      <Trash2 className="h-4 w-4 text-destructive" />
-    </Button>
-  )}
+<TableHead className="w-[100px]">Nivel</TableHead>
+```
+
+**Después:** Eliminar esta línea completamente.
+
+#### 2. Eliminar celda de Nivel del cuerpo de la tabla
+
+**Antes (líneas 421-425):**
+```tsx
+<TableCell>
+  <Badge variant="outline" className="text-xs">
+    {level} - {levelLabels[level]}
+  </Badge>
+</TableCell>
+```
+
+**Después:** Eliminar este bloque completamente.
+
+#### 3. Mejorar la indentación visual del nombre
+
+**Antes (líneas 416-420):**
+```tsx
+<TableCell>
+  <span style={{ paddingLeft: `${(level - 1) * 16}px` }}>
+    {cuenta.nombre}
+  </span>
 </TableCell>
 ```
 
 **Después:**
 ```tsx
-<TableCell className="text-right">
-  <div className="flex items-center justify-end gap-1">
-    <Button variant="ghost" size="icon" onClick={() => openEdit(cuenta)}>
-      <Edit className="h-4 w-4" />
-    </Button>
-    {canDelete && (
-      <Button variant="ghost" size="icon" onClick={() => handleDelete(cuenta)}>
-        <Trash2 className="h-4 w-4 text-destructive" />
-      </Button>
-    )}
-  </div>
+<TableCell>
+  <span 
+    className="inline-block"
+    style={{ paddingLeft: `${(level - 1) * 24}px` }}
+  >
+    {cuenta.nombre}
+  </span>
 </TableCell>
 ```
 
+- Aumentar la indentación de 16px a 24px por nivel para que sea más visible
+- Agregar `inline-block` para mejor control del espaciado
+
 ---
 
-## Resultado esperado
-- Los botones Editar y Eliminar aparecerán lado a lado en la misma línea
-- Las filas de la tabla serán más compactas
-- El diseño será similar al sistema anterior que el usuario prefiere
+## Resultado Final
+
+La tabla tendrá las siguientes columnas:
+| Código | Nombre | Naturaleza | Tipo | Acciones |
+
+Y la jerarquía se verá así:
+```
+100-000-000  Activo
+100-001-000    Activo Fijo
+100-001-001      Maquinaria
+```
+
+El nivel será claramente visible por la indentación del nombre, similar al sistema anterior que el usuario prefiere.
