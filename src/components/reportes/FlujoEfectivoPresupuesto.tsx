@@ -11,10 +11,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatCurrency } from "@/lib/accounting-utils";
 import { cn } from "@/lib/utils";
-import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
-import { format, addMonths, startOfMonth, isSameMonth, isWithinInterval, differenceInMonths, differenceInWeeks } from "date-fns";
+import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, DollarSign, CalendarDays } from "lucide-react";
+import { format, addMonths, startOfMonth, startOfYear, endOfYear, differenceInMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -57,7 +58,7 @@ interface FlujoMensual {
   tipo: TipoFlujo;
   montoTotal: number;
   frecuencia: string;
-  meses: number[]; // Array de 36 meses con montos
+  meses: number[]; // Array de meses con montos
 }
 
 // Determina si es entrada o salida basado en el código de cuenta
@@ -106,25 +107,46 @@ function getNombreFrecuencia(frecuencia: string | null): string {
   }
 }
 
+// Generar años disponibles (actual + 3 hacia adelante)
+function getAnosDisponibles(): number[] {
+  const currentYear = new Date().getFullYear();
+  return [currentYear, currentYear + 1, currentYear + 2];
+}
+
 export function FlujoEfectivoPresupuesto({
   presupuestos,
   loading,
   empresaNombre,
 }: FlujoEfectivoPresupuestoProps) {
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "entradas" | "salidas">("todos");
+  
+  // Estado para filtrar años
+  const anosDisponibles = useMemo(() => getAnosDisponibles(), []);
+  const [anosSeleccionados, setAnosSeleccionados] = useState<number[]>([new Date().getFullYear()]);
 
-  // Generar los 36 meses rolling a partir del mes actual
-  const meses36 = useMemo(() => {
+  // Generar los meses basados en los años seleccionados
+  const mesesFiltrados = useMemo(() => {
+    if (anosSeleccionados.length === 0) return [];
+    
     const meses: Date[] = [];
-    const inicio = startOfMonth(new Date());
-    for (let i = 0; i < 36; i++) {
-      meses.push(addMonths(inicio, i));
-    }
+    const sortedYears = [...anosSeleccionados].sort((a, b) => a - b);
+    
+    sortedYears.forEach(year => {
+      for (let month = 0; month < 12; month++) {
+        meses.push(new Date(year, month, 1));
+      }
+    });
+    
     return meses;
-  }, []);
+  }, [anosSeleccionados]);
+
+  // Cantidad de meses a procesar
+  const numMeses = mesesFiltrados.length;
 
   // Procesar presupuestos en flujos mensuales
   const flujosMensuales = useMemo(() => {
+    if (numMeses === 0) return [];
+    
     const flujos: FlujoMensual[] = [];
 
     presupuestos.forEach((p) => {
@@ -138,13 +160,12 @@ export function FlujoEfectivoPresupuesto({
       const frecuencia = p.frecuencia || "mensual";
       const frecuenciaEnMeses = getFrecuenciaEnMeses(frecuencia);
 
-      // Crear array de 36 meses
-      const mesesMonto: number[] = new Array(36).fill(0);
+      // Crear array dinámico de meses
+      const mesesMonto: number[] = new Array(numMeses).fill(0);
 
       // Distribuir el monto según la frecuencia
-      meses36.forEach((mesActual, index) => {
+      mesesFiltrados.forEach((mesActual, index) => {
         const inicioMes = startOfMonth(mesActual);
-        const finMes = addMonths(inicioMes, 1);
 
         // Verificar si el mes está dentro del rango del presupuesto
         const mesEstaEnRango = 
@@ -185,7 +206,7 @@ export function FlujoEfectivoPresupuesto({
     });
 
     return flujos;
-  }, [presupuestos, meses36]);
+  }, [presupuestos, mesesFiltrados, numMeses]);
 
   // Filtrar flujos
   const flujosFiltrados = useMemo(() => {
@@ -196,8 +217,8 @@ export function FlujoEfectivoPresupuesto({
 
   // Calcular totales por mes
   const totalesMensuales = useMemo(() => {
-    const entradas: number[] = new Array(36).fill(0);
-    const salidas: number[] = new Array(36).fill(0);
+    const entradas: number[] = new Array(numMeses).fill(0);
+    const salidas: number[] = new Array(numMeses).fill(0);
 
     flujosMensuales.forEach((flujo) => {
       flujo.meses.forEach((monto, index) => {
@@ -211,22 +232,22 @@ export function FlujoEfectivoPresupuesto({
 
     const saldos: number[] = [];
     let saldoAcumulado = 0;
-    for (let i = 0; i < 36; i++) {
+    for (let i = 0; i < numMeses; i++) {
       saldoAcumulado += entradas[i] - salidas[i];
       saldos.push(saldoAcumulado);
     }
 
     return { entradas, salidas, saldos };
-  }, [flujosMensuales]);
+  }, [flujosMensuales, numMeses]);
 
   // Totales generales
   const totalesGenerales = useMemo(() => {
     return {
       totalEntradas: totalesMensuales.entradas.reduce((a, b) => a + b, 0),
       totalSalidas: totalesMensuales.salidas.reduce((a, b) => a + b, 0),
-      saldoFinal: totalesMensuales.saldos[35] || 0,
+      saldoFinal: totalesMensuales.saldos[numMeses - 1] || 0,
     };
-  }, [totalesMensuales]);
+  }, [totalesMensuales, numMeses]);
 
   // Exportar a Excel
   const exportarExcel = () => {
@@ -239,14 +260,14 @@ export function FlujoEfectivoPresupuesto({
         Frecuencia: f.frecuencia,
         "Monto Base": f.montoTotal,
       };
-      meses36.forEach((mes, i) => {
+      mesesFiltrados.forEach((mes, i) => {
         fila[format(mes, "MMM yyyy", { locale: es })] = f.meses[i];
       });
       return fila;
     });
 
     // Hoja de resumen
-    const resumenData = meses36.map((mes, i) => ({
+    const resumenData = mesesFiltrados.map((mes, i) => ({
       Mes: format(mes, "MMMM yyyy", { locale: es }),
       Entradas: totalesMensuales.entradas[i],
       Salidas: totalesMensuales.salidas[i],
@@ -267,13 +288,17 @@ export function FlujoEfectivoPresupuesto({
     const doc = new jsPDF({ orientation: "landscape" });
     const pageWidth = doc.internal.pageSize.getWidth();
 
+    const anosLabel = anosSeleccionados.length > 0 
+      ? anosSeleccionados.sort().join(", ") 
+      : "Sin años seleccionados";
+    
     doc.setFontSize(16);
-    doc.text("Flujo de Efectivo - Proyección 36 Meses", pageWidth / 2, 15, { align: "center" });
+    doc.text(`Flujo de Efectivo - Proyección ${anosLabel}`, pageWidth / 2, 15, { align: "center" });
     doc.setFontSize(11);
     doc.text(empresaNombre, pageWidth / 2, 22, { align: "center" });
 
-    // Tabla resumen (primeros 12 meses)
-    const resumenData = meses36.slice(0, 12).map((mes, i) => [
+    // Tabla resumen (primeros 12 meses o todos si hay menos)
+    const resumenData = mesesFiltrados.slice(0, 12).map((mes, i) => [
       format(mes, "MMM yy", { locale: es }),
       formatCurrency(totalesMensuales.entradas[i]),
       formatCurrency(totalesMensuales.salidas[i]),
@@ -289,7 +314,7 @@ export function FlujoEfectivoPresupuesto({
       headStyles: { fillColor: [59, 130, 246] },
     });
 
-    doc.save(`Flujo_Efectivo_${empresaNombre}.pdf`);
+    doc.save(`Flujo_Efectivo_${empresaNombre}_${anosLabel}.pdf`);
   };
 
   if (loading) {
@@ -308,7 +333,7 @@ export function FlujoEfectivoPresupuesto({
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Entradas (36 meses)</p>
+                <p className="text-sm text-muted-foreground">Total Entradas ({anosSeleccionados.length > 0 ? `${anosSeleccionados.sort().join(", ")}` : "Sin años"})</p>
                 <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                   {formatCurrency(totalesGenerales.totalEntradas)}
                 </p>
@@ -321,7 +346,7 @@ export function FlujoEfectivoPresupuesto({
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Salidas (36 meses)</p>
+                <p className="text-sm text-muted-foreground">Total Salidas ({anosSeleccionados.length > 0 ? `${anosSeleccionados.sort().join(", ")}` : "Sin años"})</p>
                 <p className="text-2xl font-bold text-red-600 dark:text-red-400">
                   {formatCurrency(totalesGenerales.totalSalidas)}
                 </p>
@@ -353,33 +378,70 @@ export function FlujoEfectivoPresupuesto({
       {/* Filtros y acciones */}
       <Card>
         <CardContent className="pt-4">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
-              <Button
-                variant={filtroTipo === "todos" ? "default" : "outline"}
-                onClick={() => setFiltroTipo("todos")}
-                size="sm"
-              >
-                Todos
-              </Button>
-              <Button
-                variant={filtroTipo === "entradas" ? "default" : "outline"}
-                onClick={() => setFiltroTipo("entradas")}
-                size="sm"
-                className="gap-2"
-              >
-                <TrendingUp className="h-4 w-4" />
-                Entradas
-              </Button>
-              <Button
-                variant={filtroTipo === "salidas" ? "default" : "outline"}
-                onClick={() => setFiltroTipo("salidas")}
-                size="sm"
-                className="gap-2"
-              >
-                <TrendingDown className="h-4 w-4" />
-                Salidas
-              </Button>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Filtro de años */}
+              <div className="flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Años:</span>
+                <div className="flex gap-1 bg-muted p-1 rounded-lg">
+                  {anosDisponibles.map((ano) => {
+                    const isSelected = anosSeleccionados.includes(ano);
+                    return (
+                      <Button
+                        key={ano}
+                        variant={isSelected ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => {
+                          if (isSelected) {
+                            // No permitir deseleccionar si es el último
+                            if (anosSeleccionados.length > 1) {
+                              setAnosSeleccionados(prev => prev.filter(a => a !== ano));
+                            }
+                          } else {
+                            setAnosSeleccionados(prev => [...prev, ano].sort());
+                          }
+                        }}
+                        className="min-w-[60px]"
+                      >
+                        {ano}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Separador vertical */}
+              <div className="h-8 w-px bg-border" />
+
+              {/* Filtro de tipo */}
+              <div className="flex gap-1 bg-muted p-1 rounded-lg">
+                <Button
+                  variant={filtroTipo === "todos" ? "default" : "ghost"}
+                  onClick={() => setFiltroTipo("todos")}
+                  size="sm"
+                >
+                  Todos
+                </Button>
+                <Button
+                  variant={filtroTipo === "entradas" ? "default" : "ghost"}
+                  onClick={() => setFiltroTipo("entradas")}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  Entradas
+                </Button>
+                <Button
+                  variant={filtroTipo === "salidas" ? "default" : "ghost"}
+                  onClick={() => setFiltroTipo("salidas")}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <TrendingDown className="h-4 w-4" />
+                  Salidas
+                </Button>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button variant="default" onClick={exportarPDF} className="gap-2">
@@ -398,12 +460,21 @@ export function FlujoEfectivoPresupuesto({
       {/* Tabla de flujo */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Flujo de Efectivo - Proyección 36 Meses</CardTitle>
+          <CardTitle className="text-lg">Flujo de Efectivo - Proyección {anosSeleccionados.sort().join(", ")}</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Vista rolling desde {format(meses36[0], "MMMM yyyy", { locale: es })} hasta {format(meses36[35], "MMMM yyyy", { locale: es })}
+            {mesesFiltrados.length > 0 ? (
+              <>Vista desde {format(mesesFiltrados[0], "MMMM yyyy", { locale: es })} hasta {format(mesesFiltrados[mesesFiltrados.length - 1], "MMMM yyyy", { locale: es })}</>
+            ) : (
+              "Selecciona al menos un año para ver la proyección"
+            )}
           </p>
         </CardHeader>
         <CardContent>
+          {mesesFiltrados.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Selecciona al menos un año para ver la proyección
+            </div>
+          ) : (
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="min-w-max">
               <Table>
@@ -413,7 +484,7 @@ export function FlujoEfectivoPresupuesto({
                     <TableHead className="sticky left-[200px] z-10 bg-muted/50 min-w-[120px]">Cuenta</TableHead>
                     <TableHead className="min-w-[80px] text-center">Tipo</TableHead>
                     <TableHead className="min-w-[80px] text-center">Frecuencia</TableHead>
-                    {meses36.map((mes, i) => (
+                    {mesesFiltrados.map((mes, i) => (
                       <TableHead key={i} className="min-w-[100px] text-right">
                         {format(mes, "MMM yy", { locale: es })}
                       </TableHead>
@@ -423,7 +494,7 @@ export function FlujoEfectivoPresupuesto({
                 <TableBody>
                   {flujosFiltrados.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={40} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={4 + mesesFiltrados.length} className="text-center py-8 text-muted-foreground">
                         No hay presupuestos con fechas configuradas
                       </TableCell>
                     </TableRow>
@@ -519,6 +590,7 @@ export function FlujoEfectivoPresupuesto({
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
+          )}
         </CardContent>
       </Card>
     </div>
