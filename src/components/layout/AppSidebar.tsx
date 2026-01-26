@@ -24,6 +24,7 @@ import {
   Users2,
   Calculator,
   FileSpreadsheet,
+  Calendar,
   BarChart3,
   Settings,
 } from "lucide-react";
@@ -51,6 +52,7 @@ const menuGroups = [
     items: [
       { title: "Presupuestos", icon: Calculator, href: "/presupuestos", roles: ["admin", "contador"] },
       { title: "Asientos Contables", icon: FileSpreadsheet, href: "/asientos", roles: ["admin", "contador"] },
+      { title: "Programación", icon: Calendar, href: "/programacion", roles: ["admin", "contador"] },
     ],
   },
   {
