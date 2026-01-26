@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Plus, Play, Copy, Pencil, Trash2, TrendingUp, TrendingDown, Wallet } from "lucide-react";
+import { Plus, Play, Copy, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, Building2, Landmark } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -47,9 +47,25 @@ interface Programacion {
   observaciones: string | null;
   estado: "pendiente" | "ejecutado" | "cancelado";
   asiento_id: string | null;
+  presupuesto_id: string | null;
   empresas: { razon_social: string } | null;
   centros_negocio: { codigo: string; nombre: string } | null;
   terceros: { razon_social: string } | null;
+  presupuestos: { partida: string } | null;
+}
+
+interface CuentaContable {
+  id: string;
+  codigo: string;
+  nombre: string;
+  naturaleza: "deudora" | "acreedora";
+  empresa_id: string;
+}
+
+interface AsientoMovimiento {
+  cuenta_id: string;
+  debe: number;
+  haber: number;
 }
 
 export default function Programacion() {
@@ -68,9 +84,14 @@ export default function Programacion() {
   const [filterEstado, setFilterEstado] = useState<string>("pendiente");
   const [empresas, setEmpresas] = useState<{ id: string; razon_social: string }[]>([]);
 
+  // Saldos bancarios
+  const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
+  const [movimientos, setMovimientos] = useState<AsientoMovimiento[]>([]);
+
   useEffect(() => {
     fetchData();
     fetchEmpresas();
+    fetchCuentasYMovimientos();
   }, []);
 
   const fetchData = async () => {
@@ -81,7 +102,8 @@ export default function Programacion() {
         *,
         empresas(razon_social),
         centros_negocio(codigo, nombre),
-        terceros(razon_social)
+        terceros(razon_social),
+        presupuestos(partida)
       `)
       .order("fecha_programada", { ascending: true });
 
@@ -102,6 +124,35 @@ export default function Programacion() {
     if (data) setEmpresas(data);
   };
 
+  const fetchCuentasYMovimientos = async () => {
+    // Fetch cuentas contables para identificar bancos y cartera
+    const { data: cuentasData } = await supabase
+      .from("cuentas_contables")
+      .select("id, codigo, nombre, naturaleza, empresa_id")
+      .eq("activa", true);
+    
+    if (cuentasData) setCuentas(cuentasData);
+
+    // Fetch movimientos de asientos aplicados
+    const { data: movimientosData } = await supabase
+      .from("asiento_movimientos")
+      .select(`
+        cuenta_id,
+        debe,
+        haber,
+        asientos_contables!inner(estado)
+      `)
+      .eq("asientos_contables.estado", "aplicado");
+
+    if (movimientosData) {
+      setMovimientos(movimientosData.map(m => ({
+        cuenta_id: m.cuenta_id,
+        debe: Number(m.debe),
+        haber: Number(m.haber),
+      })));
+    }
+  };
+
   const filteredProgramaciones = useMemo(() => {
     return programaciones.filter((p) => {
       if (filterEmpresa !== "all" && p.empresa_id !== filterEmpresa) return false;
@@ -110,6 +161,34 @@ export default function Programacion() {
       return true;
     });
   }, [programaciones, filterEmpresa, filterTipo, filterEstado]);
+
+  // Calcular saldos de banco y cartera
+  const saldosBancarios = useMemo(() => {
+    // Identificar cuentas de banco (100-001 o nombre contiene "banco")
+    const cuentasBanco = cuentas.filter(c =>
+      c.codigo.startsWith("100-001") ||
+      c.nombre.toLowerCase().includes("banco")
+    );
+
+    // Identificar cuentas de cartera (100-002 o nombre contiene "cliente", "caja")
+    const cuentasCartera = cuentas.filter(c =>
+      c.codigo.startsWith("100-002") ||
+      c.nombre.toLowerCase().includes("cliente") ||
+      c.nombre.toLowerCase().includes("caja") ||
+      c.nombre.toLowerCase().includes("cartera")
+    );
+
+    const calcularSaldo = (cuentasIds: string[]) => {
+      return movimientos
+        .filter(m => cuentasIds.includes(m.cuenta_id))
+        .reduce((sum, m) => sum + m.debe - m.haber, 0);
+    };
+
+    const saldoBanco = calcularSaldo(cuentasBanco.map(c => c.id));
+    const saldoCartera = calcularSaldo(cuentasCartera.map(c => c.id));
+
+    return { banco: saldoBanco, cartera: saldoCartera };
+  }, [cuentas, movimientos]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -220,8 +299,32 @@ export default function Programacion() {
         </TabsList>
 
         <TabsContent value="programaciones" className="space-y-4">
-          {/* KPI Cards */}
-          <div className="grid gap-4 md:grid-cols-3">
+          {/* KPI Cards - Saldos Bancarios */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Saldo Bancos</CardTitle>
+                <Landmark className="h-4 w-4 text-blue-600" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${saldosBancarios.banco >= 0 ? "text-blue-600" : "text-rose-600"}`}>
+                  {formatCurrency(saldosBancarios.banco)}
+                </div>
+                <p className="text-xs text-muted-foreground">Disponible en cuentas</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Saldo Cartera</CardTitle>
+                <Building2 className="h-4 w-4 text-amber-600" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${saldosBancarios.cartera >= 0 ? "text-amber-600" : "text-rose-600"}`}>
+                  {formatCurrency(saldosBancarios.cartera)}
+                </div>
+                <p className="text-xs text-muted-foreground">Por cobrar</p>
+              </CardContent>
+            </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Ingresos Programados</CardTitle>
@@ -231,7 +334,7 @@ export default function Programacion() {
                 <div className="text-2xl font-bold text-emerald-600">
                   {formatCurrency(kpis.ingresos)}
                 </div>
-                <p className="text-xs text-muted-foreground">Pendientes de ejecutar</p>
+                <p className="text-xs text-muted-foreground">Pendientes</p>
               </CardContent>
             </Card>
             <Card>
@@ -243,7 +346,7 @@ export default function Programacion() {
                 <div className="text-2xl font-bold text-rose-600">
                   {formatCurrency(kpis.egresos)}
                 </div>
-                <p className="text-xs text-muted-foreground">Pendientes de ejecutar</p>
+                <p className="text-xs text-muted-foreground">Pendientes</p>
               </CardContent>
             </Card>
             <Card>
@@ -309,6 +412,7 @@ export default function Programacion() {
                     <TableHead>Fecha</TableHead>
                     <TableHead>Empresa</TableHead>
                     <TableHead>Tipo</TableHead>
+                    <TableHead>Presupuesto</TableHead>
                     <TableHead>Centro de Negocio</TableHead>
                     <TableHead>Tercero</TableHead>
                     <TableHead className="text-right">Monto</TableHead>
@@ -319,13 +423,13 @@ export default function Programacion() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8">
+                      <TableCell colSpan={9} className="text-center py-8">
                         Cargando...
                       </TableCell>
                     </TableRow>
                   ) : filteredProgramaciones.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No hay programaciones
                       </TableCell>
                     </TableRow>
@@ -337,6 +441,15 @@ export default function Programacion() {
                         </TableCell>
                         <TableCell>{prog.empresas?.razon_social}</TableCell>
                         <TableCell>{getTipoBadge(prog.tipo)}</TableCell>
+                        <TableCell>
+                          {prog.presupuestos ? (
+                            <Badge variant="secondary" className="max-w-[200px] truncate">
+                              {prog.presupuestos.partida}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           {prog.centros_negocio
                             ? `${prog.centros_negocio.codigo} - ${prog.centros_negocio.nombre}`
