@@ -113,7 +113,7 @@ export function calcularSaldosCuentas(
     const asiento = asientoMap.get(mov.asiento_id);
     if (!asiento) return;
     
-    const fechaAsiento = new Date(asiento.fecha);
+    const fechaAsiento = new Date(asiento.fecha + "T00:00:00");
     
     if (fechaInicio && fechaAsiento < fechaInicio) {
       movimientosAnteriores.push(mov);

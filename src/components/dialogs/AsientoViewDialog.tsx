@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDateLong } from "@/lib/date-utils";
 import {
   Dialog,
   DialogContent,
@@ -129,12 +130,7 @@ export function AsientoViewDialog({
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("es-MX", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    return formatDateLong(dateStr);
   };
 
   if (!asiento) return null;
