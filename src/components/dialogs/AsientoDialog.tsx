@@ -106,6 +106,8 @@ interface AsientoDialogProps {
   asiento: AsientoContable | null;
   empresas: Empresa[];
   onSuccess: () => void;
+  initialMovimientos?: Movimiento[];
+  isCopy?: boolean;
 }
 
 const asientoSchema = z.object({
@@ -138,6 +140,8 @@ export function AsientoDialog({
   asiento,
   empresas,
   onSuccess,
+  initialMovimientos,
+  isCopy = false,
 }: AsientoDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -177,25 +181,37 @@ export function AsientoDialog({
     }
   }, [open]);
 
-  // Hydrate form when editing
+  // Hydrate form when editing or copying
   useEffect(() => {
     if (open) {
       if (asiento) {
         setForm({
           empresa_id: asiento.empresa_id,
-          fecha: asiento.fecha,
+          fecha: isCopy ? new Date().toISOString().split("T")[0] : asiento.fecha,
           tipo: asiento.tipo,
           tercero_id: asiento.tercero_id || "",
           centro_negocio_id: asiento.centro_negocio_id || "",
-          observaciones: asiento.observaciones || "",
+          observaciones: isCopy 
+            ? `Copia de #${asiento.numero_asiento}${asiento.observaciones ? ` - ${asiento.observaciones}` : ""}`
+            : asiento.observaciones || "",
         });
-        loadMovimientos(asiento.id);
+        // If copying with initial movimientos, use those; otherwise load from DB
+        if (isCopy && initialMovimientos) {
+          setMovimientos(initialMovimientos.map((m, idx) => ({
+            ...m,
+            id: undefined,
+            isNew: true,
+            orden: idx,
+          })));
+        } else {
+          loadMovimientos(asiento.id);
+        }
       } else {
         setForm(emptyForm);
         setMovimientos([]);
       }
     }
-  }, [open, asiento]);
+  }, [open, asiento, isCopy, initialMovimientos]);
 
   const loadEmpresas = async () => {
     const { data } = await supabase
@@ -408,7 +424,7 @@ export function AsientoDialog({
 
       let asientoId: string;
 
-      if (asiento) {
+      if (asiento && !isCopy) {
         // Update existing
         const { error } = await supabase
           .from("asientos_contables")
@@ -423,7 +439,7 @@ export function AsientoDialog({
           .delete()
           .eq("asiento_id", asiento.id);
       } else {
-        // Create new
+        // Create new (including copy mode)
         const { data: newAsiento, error } = await supabase
           .from("asientos_contables")
           .insert({ ...asientoData, created_by: user?.id })
@@ -449,7 +465,7 @@ export function AsientoDialog({
         .insert(movimientosData);
       if (movError) throw movError;
 
-      toast({ title: asiento ? "Asiento actualizado" : "Asiento creado" });
+      toast({ title: asiento && !isCopy ? "Asiento actualizado" : "Asiento creado" });
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
@@ -529,7 +545,11 @@ export function AsientoDialog({
         <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {asiento ? `Editar Asiento #${asiento.numero_asiento}` : "Nuevo Asiento Contable"}
+              {isCopy 
+                ? `Copiar Asiento #${asiento?.numero_asiento}` 
+                : asiento 
+                  ? `Editar Asiento #${asiento.numero_asiento}` 
+                  : "Nuevo Asiento Contable"}
             </DialogTitle>
           </DialogHeader>
 
