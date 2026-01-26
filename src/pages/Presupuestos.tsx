@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -162,6 +163,7 @@ export default function Presupuestos() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterCompany, setFilterCompany] = useState<string>("all");
+  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPresupuesto, setEditingPresupuesto] = useState<Presupuesto | null>(null);
   const [expandedEmpresas, setExpandedEmpresas] = useState<Set<string>>(new Set());
@@ -300,9 +302,10 @@ export default function Presupuestos() {
         p.notas?.toLowerCase().includes(search.toLowerCase()) ||
         p.empresas?.razon_social.toLowerCase().includes(search.toLowerCase());
       const matchesCompany = filterCompany === "all" || p.empresa_id === filterCompany;
-      return matchesSearch && matchesCompany;
+      const matchesEstado = filterEstado === "activos" ? p.activo : !p.activo;
+      return matchesSearch && matchesCompany && matchesEstado;
     });
-  }, [presupuestosConEjercido, search, filterCompany]);
+  }, [presupuestosConEjercido, search, filterCompany, filterEstado]);
 
   // Group by empresa
   const groupedByEmpresa = useMemo(() => {
@@ -490,6 +493,12 @@ export default function Presupuestos() {
                 ))}
               </SelectContent>
             </Select>
+            <Tabs value={filterEstado} onValueChange={(v) => setFilterEstado(v as "activos" | "baja")}>
+              <TabsList>
+                <TabsTrigger value="activos">Activos</TabsTrigger>
+                <TabsTrigger value="baja">Baja</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </CardContent>
       </Card>

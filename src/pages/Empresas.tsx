@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -110,6 +111,7 @@ export default function Empresas() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editingEmpresa, setEditingEmpresa] = useState<Empresa | null>(null);
@@ -140,11 +142,13 @@ export default function Empresas() {
     fetchEmpresas();
   }, []);
 
-  const filteredEmpresas = empresas.filter(
-    (e) =>
+  const filteredEmpresas = empresas.filter((e) => {
+    const matchesSearch =
       e.razon_social.toLowerCase().includes(search.toLowerCase()) ||
-      e.rfc.toLowerCase().includes(search.toLowerCase())
-  );
+      e.rfc.toLowerCase().includes(search.toLowerCase());
+    const matchesEstado = filterEstado === "activos" ? e.activa : !e.activa;
+    return matchesSearch && matchesEstado;
+  });
 
   const openNew = () => {
     setEditingEmpresa(null);
@@ -308,14 +312,22 @@ export default function Empresas() {
               <Building className="h-5 w-5 text-primary" />
               Lista de Empresas
             </CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por RFC o razón social..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
+            <div className="flex items-center gap-4">
+              <Tabs value={filterEstado} onValueChange={(v) => setFilterEstado(v as "activos" | "baja")}>
+                <TabsList>
+                  <TabsTrigger value="activos">Activos</TabsTrigger>
+                  <TabsTrigger value="baja">Baja</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por RFC o razón social..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
