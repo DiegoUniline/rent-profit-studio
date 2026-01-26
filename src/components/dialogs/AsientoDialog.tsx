@@ -518,7 +518,7 @@ export function AsientoDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {asiento ? `Editar Asiento #${asiento.numero_asiento}` : "Nuevo Asiento Contable"}
@@ -646,22 +646,22 @@ export function AsientoDialog({
                     : "Primero seleccione una empresa"}
                 </div>
               ) : (
-                <div className="border rounded-lg overflow-x-auto">
+                <div className="border rounded-lg overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[200px]">Cuenta</TableHead>
-                        <TableHead className="w-[180px]">Partida</TableHead>
-                        <TableHead className="w-[180px]">Presupuesto</TableHead>
-                        <TableHead className="w-[120px] text-right">Debe</TableHead>
-                        <TableHead className="w-[120px] text-right">Haber</TableHead>
-                        <TableHead className="w-[80px]"></TableHead>
+                        <TableHead className="min-w-[140px]">Cuenta</TableHead>
+                        <TableHead className="min-w-[120px]">Partida</TableHead>
+                        <TableHead className="min-w-[120px]">Presupuesto</TableHead>
+                        <TableHead className="w-[100px] text-right">Debe</TableHead>
+                        <TableHead className="w-[100px] text-right">Haber</TableHead>
+                        <TableHead className="w-[70px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {movimientos.map((mov, idx) => (
                         <TableRow key={idx}>
-                          <TableCell>
+                          <TableCell className="p-1">
                             <SearchableSelect
                               value={mov.cuenta_id}
                               onValueChange={(value) => updateMovimiento(idx, "cuenta_id", value)}
@@ -673,14 +673,15 @@ export function AsientoDialog({
                               createLabel="Nueva cuenta"
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="p-1">
                             <Input
                               value={mov.partida}
                               onChange={(e) => updateMovimiento(idx, "partida", e.target.value)}
                               placeholder="Descripción"
+                              className="h-9"
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="p-1">
                             <SearchableSelect
                               value={mov.presupuesto_id || ""}
                               onValueChange={(value) => updateMovimiento(idx, "presupuesto_id", value)}
@@ -690,7 +691,7 @@ export function AsientoDialog({
                               emptyMessage="No hay presupuestos"
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="p-1">
                             <Input
                               type="number"
                               step="0.01"
@@ -699,10 +700,10 @@ export function AsientoDialog({
                               onChange={(e) =>
                                 updateMovimiento(idx, "debe", parseFloat(e.target.value) || 0)
                               }
-                              className="text-right"
+                              className="text-right h-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="p-1">
                             <Input
                               type="number"
                               step="0.01"
@@ -711,30 +712,30 @@ export function AsientoDialog({
                               onChange={(e) =>
                                 updateMovimiento(idx, "haber", parseFloat(e.target.value) || 0)
                               }
-                              className="text-right"
+                              className="text-right h-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
+                          <TableCell className="p-1">
+                            <div className="flex gap-0.5">
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => duplicateMovimiento(idx)}
                                 title="Duplicar línea"
-                                className="h-8 w-8"
+                                className="h-7 w-7"
                               >
-                                <Copy className="h-4 w-4" />
+                                <Copy className="h-3.5 w-3.5" />
                               </Button>
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => removeMovimiento(idx)}
-                                className="text-destructive h-8 w-8"
+                                className="text-destructive h-7 w-7"
                                 title="Eliminar línea"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </div>
                           </TableCell>
