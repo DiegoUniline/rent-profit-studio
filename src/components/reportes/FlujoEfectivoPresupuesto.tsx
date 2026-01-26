@@ -327,41 +327,41 @@ export function FlujoEfectivoPresupuesto({
 
   return (
     <div className="space-y-4">
-      {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
+      {/* KPIs - Contenedor independiente */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card className="flex-1">
           <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Entradas ({anosSeleccionados.length > 0 ? `${anosSeleccionados.sort().join(", ")}` : "Sin años"})</p>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-muted-foreground truncate">Total Entradas ({anosSeleccionados.length > 0 ? `${anosSeleccionados.sort().join(", ")}` : "Sin años"})</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400 truncate">
                   {formatCurrency(totalesGenerales.totalEntradas)}
                 </p>
               </div>
-              <TrendingUp className="h-8 w-8 text-green-600 opacity-50" />
+              <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 opacity-50 shrink-0" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="flex-1">
           <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Salidas ({anosSeleccionados.length > 0 ? `${anosSeleccionados.sort().join(", ")}` : "Sin años"})</p>
-                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-muted-foreground truncate">Total Salidas ({anosSeleccionados.length > 0 ? `${anosSeleccionados.sort().join(", ")}` : "Sin años"})</p>
+                <p className="text-xl sm:text-2xl font-bold text-red-600 dark:text-red-400 truncate">
                   {formatCurrency(totalesGenerales.totalSalidas)}
                 </p>
               </div>
-              <TrendingDown className="h-8 w-8 text-red-600 opacity-50" />
+              <TrendingDown className="h-6 w-6 sm:h-8 sm:w-8 text-red-600 opacity-50 shrink-0" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="flex-1">
           <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Saldo Final Proyectado</p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-muted-foreground truncate">Saldo Final Proyectado</p>
                 <p className={cn(
-                  "text-2xl font-bold",
+                  "text-xl sm:text-2xl font-bold truncate",
                   totalesGenerales.saldoFinal >= 0 
                     ? "text-green-600 dark:text-green-400" 
                     : "text-red-600 dark:text-red-400"
@@ -369,7 +369,7 @@ export function FlujoEfectivoPresupuesto({
                   {formatCurrency(totalesGenerales.saldoFinal)}
                 </p>
               </div>
-              <DollarSign className="h-8 w-8 text-primary opacity-50" />
+              <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-primary opacity-50 shrink-0" />
             </div>
           </CardContent>
         </Card>

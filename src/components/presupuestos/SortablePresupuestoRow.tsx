@@ -64,7 +64,7 @@ export function SortablePresupuestoRow({
       style={style}
       className={cn(
         !p.activo && "opacity-50",
-        isDragging && "bg-muted shadow-lg z-50 opacity-90"
+        isDragging && "opacity-30 bg-muted"
       )}
     >
       {canEdit && (
