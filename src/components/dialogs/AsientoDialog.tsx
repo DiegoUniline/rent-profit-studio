@@ -360,12 +360,12 @@ export function AsientoDialog({
     }
 
     const invalidMovimientos = movimientos.filter(
-      (m) => !m.cuenta_id || !m.partida || (m.debe === 0 && m.haber === 0)
+      (m) => !m.cuenta_id || (m.debe === 0 && m.haber === 0)
     );
     if (invalidMovimientos.length > 0) {
       toast({
         title: "Error",
-        description: "Todos los movimientos deben tener cuenta, partida y un monto",
+        description: "Todos los movimientos deben tener cuenta y un monto en Debe o Haber",
         variant: "destructive",
       });
       return;
