@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -49,6 +50,7 @@ export default function CentrosNegocio() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
+  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCentro, setEditingCentro] = useState<CentroNegocio | null>(null);
 
@@ -134,7 +136,8 @@ export default function CentrosNegocio() {
       centro.nombre.toLowerCase().includes(search.toLowerCase());
     const matchesEmpresa =
       filterEmpresa === "all" || centro.empresa_id === filterEmpresa;
-    return matchesSearch && matchesEmpresa;
+    const matchesEstado = filterEstado === "activos" ? centro.activo : !centro.activo;
+    return matchesSearch && matchesEmpresa && matchesEstado;
   });
 
   return (
@@ -154,10 +157,18 @@ export default function CentrosNegocio() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Briefcase className="h-5 w-5 text-primary" />
-            Lista de Centros de Negocio
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-primary" />
+              Lista de Centros de Negocio
+            </CardTitle>
+            <Tabs value={filterEstado} onValueChange={(v) => setFilterEstado(v as "activos" | "baja")}>
+              <TabsList>
+                <TabsTrigger value="activos">Activos</TabsTrigger>
+                <TabsTrigger value="baja">Baja</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="mb-4 flex flex-col gap-4 sm:flex-row">
