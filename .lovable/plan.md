@@ -1,156 +1,102 @@
 
-# Plan de Correcciones para Modulo Programacion
+# Corrección de Overflow en Filtros de Flujo de Efectivo
 
-## Problemas Identificados
+## Problema Identificado
+El área de filtros en el componente `FlujoEfectivoPresupuesto` se desborda cuando los elementos (botones de años + filtros de tipo + botones de exportar) exceden el ancho disponible del contenedor.
 
-1. **Overflow en el dialogo**: El componente `SearchableSelect` no soporta refs correctamente, causando problemas de posicionamiento de los dropdowns
-2. **Grafica sin colores**: Las variables CSS para colores de graficas (`--chart-1`, `--chart-2`, `--chart-3`) no estan definidas en el sistema de diseno
-3. **Falta indicador de estado**: El usuario necesita diferenciar visualmente entre Programado y Ejecutado
+**Causa raíz**: El contenedor usa `flex-wrap` pero los grupos de botones internos no permiten que se ajusten correctamente en pantallas pequeñas o cuando hay muchos elementos.
 
----
+## Solución Propuesta
+Reorganizar el layout de filtros para que:
+1. Los filtros se apilen verticalmente en pantallas pequeñas
+2. Los grupos de botones tengan `flex-wrap` para ajustarse al espacio disponible
+3. Agregar `overflow-hidden` al contenedor padre para prevenir desbordamiento visual
 
-## Solucion 1: Corregir Overflow del Dialogo
+## Cambios Específicos
 
-### Problema
-El `SearchableSelect` usa un `Popover` que puede desbordarse fuera del dialogo cuando hay muchos elementos.
+### Archivo: `src/components/reportes/FlujoEfectivoPresupuesto.tsx`
 
-### Solucion
-- Agregar `overflow-y-auto` y `max-h-[80vh]` al contenido del dialogo
-- Ajustar el `PopoverContent` en `SearchableSelect` para posicionarse correctamente con `sideOffset` y limitar su altura
+| Ubicación | Cambio |
+|-----------|--------|
+| Línea 381 | Agregar `overflow-hidden` al contenedor principal de filtros |
+| Línea 382 | Agregar `flex-wrap` y `min-w-0` al grupo de filtros izquierdo |
+| Líneas 384-412 | Envolver el grupo de años en un contenedor con `flex-wrap` |
+| Líneas 418-444 | Envolver el grupo de tipo en un contenedor con `flex-wrap` |
 
-### Cambios
-| Archivo | Modificacion |
-|---------|--------------|
-| `src/components/dialogs/ProgramacionDialog.tsx` | Agregar `className="max-h-[80vh] overflow-y-auto"` al contenedor de contenido |
-| `src/components/ui/searchable-select.tsx` | Limitar altura del `CommandList` con `max-h-[200px]` y agregar `forwardRef` para compatibilidad |
+### Código Actual vs Propuesto
 
----
-
-## Solucion 2: Agregar Colores a la Grafica de Proyeccion
-
-### Problema
-La grafica usa variables CSS (`--chart-1`, `--chart-2`, `--chart-3`) que no existen en `index.css`.
-
-### Solucion
-Agregar variables de colores para graficas al sistema de diseno.
-
-### Cambios
-| Archivo | Modificacion |
-|---------|--------------|
-| `src/index.css` | Agregar variables `--chart-1` a `--chart-5` en `:root` y `.dark` |
-
-### Paleta de colores propuesta
-```text
-chart-1: Rojo/Rosa (egresos)     → 0 84% 60%
-chart-2: Verde esmeralda (ingresos) → 160 84% 45%
-chart-3: Azul (balance)          → 199 89% 48%
-chart-4: Ambar (advertencia)     → 38 92% 50%
-chart-5: Morado (otros)          → 270 70% 60%
-```
-
----
-
-## Solucion 3: Pestanas de Estado Programado/Ejecutado
-
-### Problema
-El usuario quiere ver facilmente que items estan programados vs ejecutados.
-
-### Solucion
-Agregar pestanas secundarias dentro de "Programaciones" para filtrar por estado:
-- **Pendientes** (default): Solo items con estado "pendiente"
-- **Ejecutados**: Items con estado "ejecutado"  
-- **Todos**: Sin filtro de estado
-
-### Cambios
-| Archivo | Modificacion |
-|---------|--------------|
-| `src/pages/Programacion.tsx` | Reemplazar el dropdown de filtro de estado por `Tabs` visuales mas prominentes |
-
-### Estructura visual propuesta
-```text
-+----------------------------------------------------------+
-|  PROGRAMACION FINANCIERA                            [+]  |
-+----------------------------------------------------------+
-| [Programaciones]  [Proyeccion]                           |
-+----------------------------------------------------------+
-| [Pendientes ●12] [Ejecutados ●5] [Cancelados ●2]         |
-+----------------------------------------------------------+
-| Filtros: [Empresa ▼] [Tipo ▼]                            |
-+----------------------------------------------------------+
-| Tabla...                                                  |
-+----------------------------------------------------------+
-```
-
----
-
-## Seccion Tecnica
-
-### Cambio en SearchableSelect (forwardRef)
-```typescript
-export const SearchableSelect = React.forwardRef<HTMLDivElement, SearchableSelectProps>(
-  ({ value, onValueChange, options, ... }, ref) => {
-    // ... existing code
-    return (
-      <div ref={ref} className={cn("flex gap-2", className)}>
-        {/* existing JSX */}
+**Actual (líneas 378-458):**
+```html
+<Card>
+  <CardContent className="pt-4">
+    <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center gap-4">
+        <!-- Filtros sin restricción de overflow -->
       </div>
-    );
-  }
-);
+    </div>
+  </CardContent>
+</Card>
 ```
 
-### Variables CSS para graficas
-```css
-:root {
-  --chart-1: 0 84% 60%;      /* Rojo - egresos */
-  --chart-2: 160 84% 45%;    /* Verde - ingresos */
-  --chart-3: 199 89% 48%;    /* Azul - balance */
-  --chart-4: 38 92% 50%;     /* Ambar */
-  --chart-5: 270 70% 60%;    /* Morado */
-}
+**Propuesto:**
+```html
+<Card>
+  <CardContent className="pt-4">
+    <div className="flex flex-col gap-4">
+      {/* Fila de filtros */}
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Filtro de años */}
+        <div className="flex flex-wrap items-center gap-2">
+          <CalendarDays />
+          <span>Años:</span>
+          <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-lg">
+            {/* Botones de años */}
+          </div>
+        </div>
+
+        <div className="h-8 w-px bg-border hidden sm:block" />
+
+        {/* Filtro de tipo */}
+        <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-lg">
+          {/* Botones de tipo */}
+        </div>
+      </div>
+
+      {/* Fila de acciones (exportar) */}
+      <div className="flex flex-wrap gap-2">
+        <Button>PDF</Button>
+        <Button>Excel</Button>
+      </div>
+    </div>
+  </CardContent>
+</Card>
 ```
 
-### Tabs de estado (fragmento)
-```typescript
-<div className="flex gap-2 mb-4">
-  <Button 
-    variant={filterEstado === "pendiente" ? "default" : "outline"}
-    onClick={() => setFilterEstado("pendiente")}
-  >
-    Pendientes
-    <Badge variant="secondary" className="ml-2">{countPendientes}</Badge>
-  </Button>
-  <Button 
-    variant={filterEstado === "ejecutado" ? "default" : "outline"}
-    onClick={() => setFilterEstado("ejecutado")}
-  >
-    Ejecutados
-    <Badge variant="secondary" className="ml-2">{countEjecutados}</Badge>
-  </Button>
-  <Button 
-    variant={filterEstado === "all" ? "default" : "outline"}
-    onClick={() => setFilterEstado("all")}
-  >
-    Todos
-  </Button>
-</div>
-```
+## Mejoras Adicionales
 
----
+1. **Separador responsivo**: Ocultar el separador vertical en pantallas pequeñas (`hidden sm:block`)
+2. **Botones más compactos**: Reducir `min-w-[60px]` a `min-w-[50px]` para los botones de años
+3. **Layout vertical**: Usar `flex-col` en el contenedor principal para separar filtros de acciones
 
 ## Archivos a Modificar
 
 | Archivo | Tipo de Cambio |
 |---------|----------------|
-| `src/index.css` | Agregar variables CSS para colores de graficas |
-| `src/components/ui/searchable-select.tsx` | Agregar `forwardRef` y limitar altura de lista |
-| `src/components/dialogs/ProgramacionDialog.tsx` | Agregar scroll al contenido del dialogo |
-| `src/pages/Programacion.tsx` | Agregar botones de filtro por estado con contadores |
+| `src/components/reportes/FlujoEfectivoPresupuesto.tsx` | Ajustar clases CSS en la sección de filtros (líneas 378-458) |
 
----
+## Resultado Esperado
 
-## Orden de Implementacion
-1. Agregar variables de color CSS en `index.css`
-2. Corregir `SearchableSelect` con `forwardRef` y limite de altura
-3. Ajustar scroll en `ProgramacionDialog`
-4. Implementar botones de filtro de estado en `Programacion.tsx`
+```text
+En pantallas amplias:
++--------------------------------------------------------+
+| [Años: 2026 2027 2028] | [Todos] [Entradas] [Salidas]  |
+| [PDF] [Excel]                                           |
++--------------------------------------------------------+
+
+En pantallas reducidas:
++--------------------------------+
+| [Años: 2026 2027 2028]         |
+| [Todos] [Entradas] [Salidas]   |
+| [PDF] [Excel]                  |
++--------------------------------+
+```
