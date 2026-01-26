@@ -15,13 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { Users2, Plus, Edit, Power, Eye, Search } from "lucide-react";
 import { TerceroDialog } from "@/components/dialogs/TerceroDialog";
 import { TerceroViewDialog } from "@/components/dialogs/TerceroViewDialog";
@@ -216,30 +210,28 @@ export default function Terceros() {
                 className="pl-10"
               />
             </div>
-            <Select value={filterEmpresa} onValueChange={setFilterEmpresa}>
-              <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder="Empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las empresas</SelectItem>
-                {empresas.map((empresa) => (
-                  <SelectItem key={empresa.id} value={empresa.id}>
-                    {empresa.razon_social}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterTipo} onValueChange={setFilterTipo}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los tipos</SelectItem>
-                <SelectItem value="cliente">Cliente</SelectItem>
-                <SelectItem value="proveedor">Proveedor</SelectItem>
-                <SelectItem value="ambos">Cliente/Proveedor</SelectItem>
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              value={filterEmpresa}
+              onValueChange={setFilterEmpresa}
+              options={empresas.map((e) => ({ value: e.id, label: e.razon_social }))}
+              placeholder="Empresa"
+              searchPlaceholder="Buscar empresa..."
+              allOption={{ value: "all", label: "Todas las empresas" }}
+              className="w-full sm:w-[200px]"
+            />
+            <FilterSelect
+              value={filterTipo}
+              onValueChange={setFilterTipo}
+              options={[
+                { value: "cliente", label: "Cliente" },
+                { value: "proveedor", label: "Proveedor" },
+                { value: "ambos", label: "Cliente/Proveedor" },
+              ]}
+              placeholder="Tipo"
+              searchPlaceholder="Buscar tipo..."
+              allOption={{ value: "all", label: "Todos los tipos" }}
+              className="w-full sm:w-[180px]"
+            />
           </div>
 
           {loading ? (

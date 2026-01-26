@@ -19,16 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon } from "lucide-react";
+import { DateInput } from "@/components/ui/date-input";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { cn } from "@/lib/utils";
 import { z } from "zod";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmpresaDialog } from "./EmpresaDialog";
@@ -519,64 +511,22 @@ export function PresupuestoDialog({
                 {/* Fecha Inicio */}
                 <div className="space-y-2">
                   <Label>Fecha Inicio</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !form.fecha_inicio && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {form.fecha_inicio
-                          ? format(form.fecha_inicio, "dd MMM yyyy", { locale: es })
-                          : "Seleccionar"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={form.fecha_inicio}
-                        onSelect={(date) => setForm({ ...form, fecha_inicio: date })}
-                        initialFocus
-                        locale={es}
-                        className="p-3 pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DateInput
+                    value={form.fecha_inicio}
+                    onChange={(date) => setForm({ ...form, fecha_inicio: date })}
+                    placeholder="Seleccionar"
+                  />
                 </div>
 
                 {/* Fecha Fin */}
                 <div className="space-y-2">
                   <Label>Fecha Fin</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !form.fecha_fin && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {form.fecha_fin
-                          ? format(form.fecha_fin, "dd MMM yyyy", { locale: es })
-                          : "Seleccionar"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={form.fecha_fin}
-                        onSelect={(date) => setForm({ ...form, fecha_fin: date })}
-                        initialFocus
-                        locale={es}
-                        disabled={(date) => form.fecha_inicio ? date < form.fecha_inicio : false}
-                        className="p-3 pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DateInput
+                    value={form.fecha_fin}
+                    onChange={(date) => setForm({ ...form, fecha_fin: date })}
+                    placeholder="Seleccionar"
+                    minDate={form.fecha_inicio}
+                  />
                 </div>
 
                 {/* Frecuencia */}

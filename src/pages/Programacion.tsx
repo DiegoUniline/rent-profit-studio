@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Plus, Play, Copy, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, Building2, Landmark, CalendarIcon, X } from "lucide-react";
+import { Plus, Play, Copy, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, Building2, Landmark, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -17,13 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FilterSelect } from "@/components/ui/filter-select";
+import { DateInput } from "@/components/ui/date-input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,12 +29,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { ProgramacionDialog } from "@/components/dialogs/ProgramacionDialog";
 import { ProyeccionProgramacion } from "@/components/reportes/ProyeccionProgramacion";
 
@@ -474,113 +463,67 @@ export default function Programacion() {
             <div className="h-6 w-px bg-border mx-2" />
 
             {/* Filters */}
-            <Select value={filterEmpresa} onValueChange={(val) => {
-              setFilterEmpresa(val);
-              setFilterCentroNegocio("all");
-              setFilterTercero("all");
-            }}>
-              <SelectTrigger className="w-[180px] h-8">
-                <SelectValue placeholder="Empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las empresas</SelectItem>
-                {empresas.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.razon_social}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              value={filterEmpresa}
+              onValueChange={(val) => {
+                setFilterEmpresa(val);
+                setFilterCentroNegocio("all");
+                setFilterTercero("all");
+              }}
+              options={empresas.map((e) => ({ value: e.id, label: e.razon_social }))}
+              placeholder="Empresa"
+              searchPlaceholder="Buscar empresa..."
+              allOption={{ value: "all", label: "Todas las empresas" }}
+              className="w-[180px] h-8"
+            />
 
-            <Select value={filterCentroNegocio} onValueChange={setFilterCentroNegocio}>
-              <SelectTrigger className="w-[200px] h-8">
-                <SelectValue placeholder="Centro de Negocio" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los centros</SelectItem>
-                {filteredCentrosNegocio.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.codigo} - {c.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              value={filterCentroNegocio}
+              onValueChange={setFilterCentroNegocio}
+              options={filteredCentrosNegocio.map((c) => ({ value: c.id, label: `${c.codigo} - ${c.nombre}` }))}
+              placeholder="Centro de Negocio"
+              searchPlaceholder="Buscar centro..."
+              allOption={{ value: "all", label: "Todos los centros" }}
+              className="w-[200px] h-8"
+            />
 
-            <Select value={filterTercero} onValueChange={setFilterTercero}>
-              <SelectTrigger className="w-[180px] h-8">
-                <SelectValue placeholder="Tercero" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los terceros</SelectItem>
-                {filteredTerceros.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.razon_social}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              value={filterTercero}
+              onValueChange={setFilterTercero}
+              options={filteredTerceros.map((t) => ({ value: t.id, label: t.razon_social }))}
+              placeholder="Tercero"
+              searchPlaceholder="Buscar tercero..."
+              allOption={{ value: "all", label: "Todos los terceros" }}
+              className="w-[180px] h-8"
+            />
 
-            <Select value={filterTipo} onValueChange={setFilterTipo}>
-              <SelectTrigger className="w-[130px] h-8">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="ingreso">Ingresos</SelectItem>
-                <SelectItem value="egreso">Egresos</SelectItem>
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              value={filterTipo}
+              onValueChange={setFilterTipo}
+              options={[
+                { value: "ingreso", label: "Ingresos" },
+                { value: "egreso", label: "Egresos" },
+              ]}
+              placeholder="Tipo"
+              searchPlaceholder="Buscar tipo..."
+              allOption={{ value: "all", label: "Todos" }}
+              className="w-[130px] h-8"
+            />
 
             {/* Date Filters */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    "h-8 justify-start text-left font-normal",
-                    !filterFechaDesde && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-3 w-3" />
-                  {filterFechaDesde ? format(filterFechaDesde, "dd/MM/yy") : "Desde"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={filterFechaDesde}
-                  onSelect={setFilterFechaDesde}
-                  locale={es}
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
+            <DateInput
+              value={filterFechaDesde}
+              onChange={setFilterFechaDesde}
+              placeholder="Desde"
+              className="w-[160px]"
+            />
 
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn(
-                    "h-8 justify-start text-left font-normal",
-                    !filterFechaHasta && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-3 w-3" />
-                  {filterFechaHasta ? format(filterFechaHasta, "dd/MM/yy") : "Hasta"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={filterFechaHasta}
-                  onSelect={setFilterFechaHasta}
-                  locale={es}
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
+            <DateInput
+              value={filterFechaHasta}
+              onChange={setFilterFechaHasta}
+              placeholder="Hasta"
+              className="w-[160px]"
+            />
 
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2">

@@ -16,13 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FilterSelect } from "@/components/ui/filter-select";
 import {
   Collapsible,
   CollapsibleContent,
@@ -589,19 +583,15 @@ export default function Presupuestos() {
                 className="pl-9"
               />
             </div>
-            <Select value={filterCompany} onValueChange={setFilterCompany}>
-              <SelectTrigger className="w-full sm:w-[250px]">
-                <SelectValue placeholder="Filtrar por empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las empresas</SelectItem>
-                {empresas.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.razon_social}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              value={filterCompany}
+              onValueChange={setFilterCompany}
+              options={empresas.map((e) => ({ value: e.id, label: e.razon_social }))}
+              placeholder="Filtrar por empresa"
+              searchPlaceholder="Buscar empresa..."
+              allOption={{ value: "all", label: "Todas las empresas" }}
+              className="w-full sm:w-[250px]"
+            />
             <Tabs value={filterEstado} onValueChange={(v) => setFilterEstado(v as "activos" | "baja")}>
               <TabsList>
                 <TabsTrigger value="activos">Activos</TabsTrigger>

@@ -15,13 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { BookOpen, Plus, Edit, Trash2, Search } from "lucide-react";
 import { CuentaDialog } from "@/components/dialogs/CuentaDialog";
 import { formatCurrency } from "@/lib/accounting-utils";
@@ -280,19 +274,15 @@ export default function Cuentas() {
                   className="pl-9"
                 />
               </div>
-              <Select value={filterEmpresa} onValueChange={setFilterEmpresa}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Todas las empresas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas las empresas</SelectItem>
-                  {empresas.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.razon_social}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FilterSelect
+                value={filterEmpresa}
+                onValueChange={setFilterEmpresa}
+                options={empresas.map((e) => ({ value: e.id, label: e.razon_social }))}
+                placeholder="Todas las empresas"
+                searchPlaceholder="Buscar empresa..."
+                allOption={{ value: "all", label: "Todas las empresas" }}
+                className="w-48"
+              />
               <Tabs value={filterEstado} onValueChange={(v) => setFilterEstado(v as "activos" | "baja")}>
                 <TabsList>
                   <TabsTrigger value="activos">Activos</TabsTrigger>
