@@ -41,6 +41,7 @@ import {
   CheckCircle,
   XCircle,
   Trash2,
+  Copy,
 } from "lucide-react";
 import { AsientoDialog } from "@/components/dialogs/AsientoDialog";
 import { AsientoViewDialog } from "@/components/dialogs/AsientoViewDialog";
@@ -200,6 +201,69 @@ export default function Asientos() {
     } catch (error: any) {
       toast({
         title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCopy = async (asiento: AsientoContable) => {
+    try {
+      // Fetch the movimientos of the original asiento
+      const { data: movimientos, error: movError } = await supabase
+        .from("asiento_movimientos")
+        .select("cuenta_id, partida, debe, haber, orden, presupuesto_id")
+        .eq("asiento_id", asiento.id)
+        .order("orden");
+
+      if (movError) throw movError;
+
+      // Create a new asiento (copy) with today's date and estado borrador
+      const { data: newAsiento, error: asientoError } = await supabase
+        .from("asientos_contables")
+        .insert({
+          empresa_id: asiento.empresa_id,
+          fecha: new Date().toISOString().split("T")[0],
+          tipo: asiento.tipo,
+          tercero_id: asiento.tercero_id,
+          centro_negocio_id: asiento.centro_negocio_id,
+          observaciones: asiento.observaciones ? `Copia de #${asiento.numero_asiento} - ${asiento.observaciones}` : `Copia de asiento #${asiento.numero_asiento}`,
+          estado: "borrador",
+          total_debe: asiento.total_debe,
+          total_haber: asiento.total_haber,
+        })
+        .select()
+        .single();
+
+      if (asientoError) throw asientoError;
+
+      // Copy movimientos to the new asiento
+      if (movimientos && movimientos.length > 0) {
+        const newMovimientos = movimientos.map((m) => ({
+          asiento_id: newAsiento.id,
+          cuenta_id: m.cuenta_id,
+          partida: m.partida,
+          debe: m.debe,
+          haber: m.haber,
+          orden: m.orden,
+          presupuesto_id: m.presupuesto_id,
+        }));
+
+        const { error: insertError } = await supabase
+          .from("asiento_movimientos")
+          .insert(newMovimientos);
+
+        if (insertError) throw insertError;
+      }
+
+      toast({ 
+        title: "Asiento copiado", 
+        description: `Se creó el asiento #${newAsiento.numero_asiento} como borrador` 
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Error al copiar",
         description: error.message,
         variant: "destructive",
       });
@@ -445,6 +509,16 @@ export default function Asientos() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleCopy(asiento)}
+                            title="Copiar asiento"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        )}
                         {canEdit && asiento.estado === "borrador" && (
                           <>
                             <Button
