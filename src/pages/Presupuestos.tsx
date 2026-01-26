@@ -329,7 +329,9 @@ export default function Presupuestos() {
       const matchesSearch =
         p.partida.toLowerCase().includes(search.toLowerCase()) ||
         p.notas?.toLowerCase().includes(search.toLowerCase()) ||
-        p.empresas?.razon_social.toLowerCase().includes(search.toLowerCase());
+        p.empresas?.razon_social.toLowerCase().includes(search.toLowerCase()) ||
+        p.centros_negocio?.nombre?.toLowerCase().includes(search.toLowerCase()) ||
+        p.centros_negocio?.codigo?.toLowerCase().includes(search.toLowerCase());
       const matchesCompany = filterCompany === "all" || p.empresa_id === filterCompany;
       const matchesEstado = filterEstado === "activos" ? p.activo : !p.activo;
       return matchesSearch && matchesCompany && matchesEstado;

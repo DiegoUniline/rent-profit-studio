@@ -18,7 +18,7 @@ interface Presupuesto {
   porcentaje?: number;
   cuentas_contables?: { codigo: string } | null;
   terceros?: { razon_social: string } | null;
-  centros_negocio?: { codigo: string } | null;
+  centros_negocio?: { codigo: string; nombre: string } | null;
   unidades_medida?: { codigo: string } | null;
 }
 
@@ -105,7 +105,9 @@ export function SortablePresupuestoRow({
       </TableCell>
       <TableCell>
         {p.centros_negocio ? (
-          <span className="text-sm">{p.centros_negocio.codigo}</span>
+          <span className="text-sm" title={p.centros_negocio.codigo}>
+            {p.centros_negocio.nombre}
+          </span>
         ) : (
           <span className="text-muted-foreground">-</span>
         )}
