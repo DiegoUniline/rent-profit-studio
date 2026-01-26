@@ -1,102 +1,143 @@
 
-# Corrección de Overflow en Filtros de Flujo de Efectivo
+# Plan: Corrección de Fechas y Dropdowns con Buscador
 
-## Problema Identificado
-El área de filtros en el componente `FlujoEfectivoPresupuesto` se desborda cuando los elementos (botones de años + filtros de tipo + botones de exportar) exceden el ancho disponible del contenedor.
+## Problemas Identificados
 
-**Causa raíz**: El contenedor usa `flex-wrap` pero los grupos de botones internos no permiten que se ajusten correctamente en pantallas pequeñas o cuando hay muchos elementos.
+### 1. Problema de Fechas
+El calendario actual de `react-day-picker` no permite navegar fácilmente a años lejanos. Cuando se intenta seleccionar "1 de enero de 2016", el calendario no navega correctamente al año deseado porque solo tiene botones de mes anterior/siguiente. Además, la fecha seleccionada no se muestra correctamente.
+
+### 2. Dropdowns sin Búsqueda
+Muchos selectores en el sistema usan el componente `Select` estándar que no permite buscar/filtrar opciones, lo cual dificulta encontrar elementos cuando hay muchos registros.
+
+---
 
 ## Solución Propuesta
-Reorganizar el layout de filtros para que:
-1. Los filtros se apilen verticalmente en pantallas pequeñas
-2. Los grupos de botones tengan `flex-wrap` para ajustarse al espacio disponible
-3. Agregar `overflow-hidden` al contenedor padre para prevenir desbordamiento visual
 
-## Cambios Específicos
+### Parte 1: Crear Componente DateInput Editable
 
-### Archivo: `src/components/reportes/FlujoEfectivoPresupuesto.tsx`
+Crear un nuevo componente `DateInput` que combine:
+- **Campo de texto editable** para escribir la fecha directamente (formato dd/MM/yyyy)
+- **Botón de calendario** que abre un picker con dropdowns de mes/año
+- **Validación** de formato y fechas válidas
 
-| Ubicación | Cambio |
-|-----------|--------|
-| Línea 381 | Agregar `overflow-hidden` al contenedor principal de filtros |
-| Línea 382 | Agregar `flex-wrap` y `min-w-0` al grupo de filtros izquierdo |
-| Líneas 384-412 | Envolver el grupo de años en un contenedor con `flex-wrap` |
-| Líneas 418-444 | Envolver el grupo de tipo en un contenedor con `flex-wrap` |
-
-### Código Actual vs Propuesto
-
-**Actual (líneas 378-458):**
-```html
-<Card>
-  <CardContent className="pt-4">
-    <div className="flex flex-wrap items-center justify-between gap-4">
-      <div className="flex flex-wrap items-center gap-4">
-        <!-- Filtros sin restricción de overflow -->
-      </div>
-    </div>
-  </CardContent>
-</Card>
+```text
++--------------------------------------------------+
+|  [  01/01/2016  ]  [📅]                          |
++--------------------------------------------------+
+         ↓ Al hacer clic en el icono
++--------------------------------------------------+
+|  < Enero ▼    2016 ▼ >                          |
+|  Lu Ma Mi Ju Vi Sa Do                           |
+|  ...calendario...                                |
++--------------------------------------------------+
 ```
 
-**Propuesto:**
-```html
-<Card>
-  <CardContent className="pt-4">
-    <div className="flex flex-col gap-4">
-      {/* Fila de filtros */}
-      <div className="flex flex-wrap items-center gap-4">
-        {/* Filtro de años */}
-        <div className="flex flex-wrap items-center gap-2">
-          <CalendarDays />
-          <span>Años:</span>
-          <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-lg">
-            {/* Botones de años */}
-          </div>
-        </div>
+### Parte 2: Mejorar Calendar con Navegación por Año
 
-        <div className="h-8 w-px bg-border hidden sm:block" />
+Modificar el componente `Calendar` para incluir:
+- `captionLayout="dropdown-buttons"` - Permite seleccionar mes y año con dropdowns
+- `fromYear={1990}` y `toYear={2050}` - Rango de años navegables
 
-        {/* Filtro de tipo */}
-        <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-lg">
-          {/* Botones de tipo */}
-        </div>
-      </div>
+### Parte 3: Convertir Selects a Componentes con Búsqueda
 
-      {/* Fila de acciones (exportar) */}
-      <div className="flex flex-wrap gap-2">
-        <Button>PDF</Button>
-        <Button>Excel</Button>
-      </div>
-    </div>
-  </CardContent>
-</Card>
-```
+Crear un nuevo componente `FilterSelect` para filtros de páginas que incluya búsqueda, y reemplazar todos los `Select` actuales en:
 
-## Mejoras Adicionales
+| Página/Componente | Uso Actual |
+|-------------------|------------|
+| Dashboard.tsx | Filtro de empresa |
+| Reportes.tsx | Filtro de empresa |
+| Terceros.tsx | Filtros de empresa y tipo |
+| CentrosNegocio.tsx | Filtro de empresa |
+| Cuentas.tsx | Filtro de empresa |
+| Presupuestos.tsx | Filtro de empresa |
 
-1. **Separador responsivo**: Ocultar el separador vertical en pantallas pequeñas (`hidden sm:block`)
-2. **Botones más compactos**: Reducir `min-w-[60px]` a `min-w-[50px]` para los botones de años
-3. **Layout vertical**: Usar `flex-col` en el contenedor principal para separar filtros de acciones
+---
+
+## Archivos a Crear
+
+| Archivo | Descripción |
+|---------|-------------|
+| `src/components/ui/date-input.tsx` | Componente DateInput editable con calendario mejorado |
+| `src/components/ui/filter-select.tsx` | Componente Select con buscador para filtros de página |
 
 ## Archivos a Modificar
 
-| Archivo | Tipo de Cambio |
-|---------|----------------|
-| `src/components/reportes/FlujoEfectivoPresupuesto.tsx` | Ajustar clases CSS en la sección de filtros (líneas 378-458) |
+| Archivo | Cambios |
+|---------|---------|
+| `src/components/ui/calendar.tsx` | Añadir props `captionLayout`, `fromYear`, `toYear` con estilos para dropdowns |
+| `src/pages/Reportes.tsx` | Reemplazar date pickers y Select por nuevos componentes |
+| `src/pages/Dashboard.tsx` | Reemplazar Select por FilterSelect |
+| `src/pages/Terceros.tsx` | Reemplazar Selects por FilterSelect |
+| `src/pages/CentrosNegocio.tsx` | Reemplazar Select por FilterSelect |
+| `src/pages/Cuentas.tsx` | Reemplazar Select por FilterSelect |
+| `src/pages/Presupuestos.tsx` | Reemplazar Select por FilterSelect |
+| `src/pages/Programacion.tsx` | Reemplazar date pickers por DateInput |
+| `src/components/dialogs/PresupuestoDialog.tsx` | Reemplazar date pickers por DateInput |
+| `src/components/dialogs/ProgramacionDialog.tsx` | Reemplazar date picker por DateInput |
+
+---
+
+## Detalles Técnicos
+
+### Componente DateInput
+
+```typescript
+interface DateInputProps {
+  value: Date | undefined;
+  onChange: (date: Date | undefined) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  minDate?: Date;
+  maxDate?: Date;
+  className?: string;
+}
+```
+
+**Características:**
+- Input de texto que acepta formato "dd/MM/yyyy"
+- Parseo automático al perder foco o presionar Enter
+- Validación visual (borde rojo si fecha inválida)
+- Botón para abrir calendario con dropdowns de mes/año
+- El calendario navega automáticamente a la fecha seleccionada o actual
+
+### Componente FilterSelect
+
+```typescript
+interface FilterSelectProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+  placeholder?: string;
+  allOption?: { value: string; label: string };
+  className?: string;
+}
+```
+
+**Características:**
+- Dropdown con campo de búsqueda integrado
+- Opción "Todos" configurable
+- Estilos consistentes con el resto del sistema
+- Z-index alto para evitar problemas de superposición
+
+### Mejoras al Calendar
+
+Añadir estas clases CSS para los dropdowns de mes/año:
+
+```typescript
+classNames={{
+  // ... clases existentes ...
+  caption_dropdowns: "flex gap-2",
+  dropdown_month: "...",
+  dropdown_year: "...",
+  dropdown: "...",
+}}
+```
+
+---
 
 ## Resultado Esperado
 
-```text
-En pantallas amplias:
-+--------------------------------------------------------+
-| [Años: 2026 2027 2028] | [Todos] [Entradas] [Salidas]  |
-| [PDF] [Excel]                                           |
-+--------------------------------------------------------+
-
-En pantallas reducidas:
-+--------------------------------+
-| [Años: 2026 2027 2028]         |
-| [Todos] [Entradas] [Salidas]   |
-| [PDF] [Excel]                  |
-+--------------------------------+
-```
+1. **Fechas correctas**: Al escribir "01/01/2016" o seleccionar en el calendario, se mostrará exactamente esa fecha
+2. **Navegación rápida**: Dropdowns de mes y año permiten saltar directamente a cualquier fecha entre 1990-2050
+3. **Búsqueda en filtros**: Todos los selectores de empresa y tipo tendrán un campo de búsqueda para encontrar opciones rápidamente
+4. **Consistencia**: Todos los date pickers y selectores del sistema funcionarán de manera uniforme
