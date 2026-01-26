@@ -145,8 +145,8 @@ export default function Asientos() {
             terceros(id, razon_social),
             centros_negocio(id, codigo, nombre)
           `)
-          .order("fecha", { ascending: false })
-          .order("numero_asiento", { ascending: false }),
+          .order("fecha", { ascending: true })
+          .order("numero_asiento", { ascending: true }),
         supabase
           .from("empresas")
           .select("id, razon_social")
