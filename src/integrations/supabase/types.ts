@@ -462,6 +462,83 @@ export type Database = {
         }
         Relationships: []
       }
+      programaciones: {
+        Row: {
+          asiento_id: string | null
+          centro_negocio_id: string | null
+          created_at: string
+          created_by: string | null
+          empresa_id: string
+          estado: Database["public"]["Enums"]["estado_programacion"]
+          fecha_programada: string
+          id: string
+          monto: number
+          observaciones: string | null
+          tercero_id: string | null
+          tipo: Database["public"]["Enums"]["tipo_programacion"]
+          updated_at: string
+        }
+        Insert: {
+          asiento_id?: string | null
+          centro_negocio_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          empresa_id: string
+          estado?: Database["public"]["Enums"]["estado_programacion"]
+          fecha_programada: string
+          id?: string
+          monto?: number
+          observaciones?: string | null
+          tercero_id?: string | null
+          tipo: Database["public"]["Enums"]["tipo_programacion"]
+          updated_at?: string
+        }
+        Update: {
+          asiento_id?: string | null
+          centro_negocio_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          empresa_id?: string
+          estado?: Database["public"]["Enums"]["estado_programacion"]
+          fecha_programada?: string
+          id?: string
+          monto?: number
+          observaciones?: string | null
+          tercero_id?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_programacion"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programaciones_asiento_id_fkey"
+            columns: ["asiento_id"]
+            isOneToOne: false
+            referencedRelation: "asientos_contables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programaciones_centro_negocio_id_fkey"
+            columns: ["centro_negocio_id"]
+            isOneToOne: false
+            referencedRelation: "centros_negocio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programaciones_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programaciones_tercero_id_fkey"
+            columns: ["tercero_id"]
+            isOneToOne: false
+            referencedRelation: "terceros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       terceros: {
         Row: {
           activo: boolean
@@ -611,6 +688,7 @@ export type Database = {
       app_role: "admin" | "contador" | "usuario"
       clasificacion_cuenta: "titulo" | "saldo"
       estado_asiento: "borrador" | "aplicado" | "cancelado"
+      estado_programacion: "pendiente" | "ejecutado" | "cancelado"
       frecuencia_presupuesto:
         | "semanal"
         | "mensual"
@@ -621,6 +699,7 @@ export type Database = {
       naturaleza_cuenta: "deudora" | "acreedora"
       tipo_asiento: "ingreso" | "egreso" | "diario"
       tipo_persona: "fisica" | "moral"
+      tipo_programacion: "ingreso" | "egreso"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -751,6 +830,7 @@ export const Constants = {
       app_role: ["admin", "contador", "usuario"],
       clasificacion_cuenta: ["titulo", "saldo"],
       estado_asiento: ["borrador", "aplicado", "cancelado"],
+      estado_programacion: ["pendiente", "ejecutado", "cancelado"],
       frecuencia_presupuesto: [
         "semanal",
         "mensual",
@@ -762,6 +842,7 @@ export const Constants = {
       naturaleza_cuenta: ["deudora", "acreedora"],
       tipo_asiento: ["ingreso", "egreso", "diario"],
       tipo_persona: ["fisica", "moral"],
+      tipo_programacion: ["ingreso", "egreso"],
     },
   },
 } as const
