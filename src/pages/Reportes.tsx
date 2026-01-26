@@ -335,12 +335,12 @@ export default function Reportes() {
       {/* Filtros globales */}
       <Card>
         <CardContent className="pt-4">
-          <div className="flex flex-wrap items-end gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Empresa */}
             <div className="space-y-2">
               <Label>Empresa</Label>
               <Select value={empresaId} onValueChange={setEmpresaId}>
-                <SelectTrigger className="w-[280px]">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleccionar empresa" />
                 </SelectTrigger>
                 <SelectContent>
@@ -361,7 +361,7 @@ export default function Reportes() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-[280px] justify-between font-normal"
+                    className="w-full justify-between font-normal"
                   >
                     <div className="flex items-center gap-2 truncate">
                       <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -430,14 +430,16 @@ export default function Reportes() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-[160px] justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal",
                       !fechaInicio && "text-muted-foreground"
                     )}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {fechaInicio
-                      ? format(fechaInicio, "dd MMM yyyy", { locale: es })
-                      : "Seleccionar"}
+                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                    <span className="truncate">
+                      {fechaInicio
+                        ? format(fechaInicio, "dd MMM yyyy", { locale: es })
+                        : "Seleccionar"}
+                    </span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -447,6 +449,7 @@ export default function Reportes() {
                     onSelect={(date) => date && setFechaInicio(date)}
                     initialFocus
                     locale={es}
+                    className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
@@ -460,14 +463,16 @@ export default function Reportes() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-[160px] justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal",
                       !fechaFin && "text-muted-foreground"
                     )}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {fechaFin
-                      ? format(fechaFin, "dd MMM yyyy", { locale: es })
-                      : "Seleccionar"}
+                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                    <span className="truncate">
+                      {fechaFin
+                        ? format(fechaFin, "dd MMM yyyy", { locale: es })
+                        : "Seleccionar"}
+                    </span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -477,39 +482,40 @@ export default function Reportes() {
                     onSelect={(date) => date && setFechaFin(date)}
                     initialFocus
                     locale={es}
+                    className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
             </div>
+          </div>
 
-            {/* Atajos de período */}
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const now = new Date();
-                  setFechaInicio(startOfMonth(now));
-                  setFechaFin(endOfMonth(now));
-                }}
-              >
-                Este mes
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const now = new Date();
-                  setFechaInicio(startOfYear(now));
-                  setFechaFin(now);
-                }}
-              >
-                Este año
-              </Button>
-            </div>
+          {/* Atajos de período */}
+          <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const now = new Date();
+                setFechaInicio(startOfMonth(now));
+                setFechaFin(endOfMonth(now));
+              }}
+            >
+              Este mes
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const now = new Date();
+                setFechaInicio(startOfYear(now));
+                setFechaFin(now);
+              }}
+            >
+              Este año
+            </Button>
 
             {loadingData && (
-              <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="flex items-center gap-2 text-muted-foreground ml-auto">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span className="text-sm">Cargando...</span>
               </div>
