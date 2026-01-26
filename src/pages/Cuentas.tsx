@@ -202,6 +202,8 @@ export default function Cuentas() {
     
     return cuentas.some(c => {
       if (filterEmpresa !== "all" && c.empresa_id !== filterEmpresa) return false;
+      // Also filter by estado to match visible children
+      if (filterEstado === "activos" ? !c.activa : c.activa) return false;
       const childClean = c.codigo.replace(/[^0-9]/g, "");
       if (level === 1) return childClean.startsWith(clean.slice(0, 3)) && getCodeLevel(c.codigo) === 2;
       if (level === 2) return childClean.startsWith(clean.slice(0, 6)) && getCodeLevel(c.codigo) === 3;
