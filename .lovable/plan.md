@@ -1,83 +1,51 @@
 
-# Plan: Visualización de Nivel por Indentación
+# Plan: Agregar Foreign Key para Proteger Cuentas con Movimientos
 
-## Objetivo
-Cambiar la visualización del catálogo de cuentas para que el nivel jerárquico se muestre a través de la **indentación visual** del nombre, eliminando la columna separada de "Nivel" con badges. Esto hará la tabla más compacta y similar al sistema anterior.
+## Problema Actual
+La tabla `asiento_movimientos` tiene una columna `cuenta_id` que debería referenciar a `cuentas_contables`, pero **no existe una foreign key** que impida eliminar cuentas que tienen movimientos asociados.
 
-## Referencia Visual
-Basado en la imagen proporcionada:
-```text
-100-000-000  activo
-100-001-000     fijo
-100-001-001        maquinaria                    20,000
-```
+Esto significa que actualmente se puede eliminar una cuenta y los movimientos quedarían huérfanos, causando errores en reportes.
 
 ---
 
-## Cambios a Realizar
+## Solución Propuesta
 
-### Archivo: `src/pages/Cuentas.tsx`
+### 1. Migración de Base de Datos
 
-#### 1. Eliminar columna "Nivel" del encabezado
+Agregar una foreign key constraint con `ON DELETE RESTRICT`:
 
-**Antes (línea 376):**
-```tsx
-<TableHead className="w-[100px]">Nivel</TableHead>
+```sql
+-- Add foreign key from asiento_movimientos to cuentas_contables
+ALTER TABLE public.asiento_movimientos
+ADD CONSTRAINT asiento_movimientos_cuenta_id_fkey
+FOREIGN KEY (cuenta_id) 
+REFERENCES public.cuentas_contables(id)
+ON DELETE RESTRICT;
 ```
 
-**Después:** Eliminar esta línea completamente.
-
-#### 2. Eliminar celda de Nivel del cuerpo de la tabla
-
-**Antes (líneas 421-425):**
-```tsx
-<TableCell>
-  <Badge variant="outline" className="text-xs">
-    {level} - {levelLabels[level]}
-  </Badge>
-</TableCell>
-```
-
-**Después:** Eliminar este bloque completamente.
-
-#### 3. Mejorar la indentación visual del nombre
-
-**Antes (líneas 416-420):**
-```tsx
-<TableCell>
-  <span style={{ paddingLeft: `${(level - 1) * 16}px` }}>
-    {cuenta.nombre}
-  </span>
-</TableCell>
-```
-
-**Después:**
-```tsx
-<TableCell>
-  <span 
-    className="inline-block"
-    style={{ paddingLeft: `${(level - 1) * 24}px` }}
-  >
-    {cuenta.nombre}
-  </span>
-</TableCell>
-```
-
-- Aumentar la indentación de 16px a 24px por nivel para que sea más visible
-- Agregar `inline-block` para mejor control del espaciado
+La opcion `ON DELETE RESTRICT` significa:
+- Si intentas borrar una cuenta que tiene movimientos, la base de datos rechazara la operacion
+- El codigo existente ya maneja este error y muestra el mensaje: "No se puede eliminar: la cuenta tiene movimientos asociados"
 
 ---
 
-## Resultado Final
+## Verificacion Previa Necesaria
 
-La tabla tendrá las siguientes columnas:
-| Código | Nombre | Naturaleza | Tipo | Acciones |
+Antes de aplicar la migracion, debemos verificar que no existan movimientos con `cuenta_id` huerfanos:
 
-Y la jerarquía se verá así:
+```sql
+SELECT am.id, am.cuenta_id 
+FROM asiento_movimientos am
+LEFT JOIN cuentas_contables cc ON am.cuenta_id = cc.id
+WHERE cc.id IS NULL;
 ```
-100-000-000  Activo
-100-001-000    Activo Fijo
-100-001-001      Maquinaria
-```
 
-El nivel será claramente visible por la indentación del nombre, similar al sistema anterior que el usuario prefiere.
+Si hay registros huerfanos, habra que limpiarlos primero.
+
+---
+
+## Resultado Esperado
+
+- Las cuentas con movimientos estaran protegidas contra eliminacion accidental
+- El mensaje de error ya existente se mostrara correctamente
+- Los reportes financieros mantendran integridad de datos
