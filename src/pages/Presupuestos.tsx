@@ -41,10 +41,24 @@ import {
   TrendingDown,
   AlertTriangle,
   GripVertical,
-  ArrowUp,
-  ArrowDown,
 } from "lucide-react";
 import { PresupuestoDialog } from "@/components/dialogs/PresupuestoDialog";
+import { SortablePresupuestoRow } from "@/components/presupuestos/SortablePresupuestoRow";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 
 interface Empresa {
   id: string;
@@ -172,6 +186,18 @@ export default function Presupuestos() {
   const [expandedEmpresas, setExpandedEmpresas] = useState<Set<string>>(new Set());
 
   const canEdit = role === "admin" || role === "contador";
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     fetchData();
@@ -350,49 +376,49 @@ export default function Presupuestos() {
     );
   }, [filteredPresupuestos]);
 
-  // Function to move a presupuesto up or down within its company group
-  const handleMovePresupuesto = useCallback(async (presupuestoId: string, direction: 'up' | 'down') => {
-    // Find the empresa group and the presupuesto
-    let targetGroup: typeof groupedByEmpresa[0] | null = null;
-    let presupuestoIndex = -1;
+  // Handle drag end for reordering
+  const handleDragEnd = useCallback(async (event: DragEndEvent, empresaId: string) => {
+    const { active, over } = event;
     
-    for (const group of groupedByEmpresa) {
-      const idx = group.presupuestos.findIndex(p => p.id === presupuestoId);
-      if (idx !== -1) {
-        targetGroup = group;
-        presupuestoIndex = idx;
-        break;
-      }
-    }
+    if (!over || active.id === over.id) return;
     
-    if (!targetGroup || presupuestoIndex === -1) return;
+    // Find the group for this empresa
+    const group = groupedByEmpresa.find(g => g.empresa.id === empresaId);
+    if (!group) return;
     
-    const presupuestosList = targetGroup.presupuestos;
-    const swapIndex = direction === 'up' ? presupuestoIndex - 1 : presupuestoIndex + 1;
+    const oldIndex = group.presupuestos.findIndex(p => p.id === active.id);
+    const newIndex = group.presupuestos.findIndex(p => p.id === over.id);
     
-    // Check bounds
-    if (swapIndex < 0 || swapIndex >= presupuestosList.length) return;
+    if (oldIndex === -1 || newIndex === -1) return;
     
-    const currentItem = presupuestosList[presupuestoIndex];
-    const swapItem = presupuestosList[swapIndex];
+    // Reorder the items
+    const reorderedItems = arrayMove(group.presupuestos, oldIndex, newIndex);
     
-    // Swap orden values in database
+    // Update orden values
+    const updates = reorderedItems.map((item, index) => ({
+      id: item.id,
+      orden: index + 1,
+    }));
+    
+    // Optimistic update
+    setPresupuestos(prev => {
+      const newPresupuestos = [...prev];
+      updates.forEach(update => {
+        const idx = newPresupuestos.findIndex(p => p.id === update.id);
+        if (idx !== -1) {
+          newPresupuestos[idx] = { ...newPresupuestos[idx], orden: update.orden };
+        }
+      });
+      return newPresupuestos;
+    });
+    
+    // Update database
     try {
-      const currentOrden = currentItem.orden || presupuestoIndex;
-      const swapOrden = swapItem.orden || swapIndex;
-      
-      await Promise.all([
-        supabase.from("presupuestos").update({ orden: swapOrden }).eq("id", currentItem.id),
-        supabase.from("presupuestos").update({ orden: currentOrden }).eq("id", swapItem.id),
-      ]);
-      
-      // Optimistic update
-      setPresupuestos(prev => prev.map(p => {
-        if (p.id === currentItem.id) return { ...p, orden: swapOrden };
-        if (p.id === swapItem.id) return { ...p, orden: currentOrden };
-        return p;
-      }));
-      
+      await Promise.all(
+        updates.map(update =>
+          supabase.from("presupuestos").update({ orden: update.orden }).eq("id", update.id)
+        )
+      );
       toast({ title: "Orden actualizado" });
     } catch (error: any) {
       toast({
@@ -400,6 +426,8 @@ export default function Presupuestos() {
         description: error.message,
         variant: "destructive",
       });
+      // Revert on error
+      fetchData();
     }
   }, [groupedByEmpresa, toast]);
 
@@ -639,161 +667,47 @@ export default function Presupuestos() {
                   <CollapsibleContent>
                     <CardContent className="pt-0">
                       <div className="rounded-md border overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              {canEdit && <TableHead className="w-[60px]">Orden</TableHead>}
-                              <TableHead>Partida</TableHead>
-                              <TableHead>Cuenta</TableHead>
-                              <TableHead>Tercero</TableHead>
-                              <TableHead>Centro</TableHead>
-                              <TableHead className="text-right">Presupuesto</TableHead>
-                              <TableHead className="text-right">Ejercido</TableHead>
-                              <TableHead className="text-right">Por Ejercer</TableHead>
-                              <TableHead className="w-[120px]">Avance</TableHead>
-                              <TableHead>Estado</TableHead>
-                              {canEdit && <TableHead className="text-right">Acciones</TableHead>}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {group.presupuestos.map((p, index) => {
-                              const presupuestado = p.cantidad * p.precio_unitario;
-                              const ejercido = p.ejercido || 0;
-                              const porEjercer = p.porEjercer || 0;
-                              const porcentaje = p.porcentaje || 0;
-                              const isFirst = index === 0;
-                              const isLast = index === group.presupuestos.length - 1;
-                              
-                              return (
-                                <TableRow key={p.id} className={!p.activo ? "opacity-50" : ""}>
-                                  {canEdit && (
-                                    <TableCell>
-                                      <div className="flex items-center gap-0.5">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6"
-                                          onClick={() => handleMovePresupuesto(p.id, 'up')}
-                                          disabled={isFirst}
-                                          title="Mover arriba"
-                                        >
-                                          <ArrowUp className="h-3 w-3" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6"
-                                          onClick={() => handleMovePresupuesto(p.id, 'down')}
-                                          disabled={isLast}
-                                          title="Mover abajo"
-                                        >
-                                          <ArrowDown className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                    </TableCell>
-                                  )}
-                                  <TableCell>
-                                    <div>
-                                      <div className="font-medium">{p.partida}</div>
-                                      {p.unidades_medida && (
-                                        <div className="text-xs text-muted-foreground">
-                                          {p.cantidad.toLocaleString("es-MX")} {p.unidades_medida.codigo}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    {p.cuentas_contables ? (
-                                      <span className="text-sm">
-                                        {p.cuentas_contables.codigo}
-                                      </span>
-                                    ) : (
-                                      <span className="text-muted-foreground">-</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {p.terceros ? (
-                                      <span className="text-sm">
-                                        {p.terceros.razon_social}
-                                      </span>
-                                    ) : (
-                                      <span className="text-muted-foreground">-</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {p.centros_negocio ? (
-                                      <span className="text-sm">
-                                        {p.centros_negocio.codigo}
-                                      </span>
-                                    ) : (
-                                      <span className="text-muted-foreground">-</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono">
-                                    {formatCurrency(presupuestado)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-green-600">
-                                    {formatCurrency(ejercido)}
-                                  </TableCell>
-                                  <TableCell className={`text-right font-mono ${porEjercer < 0 ? 'text-destructive' : ''}`}>
-                                    {formatCurrency(porEjercer)}
-                                    {porEjercer < 0 && (
-                                      <AlertTriangle className="h-3 w-3 inline ml-1 text-destructive" />
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                                        <div 
-                                          className={`h-full transition-all ${getProgressColor(porcentaje)}`}
-                                          style={{ width: `${Math.min(porcentaje, 100)}%` }}
-                                        />
-                                      </div>
-                                      <span className={`text-xs font-medium min-w-[40px] ${porcentaje > 100 ? 'text-destructive' : ''}`}>
-                                        {porcentaje.toFixed(0)}%
-                                      </span>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    {porcentaje > 100 ? (
-                                      <Badge variant="destructive">Sobregiro</Badge>
-                                    ) : porcentaje >= 80 ? (
-                                      <Badge variant="outline" className="border-yellow-500 text-yellow-600">
-                                        Alerta
-                                      </Badge>
-                                    ) : p.activo ? (
-                                      <Badge variant="default">Activo</Badge>
-                                    ) : (
-                                      <Badge variant="secondary">Inactivo</Badge>
-                                    )}
-                                  </TableCell>
-                                  {canEdit && (
-                                    <TableCell className="text-right">
-                                      <div className="flex justify-end gap-2">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() => openEdit(p)}
-                                          title="Editar"
-                                        >
-                                          <Edit className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() => handleToggleActivo(p)}
-                                          title={p.activo ? "Desactivar" : "Activar"}
-                                        >
-                                          <Power className="h-4 w-4" />
-                                        </Button>
-                                      </div>
-                                    </TableCell>
-                                  )}
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={(event) => handleDragEnd(event, group.empresa.id)}
+                        >
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                {canEdit && <TableHead className="w-[40px]"></TableHead>}
+                                <TableHead>Partida</TableHead>
+                                <TableHead>Cuenta</TableHead>
+                                <TableHead>Tercero</TableHead>
+                                <TableHead>Centro</TableHead>
+                                <TableHead className="text-right">Presupuesto</TableHead>
+                                <TableHead className="text-right">Ejercido</TableHead>
+                                <TableHead className="text-right">Por Ejercer</TableHead>
+                                <TableHead className="w-[120px]">Avance</TableHead>
+                                <TableHead>Estado</TableHead>
+                                {canEdit && <TableHead className="text-right">Acciones</TableHead>}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              <SortableContext
+                                items={group.presupuestos.map(p => p.id)}
+                                strategy={verticalListSortingStrategy}
+                              >
+                                {group.presupuestos.map((p) => (
+                                  <SortablePresupuestoRow
+                                    key={p.id}
+                                    presupuesto={p}
+                                    canEdit={canEdit}
+                                    formatCurrency={formatCurrency}
+                                    getProgressColor={getProgressColor}
+                                    onEdit={openEdit}
+                                    onToggleActivo={handleToggleActivo}
+                                  />
+                                ))}
+                              </SortableContext>
+                            </TableBody>
+                          </Table>
+                        </DndContext>
                       </div>
                     </CardContent>
                   </CollapsibleContent>
