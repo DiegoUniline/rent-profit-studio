@@ -376,16 +376,16 @@ export function FlujoEfectivoPresupuesto({
       </div>
 
       {/* Filtros y acciones */}
-      <Card className="overflow-hidden">
-        <CardContent className="pt-4">
-          <div className="flex flex-col gap-4">
-            {/* Fila de filtros */}
-            <div className="flex flex-wrap items-center gap-4">
+      <Card>
+        <CardContent className="pt-4 overflow-x-auto">
+          <div className="flex flex-col gap-3">
+            {/* Fila de filtros - responsive */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               {/* Filtro de años */}
-              <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <div className="flex items-center gap-2">
                 <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm font-medium shrink-0">Años:</span>
-                <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-lg">
+                <span className="text-sm font-medium whitespace-nowrap">Años:</span>
+                <div className="flex gap-1 bg-muted p-1 rounded-lg">
                   {anosDisponibles.map((ano) => {
                     const isSelected = anosSeleccionados.includes(ano);
                     return (
@@ -395,7 +395,6 @@ export function FlujoEfectivoPresupuesto({
                         size="sm"
                         onClick={() => {
                           if (isSelected) {
-                            // No permitir deseleccionar si es el último
                             if (anosSeleccionados.length > 1) {
                               setAnosSeleccionados(prev => prev.filter(a => a !== ano));
                             }
@@ -403,7 +402,7 @@ export function FlujoEfectivoPresupuesto({
                             setAnosSeleccionados(prev => [...prev, ano].sort());
                           }
                         }}
-                        className="min-w-[50px]"
+                        className="px-3 h-8"
                       >
                         {ano}
                       </Button>
@@ -412,15 +411,16 @@ export function FlujoEfectivoPresupuesto({
                 </div>
               </div>
 
-              {/* Separador vertical - oculto en móvil */}
-              <div className="h-8 w-px bg-border hidden sm:block" />
+              {/* Separador - oculto en móvil */}
+              <div className="hidden sm:block h-6 w-px bg-border" />
 
               {/* Filtro de tipo */}
-              <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-lg">
+              <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
                 <Button
                   variant={filtroTipo === "todos" ? "default" : "ghost"}
                   onClick={() => setFiltroTipo("todos")}
                   size="sm"
+                  className="h-8"
                 >
                   Todos
                 </Button>
@@ -428,30 +428,30 @@ export function FlujoEfectivoPresupuesto({
                   variant={filtroTipo === "entradas" ? "default" : "ghost"}
                   onClick={() => setFiltroTipo("entradas")}
                   size="sm"
-                  className="gap-2"
+                  className="gap-1 h-8"
                 >
-                  <TrendingUp className="h-4 w-4" />
+                  <TrendingUp className="h-3.5 w-3.5" />
                   Entradas
                 </Button>
                 <Button
                   variant={filtroTipo === "salidas" ? "default" : "ghost"}
                   onClick={() => setFiltroTipo("salidas")}
                   size="sm"
-                  className="gap-2"
+                  className="gap-1 h-8"
                 >
-                  <TrendingDown className="h-4 w-4" />
+                  <TrendingDown className="h-3.5 w-3.5" />
                   Salidas
                 </Button>
               </div>
             </div>
 
-            {/* Fila de acciones (exportar) */}
-            <div className="flex flex-wrap gap-2">
-              <Button variant="default" onClick={exportarPDF} className="gap-2">
+            {/* Fila de acciones */}
+            <div className="flex gap-2">
+              <Button variant="default" size="sm" onClick={exportarPDF} className="gap-1.5">
                 <FileText className="h-4 w-4" />
                 PDF
               </Button>
-              <Button variant="default" onClick={exportarExcel} className="gap-2">
+              <Button variant="default" size="sm" onClick={exportarExcel} className="gap-1.5">
                 <FileSpreadsheet className="h-4 w-4" />
                 Excel
               </Button>
