@@ -52,6 +52,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -187,7 +189,8 @@ export default function Presupuestos() {
 
   const canEdit = role === "admin" || role === "contador";
 
-  // DnD sensors
+  // DnD state and sensors
+  const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -198,6 +201,14 @@ export default function Presupuestos() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
+  };
 
   useEffect(() => {
     fetchData();
@@ -380,6 +391,7 @@ export default function Presupuestos() {
 
   // Handle drag end for reordering
   const handleDragEnd = useCallback(async (event: DragEndEvent, empresaId: string) => {
+    setActiveId(null);
     const { active, over } = event;
     
     if (!over || active.id === over.id) return;
@@ -432,6 +444,12 @@ export default function Presupuestos() {
       fetchData();
     }
   }, [groupedByEmpresa, toast]);
+
+  // Get the active presupuesto for drag overlay
+  const activePresupuesto = useMemo(() => {
+    if (!activeId) return null;
+    return filteredPresupuestos.find(p => p.id === activeId) || null;
+  }, [activeId, filteredPresupuestos]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -672,7 +690,9 @@ export default function Presupuestos() {
                         <DndContext
                           sensors={sensors}
                           collisionDetection={closestCenter}
+                          onDragStart={handleDragStart}
                           onDragEnd={(event) => handleDragEnd(event, group.empresa.id)}
+                          onDragCancel={handleDragCancel}
                         >
                           <Table>
                             <TableHeader>
@@ -709,6 +729,19 @@ export default function Presupuestos() {
                               </SortableContext>
                             </TableBody>
                           </Table>
+                          <DragOverlay>
+                            {activePresupuesto && (
+                              <div className="bg-card border rounded-md shadow-lg p-3 flex items-center gap-4">
+                                <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                <div>
+                                  <div className="font-medium">{activePresupuesto.partida}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {activePresupuesto.cuentas_contables?.codigo || "Sin cuenta"} • {formatCurrency(activePresupuesto.cantidad * activePresupuesto.precio_unitario)}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </DragOverlay>
                         </DndContext>
                       </div>
                     </CardContent>
