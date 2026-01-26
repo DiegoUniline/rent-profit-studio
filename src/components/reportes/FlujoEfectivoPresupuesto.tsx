@@ -376,15 +376,16 @@ export function FlujoEfectivoPresupuesto({
       </div>
 
       {/* Filtros y acciones */}
-      <Card>
+      <Card className="overflow-hidden">
         <CardContent className="pt-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-col gap-4">
+            {/* Fila de filtros */}
             <div className="flex flex-wrap items-center gap-4">
               {/* Filtro de años */}
-              <div className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Años:</span>
-                <div className="flex gap-1 bg-muted p-1 rounded-lg">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm font-medium shrink-0">Años:</span>
+                <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-lg">
                   {anosDisponibles.map((ano) => {
                     const isSelected = anosSeleccionados.includes(ano);
                     return (
@@ -402,7 +403,7 @@ export function FlujoEfectivoPresupuesto({
                             setAnosSeleccionados(prev => [...prev, ano].sort());
                           }
                         }}
-                        className="min-w-[60px]"
+                        className="min-w-[50px]"
                       >
                         {ano}
                       </Button>
@@ -411,11 +412,11 @@ export function FlujoEfectivoPresupuesto({
                 </div>
               </div>
 
-              {/* Separador vertical */}
-              <div className="h-8 w-px bg-border" />
+              {/* Separador vertical - oculto en móvil */}
+              <div className="h-8 w-px bg-border hidden sm:block" />
 
               {/* Filtro de tipo */}
-              <div className="flex gap-1 bg-muted p-1 rounded-lg">
+              <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-lg">
                 <Button
                   variant={filtroTipo === "todos" ? "default" : "ghost"}
                   onClick={() => setFiltroTipo("todos")}
@@ -443,7 +444,9 @@ export function FlujoEfectivoPresupuesto({
                 </Button>
               </div>
             </div>
-            <div className="flex gap-2">
+
+            {/* Fila de acciones (exportar) */}
+            <div className="flex flex-wrap gap-2">
               <Button variant="default" onClick={exportarPDF} className="gap-2">
                 <FileText className="h-4 w-4" />
                 PDF
