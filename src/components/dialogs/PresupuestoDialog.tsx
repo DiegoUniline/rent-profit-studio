@@ -295,9 +295,19 @@ export function PresupuestoDialog({
         if (error) throw error;
         toast({ title: "Presupuesto actualizado" });
       } else {
+        // Obtener el máximo orden actual para la empresa
+        const { data: maxData } = await supabase
+          .from("presupuestos")
+          .select("orden")
+          .eq("empresa_id", form.empresa_id)
+          .order("orden", { ascending: false })
+          .limit(1);
+
+        const nuevoOrden = maxData && maxData.length > 0 ? (maxData[0].orden || 0) + 1 : 1;
+
         const { error } = await supabase
           .from("presupuestos")
-          .insert(data);
+          .insert({ ...data, orden: nuevoOrden });
         if (error) throw error;
         toast({ title: "Presupuesto creado" });
       }

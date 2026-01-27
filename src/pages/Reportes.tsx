@@ -218,12 +218,14 @@ export default function Reportes() {
           fecha_inicio,
           fecha_fin,
           frecuencia,
+          orden,
           centro_negocio_id,
           cuentas_contables:cuenta_id (codigo, nombre),
           terceros:tercero_id (razon_social),
           centros_negocio:centro_negocio_id (codigo, nombre)
         `)
-        .eq("activo", true);
+        .eq("activo", true)
+        .order("orden", { ascending: true });
 
       if (empresaId !== "todas") {
         query = query.eq("empresa_id", empresaId);
@@ -248,6 +250,7 @@ export default function Reportes() {
         fecha_inicio: p.fecha_inicio,
         fecha_fin: p.fecha_fin,
         frecuencia: p.frecuencia,
+        orden: p.orden,
         cuenta: p.cuentas_contables,
         tercero: p.terceros,
         centro_negocio: p.centros_negocio,
@@ -522,6 +525,7 @@ export default function Reportes() {
             presupuestos={presupuestos}
             loading={loadingData}
             empresaNombre={empresaNombre}
+            onOrderUpdate={loadPresupuestos}
           />
         </TabsContent>
       </Tabs>
