@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FilterSelect } from "@/components/ui/filter-select";
+import { MultiFilterSelect } from "@/components/ui/multi-filter-select";
 import {
   Collapsible,
   CollapsibleContent,
@@ -35,6 +36,7 @@ import {
   TrendingDown,
   AlertTriangle,
   GripVertical,
+  Filter,
 } from "lucide-react";
 import { PresupuestoDialog } from "@/components/dialogs/PresupuestoDialog";
 import { SortablePresupuestoRow } from "@/components/presupuestos/SortablePresupuestoRow";
@@ -176,6 +178,10 @@ export default function Presupuestos() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterCompany, setFilterCompany] = useState<string>("all");
+  const [filterCentros, setFilterCentros] = useState<string[]>([]);
+  const [filterCuentas, setFilterCuentas] = useState<string[]>([]);
+  const [filterPartidas, setFilterPartidas] = useState<string[]>([]);
+  const [filterTerceros, setFilterTerceros] = useState<string[]>([]);
   const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPresupuesto, setEditingPresupuesto] = useState<Presupuesto | null>(null);
@@ -328,6 +334,54 @@ export default function Presupuestos() {
     });
   }, [presupuestos, movimientos]);
 
+  // Generate unique options for filters
+  const filterOptions = useMemo(() => {
+    const centrosMap = new Map<string, { value: string; label: string; sublabel?: string }>();
+    const cuentasMap = new Map<string, { value: string; label: string; sublabel?: string }>();
+    const partidasSet = new Set<string>();
+    const tercerosMap = new Map<string, { value: string; label: string; sublabel?: string }>();
+
+    presupuestosConEjercido.forEach((p) => {
+      // Centros de negocio
+      if (p.centros_negocio?.id) {
+        centrosMap.set(p.centros_negocio.id, {
+          value: p.centros_negocio.id,
+          label: p.centros_negocio.nombre,
+          sublabel: p.centros_negocio.codigo,
+        });
+      }
+      // Cuentas
+      if (p.cuentas_contables?.id) {
+        cuentasMap.set(p.cuentas_contables.id, {
+          value: p.cuentas_contables.id,
+          label: p.cuentas_contables.nombre,
+          sublabel: p.cuentas_contables.codigo,
+        });
+      }
+      // Partidas (unique names)
+      if (p.partida) {
+        partidasSet.add(p.partida);
+      }
+      // Terceros
+      if (p.terceros?.id) {
+        tercerosMap.set(p.terceros.id, {
+          value: p.terceros.id,
+          label: p.terceros.razon_social,
+          sublabel: p.terceros.rfc,
+        });
+      }
+    });
+
+    return {
+      centros: Array.from(centrosMap.values()).sort((a, b) => a.label.localeCompare(b.label)),
+      cuentas: Array.from(cuentasMap.values()).sort((a, b) => (a.sublabel || "").localeCompare(b.sublabel || "")),
+      partidas: Array.from(partidasSet)
+        .sort((a, b) => a.localeCompare(b))
+        .map((p) => ({ value: p, label: p })),
+      terceros: Array.from(tercerosMap.values()).sort((a, b) => a.label.localeCompare(b.label)),
+    };
+  }, [presupuestosConEjercido]);
+
   // Filter presupuestos
   const filteredPresupuestos = useMemo(() => {
     return presupuestosConEjercido.filter((p) => {
@@ -339,9 +393,16 @@ export default function Presupuestos() {
         p.centros_negocio?.codigo?.toLowerCase().includes(search.toLowerCase());
       const matchesCompany = filterCompany === "all" || p.empresa_id === filterCompany;
       const matchesEstado = filterEstado === "activos" ? p.activo : !p.activo;
-      return matchesSearch && matchesCompany && matchesEstado;
+      
+      // Multi-select filters
+      const matchesCentro = filterCentros.length === 0 || (p.centro_negocio_id && filterCentros.includes(p.centro_negocio_id));
+      const matchesCuenta = filterCuentas.length === 0 || (p.cuenta_id && filterCuentas.includes(p.cuenta_id));
+      const matchesPartida = filterPartidas.length === 0 || filterPartidas.includes(p.partida);
+      const matchesTercero = filterTerceros.length === 0 || (p.tercero_id && filterTerceros.includes(p.tercero_id));
+      
+      return matchesSearch && matchesCompany && matchesEstado && matchesCentro && matchesCuenta && matchesPartida && matchesTercero;
     });
-  }, [presupuestosConEjercido, search, filterCompany, filterEstado]);
+  }, [presupuestosConEjercido, search, filterCompany, filterEstado, filterCentros, filterCuentas, filterPartidas, filterTerceros]);
 
   // Group by empresa - sort by orden within each group
   const groupedByEmpresa = useMemo(() => {
@@ -573,31 +634,70 @@ export default function Presupuestos() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 sm:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por partida, notas o empresa..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+          <div className="flex flex-col gap-4">
+            {/* Row 1: Search and Company */}
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por partida, notas o empresa..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <FilterSelect
+                value={filterCompany}
+                onValueChange={setFilterCompany}
+                options={empresas.map((e) => ({ value: e.id, label: e.razon_social }))}
+                placeholder="Filtrar por empresa"
+                searchPlaceholder="Buscar empresa..."
+                allOption={{ value: "all", label: "Todas las empresas" }}
+                className="w-full sm:w-[250px]"
+              />
+              <Tabs value={filterEstado} onValueChange={(v) => setFilterEstado(v as "activos" | "baja")}>
+                <TabsList>
+                  <TabsTrigger value="activos">Activos</TabsTrigger>
+                  <TabsTrigger value="baja">Baja</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            
+            {/* Row 2: Multi-filters */}
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+              <MultiFilterSelect
+                values={filterCentros}
+                onValuesChange={setFilterCentros}
+                options={filterOptions.centros}
+                placeholder="Centro de Negocio"
+                searchPlaceholder="Buscar centro..."
+                className="w-full"
+              />
+              <MultiFilterSelect
+                values={filterCuentas}
+                onValuesChange={setFilterCuentas}
+                options={filterOptions.cuentas}
+                placeholder="Cuenta"
+                searchPlaceholder="Buscar cuenta..."
+                className="w-full"
+              />
+              <MultiFilterSelect
+                values={filterPartidas}
+                onValuesChange={setFilterPartidas}
+                options={filterOptions.partidas}
+                placeholder="Partida"
+                searchPlaceholder="Buscar partida..."
+                className="w-full"
+              />
+              <MultiFilterSelect
+                values={filterTerceros}
+                onValuesChange={setFilterTerceros}
+                options={filterOptions.terceros}
+                placeholder="Tercero"
+                searchPlaceholder="Buscar tercero..."
+                className="w-full"
               />
             </div>
-            <FilterSelect
-              value={filterCompany}
-              onValueChange={setFilterCompany}
-              options={empresas.map((e) => ({ value: e.id, label: e.razon_social }))}
-              placeholder="Filtrar por empresa"
-              searchPlaceholder="Buscar empresa..."
-              allOption={{ value: "all", label: "Todas las empresas" }}
-              className="w-full sm:w-[250px]"
-            />
-            <Tabs value={filterEstado} onValueChange={(v) => setFilterEstado(v as "activos" | "baja")}>
-              <TabsList>
-                <TabsTrigger value="activos">Activos</TabsTrigger>
-                <TabsTrigger value="baja">Baja</TabsTrigger>
-              </TabsList>
-            </Tabs>
           </div>
         </CardContent>
       </Card>
