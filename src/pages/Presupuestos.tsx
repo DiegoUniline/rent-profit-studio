@@ -23,6 +23,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Plus,
   Search,
@@ -36,7 +37,7 @@ import {
   TrendingDown,
   AlertTriangle,
   GripVertical,
-  Filter,
+  Layers,
 } from "lucide-react";
 import { PresupuestoDialog } from "@/components/dialogs/PresupuestoDialog";
 import { SortablePresupuestoRow } from "@/components/presupuestos/SortablePresupuestoRow";
@@ -186,6 +187,21 @@ export default function Presupuestos() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPresupuesto, setEditingPresupuesto] = useState<Presupuesto | null>(null);
   const [expandedEmpresas, setExpandedEmpresas] = useState<Set<string>>(new Set());
+  
+  // Grouping preference with localStorage persistence
+  type GroupingType = "partida" | "cuenta" | "centro" | "empresa";
+  const [grouping, setGrouping] = useState<GroupingType>(() => {
+    const saved = localStorage.getItem("presupuestos_grouping");
+    return (saved as GroupingType) || "empresa";
+  });
+
+  const handleGroupingChange = (value: string) => {
+    if (value) {
+      const newGrouping = value as GroupingType;
+      setGrouping(newGrouping);
+      localStorage.setItem("presupuestos_grouping", newGrouping);
+    }
+  };
 
   const canEdit = role === "admin" || role === "contador";
 
@@ -404,33 +420,65 @@ export default function Presupuestos() {
     });
   }, [presupuestosConEjercido, search, filterCompany, filterEstado, filterCentros, filterCuentas, filterPartidas, filterTerceros]);
 
-  // Group by empresa - sort by orden within each group
-  const groupedByEmpresa = useMemo(() => {
-    const groups: Record<string, { 
-      empresa: Empresa; 
-      presupuestos: Presupuesto[]; 
-      totalPresupuestado: number;
-      totalEjercido: number;
-      totalPorEjercer: number;
-    }> = {};
+  // Generic grouping structure
+  interface GroupedData {
+    id: string;
+    label: string;
+    sublabel?: string;
+    presupuestos: Presupuesto[];
+    totalPresupuestado: number;
+    totalEjercido: number;
+    totalPorEjercer: number;
+  }
+
+  // Dynamic grouping based on selected grouping type
+  const groupedData = useMemo(() => {
+    const groups: Record<string, GroupedData> = {};
     
     filteredPresupuestos.forEach((p) => {
-      const empresaId = p.empresa_id;
-      if (!groups[empresaId]) {
-        groups[empresaId] = {
-          empresa: p.empresas || { id: empresaId, razon_social: "Sin empresa" },
+      let groupKey: string;
+      let groupLabel: string;
+      let groupSublabel: string | undefined;
+
+      switch (grouping) {
+        case "partida":
+          groupKey = p.partida;
+          groupLabel = p.partida;
+          break;
+        case "cuenta":
+          groupKey = p.cuenta_id || "sin-cuenta";
+          groupLabel = p.cuentas_contables?.nombre || "Sin cuenta";
+          groupSublabel = p.cuentas_contables?.codigo;
+          break;
+        case "centro":
+          groupKey = p.centro_negocio_id || "sin-centro";
+          groupLabel = p.centros_negocio?.nombre || "Sin centro de negocio";
+          groupSublabel = p.centros_negocio?.codigo;
+          break;
+        case "empresa":
+        default:
+          groupKey = p.empresa_id;
+          groupLabel = p.empresas?.razon_social || "Sin empresa";
+          break;
+      }
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          id: groupKey,
+          label: groupLabel,
+          sublabel: groupSublabel,
           presupuestos: [],
           totalPresupuestado: 0,
           totalEjercido: 0,
           totalPorEjercer: 0,
         };
       }
-      groups[empresaId].presupuestos.push(p);
+      groups[groupKey].presupuestos.push(p);
       if (p.activo) {
         const presupuestado = p.cantidad * p.precio_unitario;
-        groups[empresaId].totalPresupuestado += presupuestado;
-        groups[empresaId].totalEjercido += p.ejercido || 0;
-        groups[empresaId].totalPorEjercer += p.porEjercer || 0;
+        groups[groupKey].totalPresupuestado += presupuestado;
+        groups[groupKey].totalEjercido += p.ejercido || 0;
+        groups[groupKey].totalPorEjercer += p.porEjercer || 0;
       }
     });
     
@@ -439,10 +487,19 @@ export default function Presupuestos() {
       group.presupuestos.sort((a, b) => (a.orden || 0) - (b.orden || 0));
     });
     
-    return Object.values(groups).sort((a, b) => 
-      a.empresa.razon_social.localeCompare(b.empresa.razon_social)
-    );
-  }, [filteredPresupuestos]);
+    return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label));
+  }, [filteredPresupuestos, grouping]);
+
+  // Backward compatibility alias for drag & drop (uses empresa.id)
+  const groupedByEmpresa = useMemo(() => {
+    return groupedData.map(g => ({
+      empresa: { id: g.id, razon_social: g.label },
+      presupuestos: g.presupuestos,
+      totalPresupuestado: g.totalPresupuestado,
+      totalEjercido: g.totalEjercido,
+      totalPorEjercer: g.totalPorEjercer,
+    }));
+  }, [groupedData]);
 
   // Handle drag end for reordering
   const handleDragEnd = useCallback(async (event: DragEndEvent, empresaId: string) => {
@@ -698,13 +755,35 @@ export default function Presupuestos() {
                 className="w-full"
               />
             </div>
+            
+            {/* Row 3: Grouping buttons */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Layers className="h-4 w-4" />
+                <span>Agrupar por:</span>
+              </div>
+              <ToggleGroup type="single" value={grouping} onValueChange={handleGroupingChange}>
+                <ToggleGroupItem value="empresa" aria-label="Agrupar por empresa" className="text-xs px-3">
+                  Empresa
+                </ToggleGroupItem>
+                <ToggleGroupItem value="partida" aria-label="Agrupar por partida" className="text-xs px-3">
+                  Partida
+                </ToggleGroupItem>
+                <ToggleGroupItem value="cuenta" aria-label="Agrupar por cuenta" className="text-xs px-3">
+                  Cuenta
+                </ToggleGroupItem>
+                <ToggleGroupItem value="centro" aria-label="Agrupar por centro" className="text-xs px-3">
+                  Centro
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Grouped List */}
       <div className="space-y-4">
-        {groupedByEmpresa.length === 0 ? (
+        {groupedData.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center">
               <p className="text-muted-foreground">No hay presupuestos registrados</p>
@@ -716,30 +795,35 @@ export default function Presupuestos() {
             </CardContent>
           </Card>
         ) : (
-          groupedByEmpresa.map((group) => {
+          groupedData.map((group) => {
             const porcentajeGrupo = group.totalPresupuestado > 0 
               ? (group.totalEjercido / group.totalPresupuestado) * 100 
               : 0;
             
             return (
-              <Card key={group.empresa.id}>
+              <Card key={group.id}>
                 <Collapsible
-                  open={expandedEmpresas.has(group.empresa.id)}
-                  onOpenChange={() => toggleEmpresa(group.empresa.id)}
+                  open={expandedEmpresas.has(group.id)}
+                  onOpenChange={() => toggleEmpresa(group.id)}
                 >
                   <CollapsibleTrigger asChild>
                     <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          {expandedEmpresas.has(group.empresa.id) ? (
+                          {expandedEmpresas.has(group.id) ? (
                             <ChevronDown className="h-5 w-5" />
                           ) : (
                             <ChevronRight className="h-5 w-5" />
                           )}
                           <div>
                             <CardTitle className="text-lg">
-                              {group.empresa.razon_social}
+                              {group.label}
                             </CardTitle>
+                            {group.sublabel && (
+                              <p className="text-xs text-muted-foreground font-mono">
+                                {group.sublabel}
+                              </p>
+                            )}
                             <p className="text-sm text-muted-foreground">
                               {group.presupuestos.length} partida(s)
                             </p>
@@ -781,7 +865,7 @@ export default function Presupuestos() {
                           sensors={sensors}
                           collisionDetection={closestCenter}
                           onDragStart={handleDragStart}
-                          onDragEnd={(event) => handleDragEnd(event, group.empresa.id)}
+                          onDragEnd={(event) => handleDragEnd(event, group.id)}
                           onDragCancel={handleDragCancel}
                         >
                           <Table>
