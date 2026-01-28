@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { User, Loader2 } from "lucide-react";
+import { User, Loader2, Eye, EyeOff, Key } from "lucide-react";
 import { z } from "zod";
 
 interface Profile {
@@ -17,6 +17,7 @@ interface Profile {
   nombre_usuario: string;
   telefono: string | null;
   avatar_url: string | null;
+  codigo_acceso: string | null;
 }
 
 const profileSchema = z.object({
@@ -42,6 +43,9 @@ export default function Perfil() {
     nombre_usuario: "",
     telefono: "",
   });
+  const [codigoAcceso, setCodigoAcceso] = useState("");
+  const [showCodigo, setShowCodigo] = useState(false);
+  const [savingCodigo, setSavingCodigo] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -66,6 +70,7 @@ export default function Perfil() {
           nombre_usuario: data.nombre_usuario,
           telefono: data.telefono || "",
         });
+        setCodigoAcceso(data.codigo_acceso || "");
       }
       setLoading(false);
     };
@@ -109,6 +114,28 @@ export default function Perfil() {
 
     toast({ title: "Perfil actualizado" });
     setSaving(false);
+  };
+
+  const handleSaveCodigoAcceso = async () => {
+    setSavingCodigo(true);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ codigo_acceso: codigoAcceso || null })
+      .eq("user_id", user?.id);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el código de acceso",
+        variant: "destructive",
+      });
+      setSavingCodigo(false);
+      return;
+    }
+
+    toast({ title: "Código de acceso actualizado" });
+    setSavingCodigo(false);
   };
 
   if (loading) {
@@ -179,28 +206,74 @@ export default function Perfil() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Tu Cuenta</CardTitle>
-            <CardDescription>Información de tu cuenta</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Rol en el sistema</p>
-              <Badge className="mt-1" variant="default">
-                {role ? roleLabels[role] : "Sin rol"}
-              </Badge>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Usuario</p>
-              <p className="mt-1">@{profile?.nombre_usuario}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Email</p>
-              <p className="mt-1 text-sm">{user?.email}</p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tu Cuenta</CardTitle>
+              <CardDescription>Información de tu cuenta</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Rol en el sistema</p>
+                <Badge className="mt-1" variant="default">
+                  {role ? roleLabels[role] : "Sin rol"}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Usuario</p>
+                <p className="mt-1">@{profile?.nombre_usuario}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Email</p>
+                <p className="mt-1 text-sm">{user?.email}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Admin Access Code Card - only visible to admins */}
+          {role === "admin" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Key className="h-5 w-5 text-primary" />
+                  Código de Acceso
+                </CardTitle>
+                <CardDescription>
+                  Este código se usa para autorizar acciones sensibles cuando otros usuarios las solicitan
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="codigo-acceso">Código de Acceso</Label>
+                  <div className="relative">
+                    <Input
+                      id="codigo-acceso"
+                      type={showCodigo ? "text" : "password"}
+                      value={codigoAcceso}
+                      onChange={(e) => setCodigoAcceso(e.target.value)}
+                      placeholder="Ingresa tu código de acceso..."
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCodigo(!showCodigo)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showCodigo ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Otros usuarios necesitarán este código para eliminar asientos contables
+                  </p>
+                </div>
+                <Button onClick={handleSaveCodigoAcceso} disabled={savingCodigo} size="sm">
+                  {savingCodigo && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Guardar Código
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );

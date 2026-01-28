@@ -435,6 +435,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          codigo_acceso: string | null
           created_at: string
           id: string
           nombre_completo: string
@@ -445,6 +446,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          codigo_acceso?: string | null
           created_at?: string
           id?: string
           nombre_completo: string
@@ -455,6 +457,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          codigo_acceso?: string | null
           created_at?: string
           id?: string
           nombre_completo?: string
