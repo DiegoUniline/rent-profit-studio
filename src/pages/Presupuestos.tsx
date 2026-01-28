@@ -613,7 +613,7 @@ export default function Presupuestos() {
             Gestiona las partidas presupuestales por empresa
           </p>
         </div>
-        {canEdit && (
+        {role === "admin" && (
           <Button onClick={openNew} className="gap-2">
             <Plus className="h-4 w-4" />
             Nuevo Presupuesto
