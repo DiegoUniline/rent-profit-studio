@@ -46,6 +46,7 @@ import {
   Copy,
 } from "lucide-react";
 import { AsientoViewDialog } from "@/components/dialogs/AsientoViewDialog";
+import { AdminCodeDialog } from "@/components/dialogs/AdminCodeDialog";
 
 interface Empresa {
   id: string;
@@ -123,9 +124,13 @@ export default function Asientos() {
   const [viewingAsiento, setViewingAsiento] = useState<AsientoContable | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingAsiento, setDeletingAsiento] = useState<AsientoContable | null>(null);
+  const [adminCodeDialogOpen, setAdminCodeDialogOpen] = useState(false);
+  const [pendingDeleteAsiento, setPendingDeleteAsiento] = useState<AsientoContable | null>(null);
 
   const canEdit = role === "admin" || role === "contador";
-  const canDelete = role === "admin";
+  // Now contadores can also see delete button, but they need admin code
+  const canDelete = role === "admin" || role === "contador";
+  const isAdmin = role === "admin";
 
   useEffect(() => {
     fetchData();
@@ -225,7 +230,21 @@ export default function Asientos() {
   };
 
   const openDelete = (asiento: AsientoContable) => {
-    setDeletingAsiento(asiento);
+    if (isAdmin) {
+      // Admin can delete directly
+      setDeletingAsiento(asiento);
+      setDeleteDialogOpen(true);
+    } else {
+      // Non-admin needs admin code
+      setPendingDeleteAsiento(asiento);
+      setAdminCodeDialogOpen(true);
+    }
+  };
+
+  const handleAdminCodeSuccess = () => {
+    // Admin code verified, now show the delete confirmation dialog
+    setDeletingAsiento(pendingDeleteAsiento);
+    setPendingDeleteAsiento(null);
     setDeleteDialogOpen(true);
   };
 
@@ -531,6 +550,18 @@ export default function Asientos() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Admin Code Dialog for non-admin delete */}
+      <AdminCodeDialog
+        open={adminCodeDialogOpen}
+        onOpenChange={(open) => {
+          setAdminCodeDialogOpen(open);
+          if (!open) setPendingDeleteAsiento(null);
+        }}
+        onSuccess={handleAdminCodeSuccess}
+        title="Autorización para Eliminar"
+        description={`Para eliminar el asiento #${pendingDeleteAsiento?.numero_asiento}, ingrese el código de acceso del administrador.`}
+      />
     </div>
   );
 }
