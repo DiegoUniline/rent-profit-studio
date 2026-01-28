@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -44,7 +45,6 @@ import {
   Trash2,
   Copy,
 } from "lucide-react";
-import { AsientoDialog } from "@/components/dialogs/AsientoDialog";
 import { AsientoViewDialog } from "@/components/dialogs/AsientoViewDialog";
 
 interface Empresa {
@@ -109,6 +109,7 @@ const estadoBadgeVariants: Record<EstadoAsiento, "default" | "secondary" | "dest
 };
 
 export default function Asientos() {
+  const navigate = useNavigate();
   const { role } = useAuth();
   const { toast } = useToast();
   const [asientos, setAsientos] = useState<AsientoContable[]>([]);
@@ -118,14 +119,10 @@ export default function Asientos() {
   const [filterCompany, setFilterCompany] = useState<string>("all");
   const [filterTipo, setFilterTipo] = useState<string>("all");
   const [filterEstado, setFilterEstado] = useState<string>("all");
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [editingAsiento, setEditingAsiento] = useState<AsientoContable | null>(null);
   const [viewingAsiento, setViewingAsiento] = useState<AsientoContable | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingAsiento, setDeletingAsiento] = useState<AsientoContable | null>(null);
-  const [isCopyMode, setIsCopyMode] = useState(false);
-  const [copyMovimientos, setCopyMovimientos] = useState<any[]>([]);
 
   const canEdit = role === "admin" || role === "contador";
   const canDelete = role === "admin";
@@ -210,55 +207,16 @@ export default function Asientos() {
     }
   };
 
-  const handleCopy = async (asiento: AsientoContable) => {
-    try {
-      // Fetch the movimientos of the original asiento
-      const { data: movimientos, error: movError } = await supabase
-        .from("asiento_movimientos")
-        .select("*, cuentas_contables(codigo, nombre)")
-        .eq("asiento_id", asiento.id)
-        .order("orden");
-
-      if (movError) throw movError;
-
-      // Prepare movimientos for the dialog
-      const preparedMovimientos = (movimientos || []).map((m: any, idx: number) => ({
-        cuenta_id: m.cuenta_id,
-        cuenta_codigo: m.cuentas_contables?.codigo,
-        cuenta_nombre: m.cuentas_contables?.nombre,
-        partida: m.partida,
-        debe: Number(m.debe),
-        haber: Number(m.haber),
-        orden: idx,
-        presupuesto_id: m.presupuesto_id || "",
-      }));
-
-      // Open dialog in copy mode
-      setEditingAsiento(asiento);
-      setCopyMovimientos(preparedMovimientos);
-      setIsCopyMode(true);
-      setDialogOpen(true);
-    } catch (error: any) {
-      toast({
-        title: "Error al cargar datos para copiar",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+  const handleCopy = (asiento: AsientoContable) => {
+    navigate(`/asientos/nuevo?copy=true&from=${asiento.id}`);
   };
 
   const openNew = () => {
-    setEditingAsiento(null);
-    setCopyMovimientos([]);
-    setIsCopyMode(false);
-    setDialogOpen(true);
+    navigate("/asientos/nuevo");
   };
 
   const openEdit = (asiento: AsientoContable) => {
-    setEditingAsiento(asiento);
-    setCopyMovimientos([]);
-    setIsCopyMode(false);
-    setDialogOpen(true);
+    navigate(`/asientos/${asiento.id}`);
   };
 
   const openView = (asiento: AsientoContable) => {
@@ -550,21 +508,6 @@ export default function Asientos() {
       </Card>
 
       {/* Dialogs */}
-      <AsientoDialog
-        open={dialogOpen}
-        onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) {
-            setIsCopyMode(false);
-            setCopyMovimientos([]);
-          }
-        }}
-        asiento={isCopyMode ? editingAsiento : editingAsiento}
-        empresas={empresas}
-        onSuccess={fetchData}
-        initialMovimientos={isCopyMode ? copyMovimientos : undefined}
-        isCopy={isCopyMode}
-      />
 
       <AsientoViewDialog
         open={viewDialogOpen}
