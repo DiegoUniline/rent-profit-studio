@@ -652,118 +652,114 @@ export function AsientoDialog({
 
             {/* Movimientos Section */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold">Movimientos</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addMovimiento}
-                  disabled={!form.empresa_id}
-                  className="gap-1"
-                >
-                  <Plus className="h-4 w-4" />
-                  Agregar Línea
-                </Button>
-              </div>
+              <Label className="text-base font-semibold">Movimientos</Label>
 
-              {movimientos.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground border rounded-lg">
-                  {form.empresa_id
-                    ? "Haga clic en 'Agregar Línea' para añadir movimientos"
-                    : "Primero seleccione una empresa"}
-                </div>
-              ) : (
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="min-w-[160px]">Cuenta</TableHead>
-                        <TableHead className="min-w-[200px]">PARTIDA</TableHead>
-                        <TableHead className="w-[100px] text-right">Debe</TableHead>
-                        <TableHead className="w-[100px] text-right">Haber</TableHead>
-                        <TableHead className="w-[70px]"></TableHead>
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[160px]">Cuenta</TableHead>
+                      <TableHead className="min-w-[200px]">PARTIDA</TableHead>
+                      <TableHead className="w-[100px] text-right">Debe</TableHead>
+                      <TableHead className="w-[100px] text-right">Haber</TableHead>
+                      <TableHead className="w-[70px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {movimientos.map((mov, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="p-1">
+                          <SearchableSelect
+                            value={mov.cuenta_id}
+                            onValueChange={(value) => updateMovimiento(idx, "cuenta_id", value)}
+                            options={cuentaOptions}
+                            placeholder="Cuenta"
+                            searchPlaceholder="Buscar cuenta..."
+                            emptyMessage="No hay cuentas"
+                            onCreateNew={() => setCuentaDialogOpen(true)}
+                            createLabel="Nueva cuenta"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1">
+                          <SearchableSelect
+                            value={mov.presupuesto_id || ""}
+                            onValueChange={(value) => updateMovimiento(idx, "presupuesto_id", value)}
+                            options={getPresupuestoOptionsForMovimiento(mov.cuenta_id)}
+                            placeholder="Seleccionar partida..."
+                            searchPlaceholder="Buscar presupuesto..."
+                            emptyMessage="No hay presupuestos"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={mov.debe || ""}
+                            onChange={(e) =>
+                              updateMovimiento(idx, "debe", parseFloat(e.target.value) || 0)
+                            }
+                            className="text-right h-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={mov.haber || ""}
+                            onChange={(e) =>
+                              updateMovimiento(idx, "haber", parseFloat(e.target.value) || 0)
+                            }
+                            className="text-right h-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1">
+                          <div className="flex gap-0.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => duplicateMovimiento(idx)}
+                              title="Duplicar línea"
+                              className="h-7 w-7"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeMovimiento(idx)}
+                              className="text-destructive h-7 w-7"
+                              title="Eliminar línea"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {movimientos.map((mov, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="p-1">
-                            <SearchableSelect
-                              value={mov.cuenta_id}
-                              onValueChange={(value) => updateMovimiento(idx, "cuenta_id", value)}
-                              options={cuentaOptions}
-                              placeholder="Cuenta"
-                              searchPlaceholder="Buscar cuenta..."
-                              emptyMessage="No hay cuentas"
-                              onCreateNew={() => setCuentaDialogOpen(true)}
-                              createLabel="Nueva cuenta"
-                            />
-                          </TableCell>
-                          <TableCell className="p-1">
-                            <SearchableSelect
-                              value={mov.presupuesto_id || ""}
-                              onValueChange={(value) => updateMovimiento(idx, "presupuesto_id", value)}
-                              options={getPresupuestoOptionsForMovimiento(mov.cuenta_id)}
-                              placeholder="Seleccionar partida..."
-                              searchPlaceholder="Buscar presupuesto..."
-                              emptyMessage="No hay presupuestos"
-                            />
-                          </TableCell>
-                          <TableCell className="p-1">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={mov.debe || ""}
-                              onChange={(e) =>
-                                updateMovimiento(idx, "debe", parseFloat(e.target.value) || 0)
-                              }
-                              className="text-right h-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                          </TableCell>
-                          <TableCell className="p-1">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={mov.haber || ""}
-                              onChange={(e) =>
-                                updateMovimiento(idx, "haber", parseFloat(e.target.value) || 0)
-                              }
-                              className="text-right h-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                          </TableCell>
-                          <TableCell className="p-1">
-                            <div className="flex gap-0.5">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => duplicateMovimiento(idx)}
-                                title="Duplicar línea"
-                                className="h-7 w-7"
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeMovimiento(idx)}
-                                className="text-destructive h-7 w-7"
-                                title="Eliminar línea"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+                    ))}
+                    {/* Add Line Row - Odoo Style */}
+                    <TableRow 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={form.empresa_id ? addMovimiento : undefined}
+                    >
+                      <TableCell 
+                        colSpan={5} 
+                        className={`p-2 text-center ${!form.empresa_id ? 'text-muted-foreground' : 'text-primary'}`}
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <Plus className="h-4 w-4" />
+                          <span className="text-sm">
+                            {form.empresa_id ? "Agregar línea" : "Primero seleccione una empresa"}
+                          </span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
 
               {/* Totals */}
               {movimientos.length > 0 && (
