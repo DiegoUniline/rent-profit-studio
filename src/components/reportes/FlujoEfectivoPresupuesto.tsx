@@ -213,6 +213,19 @@ export function FlujoEfectivoPresupuesto({
       const frecuencia = p.frecuencia || "mensual";
       const frecuenciaEnMeses = getFrecuenciaEnMeses(frecuencia);
 
+      // Calcular cuántas ocurrencias hay en el periodo del presupuesto
+      const mesesEnPeriodo = differenceInMonths(fechaFin, fechaInicio) + 1;
+      let numOcurrencias: number;
+
+      if (frecuencia === "semanal") {
+        numOcurrencias = mesesEnPeriodo * 4; // 4 semanas por mes
+      } else {
+        numOcurrencias = Math.ceil(mesesEnPeriodo / frecuenciaEnMeses);
+      }
+
+      // Monto por cada ocurrencia (total dividido entre ocurrencias)
+      const montoPorOcurrencia = numOcurrencias > 0 ? montoTotal / numOcurrencias : montoTotal;
+
       const mesesMonto: number[] = new Array(numMeses).fill(0);
 
       mesesFiltrados.forEach((mesActual, index) => {
@@ -225,14 +238,16 @@ export function FlujoEfectivoPresupuesto({
         if (!mesEstaEnRango) return;
 
         if (frecuencia === "semanal") {
-          const semanasEnMes = 4;
-          mesesMonto[index] = montoTotal * semanasEnMes;
+          // Para semanal: monto por semana * 4 semanas del mes
+          const montoSemanal = montoTotal / numOcurrencias;
+          mesesMonto[index] = montoSemanal * 4;
         } else if (frecuencia === "mensual") {
-          mesesMonto[index] = montoTotal;
+          mesesMonto[index] = montoPorOcurrencia;
         } else {
+          // Trimestral, semestral, anual, bimestral
           const mesesDesdeInicio = differenceInMonths(inicioMes, startOfMonth(fechaInicio));
           if (mesesDesdeInicio % frecuenciaEnMeses === 0) {
-            mesesMonto[index] = montoTotal;
+            mesesMonto[index] = montoPorOcurrencia;
           }
         }
       });
