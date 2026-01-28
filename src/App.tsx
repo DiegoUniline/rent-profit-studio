@@ -16,6 +16,7 @@ import CentrosNegocio from "./pages/CentrosNegocio";
 import Terceros from "./pages/Terceros";
 import Presupuestos from "./pages/Presupuestos";
 import Asientos from "./pages/Asientos";
+import AsientoDetalle from "./pages/AsientoDetalle";
 import Programacion from "./pages/Programacion";
 import Reportes from "./pages/Reportes";
 import NotFound from "./pages/NotFound";
@@ -143,6 +144,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["admin", "contador"]}>
             <Asientos />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/asientos/:id"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "contador"]}>
+            <AsientoDetalle />
           </ProtectedRoute>
         }
       />
