@@ -222,7 +222,7 @@ export default function Programacion() {
   }, [terceros, filterEmpresa]);
 
   const filteredProgramaciones = useMemo(() => {
-    return programaciones.filter((p) => {
+    const filtered = programaciones.filter((p) => {
       if (filterEmpresa !== "all" && p.empresa_id !== filterEmpresa) return false;
       if (filterTipo !== "all" && p.tipo !== filterTipo) return false;
       if (filterEstado !== "all" && p.estado !== filterEstado) return false;
@@ -237,6 +237,28 @@ export default function Programacion() {
         if (fechaProg > filterFechaHasta) return false;
       }
       return true;
+    });
+
+    // Sort: by Presupuesto (A-Z), then Centro de Negocio (A-Z), then by fecha
+    return filtered.sort((a, b) => {
+      // First by presupuesto name (items without presupuesto go last)
+      const presA = a.presupuestos?.partida || "";
+      const presB = b.presupuestos?.partida || "";
+      if (presA && !presB) return -1;
+      if (!presA && presB) return 1;
+      const presCompare = presA.localeCompare(presB, "es", { sensitivity: "base" });
+      if (presCompare !== 0) return presCompare;
+
+      // Then by centro de negocio name (items without centro go last)
+      const centroA = a.centros_negocio?.nombre || "";
+      const centroB = b.centros_negocio?.nombre || "";
+      if (centroA && !centroB) return -1;
+      if (!centroA && centroB) return 1;
+      const centroCompare = centroA.localeCompare(centroB, "es", { sensitivity: "base" });
+      if (centroCompare !== 0) return centroCompare;
+
+      // Finally by date
+      return a.fecha_programada.localeCompare(b.fecha_programada);
     });
   }, [programaciones, filterEmpresa, filterTipo, filterEstado, filterCentroNegocio, filterTercero, filterFechaDesde, filterFechaHasta]);
 
