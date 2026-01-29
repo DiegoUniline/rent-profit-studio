@@ -189,7 +189,7 @@ export default function Presupuestos() {
   const [expandedEmpresas, setExpandedEmpresas] = useState<Set<string>>(new Set());
   
   // Grouping preference with localStorage persistence
-  type GroupingType = "partida" | "cuenta" | "centro" | "empresa";
+  type GroupingType = "partida" | "cuenta" | "centro" | "empresa" | "ninguno";
   const [grouping, setGrouping] = useState<GroupingType>(() => {
     const saved = localStorage.getItem("presupuestos_grouping");
     return (saved as GroupingType) || "empresa";
@@ -758,6 +758,9 @@ export default function Presupuestos() {
                 <ToggleGroupItem value="centro" aria-label="Agrupar por centro" className="text-xs px-3">
                   Centro
                 </ToggleGroupItem>
+                <ToggleGroupItem value="ninguno" aria-label="Sin agrupar" className="text-xs px-3">
+                  Sin agrupar
+                </ToggleGroupItem>
               </ToggleGroup>
             </div>
           </div>
@@ -766,7 +769,7 @@ export default function Presupuestos() {
 
       {/* Grouped List */}
       <div className="space-y-4">
-        {groupedData.length === 0 ? (
+        {filteredPresupuestos.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center">
               <p className="text-muted-foreground">No hay presupuestos registrados</p>
@@ -777,7 +780,145 @@ export default function Presupuestos() {
               )}
             </CardContent>
           </Card>
+        ) : grouping === "ninguno" ? (
+          /* Flat list view - no grouping */
+          <Card>
+            <CardContent className="pt-6">
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Empresa</TableHead>
+                      <TableHead>Partida</TableHead>
+                      <TableHead>Cuenta</TableHead>
+                      <TableHead>Centro</TableHead>
+                      <TableHead className="text-right">Presupuesto</TableHead>
+                      <TableHead className="text-right">Ejercido</TableHead>
+                      <TableHead className="text-right">Por Ejercer</TableHead>
+                      <TableHead className="w-[120px]">Avance</TableHead>
+                      <TableHead>Estado</TableHead>
+                      {canEdit && <TableHead className="text-right">Acciones</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPresupuestos.map((p) => {
+                      const presupuestado = p.cantidad * p.precio_unitario;
+                      const ejercido = p.ejercido || 0;
+                      const porEjercer = p.porEjercer || 0;
+                      const porcentaje = p.porcentaje || 0;
+                      
+                      return (
+                        <TableRow
+                          key={p.id}
+                          className={!p.activo ? "opacity-50" : undefined}
+                        >
+                          <TableCell>
+                            <span className="font-medium">{p.empresas?.razon_social || "-"}</span>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{p.partida}</div>
+                              {p.unidades_medida && (
+                                <div className="text-xs text-muted-foreground">
+                                  {p.cantidad.toLocaleString("es-MX")} {p.unidades_medida.codigo}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {p.cuentas_contables ? (
+                              <span className="text-sm">{p.cuentas_contables.codigo}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {p.centros_negocio ? (
+                              <span className="text-sm" title={p.centros_negocio.codigo}>
+                                {p.centros_negocio.nombre}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCurrency(presupuestado)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-green-600">
+                            {formatCurrency(ejercido)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right font-mono ${porEjercer < 0 ? "text-destructive" : ""}`}
+                          >
+                            {formatCurrency(porEjercer)}
+                            {porEjercer < 0 && (
+                              <AlertTriangle className="h-3 w-3 inline ml-1 text-destructive" />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                                <div
+                                  className={`h-full transition-all ${getProgressColor(porcentaje)}`}
+                                  style={{ width: `${Math.min(porcentaje, 100)}%` }}
+                                />
+                              </div>
+                              <span
+                                className={`text-xs font-medium min-w-[40px] ${porcentaje > 100 ? "text-destructive" : ""}`}
+                              >
+                                {porcentaje.toFixed(0)}%
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {porcentaje > 100 ? (
+                              <Badge variant="destructive">Sobregiro</Badge>
+                            ) : porcentaje >= 80 ? (
+                              <Badge variant="outline" className="border-yellow-500 text-yellow-600">
+                                Alerta
+                              </Badge>
+                            ) : p.activo ? (
+                              <Badge variant="default">Activo</Badge>
+                            ) : (
+                              <Badge variant="secondary">Inactivo</Badge>
+                            )}
+                          </TableCell>
+                          {canEdit && (
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => openEdit(p)}
+                                  title="Editar"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                {role === "admin" && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => handleToggleActivo(p)}
+                                    title={p.activo ? "Desactivar" : "Activar"}
+                                  >
+                                    <Power className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
+          /* Grouped view with collapsible sections */
           groupedData.map((group) => {
             const porcentajeGrupo = group.totalPresupuestado > 0 
               ? (group.totalEjercido / group.totalPresupuestado) * 100 
