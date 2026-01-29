@@ -172,8 +172,8 @@ export function PresupuestoDialog({
           cantidad: String(presupuesto.cantidad),
           precio_unitario: String(presupuesto.precio_unitario),
           notas: presupuesto.notas || "",
-          fecha_inicio: presupuesto.fecha_inicio ? new Date(presupuesto.fecha_inicio) : undefined,
-          fecha_fin: presupuesto.fecha_fin ? new Date(presupuesto.fecha_fin) : undefined,
+          fecha_inicio: presupuesto.fecha_inicio ? new Date(presupuesto.fecha_inicio + "T00:00:00") : undefined,
+          fecha_fin: presupuesto.fecha_fin ? new Date(presupuesto.fecha_fin + "T00:00:00") : undefined,
           frecuencia: presupuesto.frecuencia || "mensual",
         });
       } else {

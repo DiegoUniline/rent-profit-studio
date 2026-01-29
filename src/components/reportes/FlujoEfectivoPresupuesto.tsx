@@ -28,6 +28,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatCurrency } from "@/lib/accounting-utils";
 import { cn } from "@/lib/utils";
+import { parseLocalDate } from "@/lib/date-utils";
 import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, DollarSign, CalendarDays, Layers, GripVertical } from "lucide-react";
 import { format, startOfMonth, differenceInMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -205,8 +206,8 @@ export function FlujoEfectivoPresupuesto({
     presupuestos.forEach((p) => {
       if (!p.fecha_inicio || !p.fecha_fin) return;
 
-      const fechaInicio = new Date(p.fecha_inicio);
-      const fechaFin = new Date(p.fecha_fin);
+      const fechaInicio = parseLocalDate(p.fecha_inicio);
+      const fechaFin = parseLocalDate(p.fecha_fin);
       const montoTotal = p.cantidad * p.precio_unitario;
       const codigoCuenta = p.cuenta?.codigo || "";
       const tipo = determinarTipoFlujo(codigoCuenta);
