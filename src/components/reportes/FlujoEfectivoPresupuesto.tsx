@@ -1,19 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  arrayMove,
-} from "@dnd-kit/sortable";
+import React, { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -25,19 +10,15 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatCurrency } from "@/lib/accounting-utils";
 import { cn } from "@/lib/utils";
 import { parseLocalDate } from "@/lib/date-utils";
-import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, DollarSign, CalendarDays, Layers, GripVertical } from "lucide-react";
+import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, DollarSign, CalendarDays, ChevronDown, ChevronRight } from "lucide-react";
 import { format, startOfMonth, differenceInMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { SortableFlujoRow } from "./SortableFlujoRow";
 
 interface Presupuesto {
   id: string;
@@ -69,7 +50,6 @@ interface FlujoEfectivoPresupuestoProps {
 }
 
 type TipoFlujo = "entrada" | "salida";
-type GroupingType = "ninguno" | "cuenta" | "centro";
 
 interface FlujoMensual {
   presupuestoId: string;
@@ -85,9 +65,9 @@ interface FlujoMensual {
   centroNegocioNombre: string;
 }
 
-interface GrupoFlujo {
-  key: string;
-  label: string;
+interface GrupoCuenta {
+  codigoCuenta: string;
+  nombreCuenta: string;
   flujos: FlujoMensual[];
   totalMeses: number[];
 }
@@ -143,40 +123,31 @@ export function FlujoEfectivoPresupuesto({
   presupuestos,
   loading,
   empresaNombre,
-  onOrderUpdate,
 }: FlujoEfectivoPresupuestoProps) {
-  const { toast } = useToast();
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "entradas" | "salidas">("todos");
-  const [updatingOrder, setUpdatingOrder] = useState(false);
-  
-  // Estado de agrupación persistido en localStorage
-  const [grouping, setGrouping] = useState<GroupingType>(() => {
-    const saved = localStorage.getItem("flujo_efectivo_grouping");
-    return (saved as GroupingType) || "ninguno";
-  });
 
   // Estado para filtrar años
   const anosDisponibles = useMemo(() => getAnosDisponibles(), []);
   const [anosSeleccionados, setAnosSeleccionados] = useState<number[]>([new Date().getFullYear()]);
 
-  // Sensores para dnd-kit
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  // Estado para cuentas expandidas (por tipo y código de cuenta)
+  const [expandedCuentas, setExpandedCuentas] = useState<Set<string>>(new Set());
 
-  // Guardar agrupación en localStorage
-  const handleGroupingChange = (value: string) => {
-    if (value) {
-      setGrouping(value as GroupingType);
-      localStorage.setItem("flujo_efectivo_grouping", value);
-    }
+  const toggleCuenta = (tipo: TipoFlujo, codigoCuenta: string) => {
+    const key = `${tipo}-${codigoCuenta}`;
+    setExpandedCuentas(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const isCuentaExpanded = (tipo: TipoFlujo, codigoCuenta: string) => {
+    return expandedCuentas.has(`${tipo}-${codigoCuenta}`);
   };
 
   // Generar los meses basados en los años seleccionados
@@ -274,7 +245,7 @@ export function FlujoEfectivoPresupuesto({
     return flujos.sort((a, b) => a.orden - b.orden);
   }, [presupuestos, mesesFiltrados, numMeses]);
 
-  // Separar y ordenar flujos por tipo
+  // Separar flujos por tipo
   const flujosEntradas = useMemo(() => {
     return flujosMensuales.filter(f => f.tipo === "entrada");
   }, [flujosMensuales]);
@@ -283,58 +254,48 @@ export function FlujoEfectivoPresupuesto({
     return flujosMensuales.filter(f => f.tipo === "salida");
   }, [flujosMensuales]);
 
-  // Agrupar flujos según el tipo de agrupación
-  const gruposEntradas = useMemo((): GrupoFlujo[] => {
-    if (grouping === "ninguno") return [];
-    
+  // Agrupar flujos por cuenta (ordenadas de menor a mayor código)
+  const gruposCuentasEntradas = useMemo((): GrupoCuenta[] => {
     const grupos: Record<string, FlujoMensual[]> = {};
     
     flujosEntradas.forEach(flujo => {
-      const key = grouping === "cuenta" 
-        ? flujo.codigoCuenta || "sin-cuenta"
-        : flujo.centroNegocioCodigo || "sin-centro";
-      
+      const key = flujo.codigoCuenta || "sin-cuenta";
       if (!grupos[key]) grupos[key] = [];
       grupos[key].push(flujo);
     });
     
-    return Object.entries(grupos).map(([key, flujos]) => ({
-      key,
-      label: grouping === "cuenta" 
-        ? `${key} - ${flujos[0]?.nombreCuenta || "Sin cuenta"}`
-        : `${key} - ${flujos[0]?.centroNegocioNombre || "Sin centro"}`,
-      flujos,
-      totalMeses: flujos.reduce((acc, f) => {
-        return acc.map((v, i) => v + f.meses[i]);
-      }, new Array(numMeses).fill(0) as number[]),
-    })).sort((a, b) => a.key.localeCompare(b.key));
-  }, [flujosEntradas, grouping, numMeses]);
+    return Object.entries(grupos)
+      .map(([codigoCuenta, flujos]) => ({
+        codigoCuenta,
+        nombreCuenta: flujos[0]?.nombreCuenta || "Sin cuenta",
+        flujos,
+        totalMeses: flujos.reduce((acc, f) => {
+          return acc.map((v, i) => v + f.meses[i]);
+        }, new Array(numMeses).fill(0) as number[]),
+      }))
+      .sort((a, b) => a.codigoCuenta.localeCompare(b.codigoCuenta));
+  }, [flujosEntradas, numMeses]);
 
-  const gruposSalidas = useMemo((): GrupoFlujo[] => {
-    if (grouping === "ninguno") return [];
-    
+  const gruposCuentasSalidas = useMemo((): GrupoCuenta[] => {
     const grupos: Record<string, FlujoMensual[]> = {};
     
     flujosSalidas.forEach(flujo => {
-      const key = grouping === "cuenta" 
-        ? flujo.codigoCuenta || "sin-cuenta"
-        : flujo.centroNegocioCodigo || "sin-centro";
-      
+      const key = flujo.codigoCuenta || "sin-cuenta";
       if (!grupos[key]) grupos[key] = [];
       grupos[key].push(flujo);
     });
     
-    return Object.entries(grupos).map(([key, flujos]) => ({
-      key,
-      label: grouping === "cuenta" 
-        ? `${key} - ${flujos[0]?.nombreCuenta || "Sin cuenta"}`
-        : `${key} - ${flujos[0]?.centroNegocioNombre || "Sin centro"}`,
-      flujos,
-      totalMeses: flujos.reduce((acc, f) => {
-        return acc.map((v, i) => v + f.meses[i]);
-      }, new Array(numMeses).fill(0) as number[]),
-    })).sort((a, b) => a.key.localeCompare(b.key));
-  }, [flujosSalidas, grouping, numMeses]);
+    return Object.entries(grupos)
+      .map(([codigoCuenta, flujos]) => ({
+        codigoCuenta,
+        nombreCuenta: flujos[0]?.nombreCuenta || "Sin cuenta",
+        flujos,
+        totalMeses: flujos.reduce((acc, f) => {
+          return acc.map((v, i) => v + f.meses[i]);
+        }, new Array(numMeses).fill(0) as number[]),
+      }))
+      .sort((a, b) => a.codigoCuenta.localeCompare(b.codigoCuenta));
+  }, [flujosSalidas, numMeses]);
 
   const mostrarEntradas = filtroTipo === "todos" || filtroTipo === "entradas";
   const mostrarSalidas = filtroTipo === "todos" || filtroTipo === "salidas";
@@ -372,48 +333,6 @@ export function FlujoEfectivoPresupuesto({
       saldoFinal: totalesMensuales.saldos[numMeses - 1] || 0,
     };
   }, [totalesMensuales, numMeses]);
-
-  // Manejar drag and drop
-  const handleDragEnd = useCallback(async (event: DragEndEvent, flujos: FlujoMensual[], tipo: TipoFlujo) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = flujos.findIndex(f => f.presupuestoId === active.id);
-    const newIndex = flujos.findIndex(f => f.presupuestoId === over.id);
-
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const reordered = arrayMove(flujos, oldIndex, newIndex);
-
-    setUpdatingOrder(true);
-    try {
-      // Actualizar orden en la base de datos
-      const updates = reordered.map((flujo, index) => ({
-        id: flujo.presupuestoId,
-        orden: index + 1,
-      }));
-
-      for (const update of updates) {
-        const { error } = await supabase
-          .from("presupuestos")
-          .update({ orden: update.orden })
-          .eq("id", update.id);
-        
-        if (error) throw error;
-      }
-
-      toast({ title: "Orden actualizado" });
-      onOrderUpdate?.();
-    } catch (error: any) {
-      toast({
-        title: "Error al actualizar orden",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setUpdatingOrder(false);
-    }
-  }, [onOrderUpdate, toast]);
 
   // Exportar a Excel
   const exportarExcel = () => {
@@ -480,98 +399,63 @@ export function FlujoEfectivoPresupuesto({
     doc.save(`Flujo_Efectivo_${empresaNombre}_${anosLabel}.pdf`);
   };
 
-  // Renderizar filas de flujo (sin agrupación)
-  const renderFlujoRows = (flujos: FlujoMensual[], tipo: TipoFlujo) => {
-    const canReorder = grouping === "ninguno";
-    
-    if (!canReorder) {
-      return flujos.map((flujo) => (
-        <TableRow key={flujo.presupuestoId} className={cn(
-          tipo === "entrada" 
-            ? "hover:bg-green-50/50 dark:hover:bg-green-950/20" 
-            : "hover:bg-red-50/50 dark:hover:bg-red-950/20"
-        )}>
-          <TableCell className="sticky left-0 z-10 bg-background pl-6">
-            {flujo.partida}
-          </TableCell>
-          <TableCell className="font-mono text-xs text-muted-foreground">
-            {flujo.codigoCuenta}
-          </TableCell>
-          <TableCell className="text-center text-xs">
-            {flujo.frecuencia}
-          </TableCell>
-          {flujo.meses.map((monto, i) => (
-            <TableCell key={i} className={cn(
-              "text-right font-mono text-sm",
-              monto === 0 && "text-muted-foreground"
-            )}>
-              {monto !== 0 ? formatCurrency(monto) : "-"}
-            </TableCell>
-          ))}
-        </TableRow>
-      ));
-    }
-
-    return (
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={(e) => handleDragEnd(e, flujos, tipo)}
-      >
-        <SortableContext
-          items={flujos.map(f => f.presupuestoId)}
-          strategy={verticalListSortingStrategy}
-        >
-          {flujos.map((flujo) => (
-            <SortableFlujoRow
-              key={flujo.presupuestoId}
-              flujo={flujo}
-              tipo={tipo}
-              canReorder={true}
-            />
-          ))}
-        </SortableContext>
-      </DndContext>
-    );
-  };
-
-  // Renderizar grupo con sus flujos
-  const renderGrupo = (grupo: GrupoFlujo, tipo: TipoFlujo) => {
+  // Renderizar grupo de cuenta colapsable
+  const renderGrupoCuenta = (grupo: GrupoCuenta, tipo: TipoFlujo) => {
+    const isExpanded = isCuentaExpanded(tipo, grupo.codigoCuenta);
     const bgClass = tipo === "entrada" 
-      ? "bg-green-50/30 dark:bg-green-950/20" 
-      : "bg-red-50/30 dark:bg-red-950/20";
+      ? "bg-green-50/50 dark:bg-green-950/30 hover:bg-green-100/50 dark:hover:bg-green-950/40" 
+      : "bg-red-50/50 dark:bg-red-950/30 hover:bg-red-100/50 dark:hover:bg-red-950/40";
+    const textClass = tipo === "entrada"
+      ? "text-green-800 dark:text-green-300"
+      : "text-red-800 dark:text-red-300";
     
     return (
-      <React.Fragment key={grupo.key}>
-        {/* Header del grupo */}
-        <TableRow className={bgClass}>
-          <TableCell className="sticky left-0 z-10 pl-4 font-medium" style={{ background: "inherit" }}>
-            {grupo.label}
+      <React.Fragment key={`${tipo}-${grupo.codigoCuenta}`}>
+        {/* Header de cuenta - clickable para expandir/contraer */}
+        <TableRow 
+          className={cn(bgClass, "cursor-pointer transition-colors")}
+          onClick={() => toggleCuenta(tipo, grupo.codigoCuenta)}
+        >
+          <TableCell className="sticky left-0 z-10 pl-6" style={{ background: "inherit" }}>
+            <div className="flex items-center gap-2">
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4 shrink-0" />
+              ) : (
+                <ChevronRight className="h-4 w-4 shrink-0" />
+              )}
+              <span className="font-medium">{grupo.codigoCuenta}</span>
+              <span className={cn("text-sm", textClass)}>{grupo.nombreCuenta}</span>
+              <span className="text-xs text-muted-foreground ml-2">
+                ({grupo.flujos.length} {grupo.flujos.length === 1 ? "partida" : "partidas"})
+              </span>
+            </div>
           </TableCell>
-          <TableCell colSpan={2}></TableCell>
+          <TableCell className="text-center text-xs text-muted-foreground">-</TableCell>
           {grupo.totalMeses.map((monto, i) => (
             <TableCell key={i} className={cn(
-              "text-right font-mono text-xs font-medium",
-              monto === 0 && "text-muted-foreground"
+              "text-right font-mono text-sm font-medium",
+              monto === 0 && "text-muted-foreground",
+              textClass
             )}>
               {monto !== 0 ? formatCurrency(monto) : "-"}
             </TableCell>
           ))}
         </TableRow>
-        {/* Filas del grupo */}
-        {grupo.flujos.map((flujo) => (
-          <TableRow key={flujo.presupuestoId} className={cn(
-            tipo === "entrada" 
-              ? "hover:bg-green-50/50 dark:hover:bg-green-950/20" 
-              : "hover:bg-red-50/50 dark:hover:bg-red-950/20"
-          )}>
-            <TableCell className="sticky left-0 z-10 bg-background pl-8">
-              {flujo.partida}
+        
+        {/* Filas de detalle - solo si está expandido */}
+        {isExpanded && grupo.flujos.map((flujo) => (
+          <TableRow 
+            key={flujo.presupuestoId} 
+            className={cn(
+              tipo === "entrada" 
+                ? "hover:bg-green-50/30 dark:hover:bg-green-950/10" 
+                : "hover:bg-red-50/30 dark:hover:bg-red-950/10"
+            )}
+          >
+            <TableCell className="sticky left-0 z-10 bg-background pl-12">
+              <span className="text-sm">{flujo.partida}</span>
             </TableCell>
-            <TableCell className="font-mono text-xs text-muted-foreground">
-              {flujo.codigoCuenta}
-            </TableCell>
-            <TableCell className="text-center text-xs">
+            <TableCell className="text-center text-xs text-muted-foreground">
               {flujo.frecuencia}
             </TableCell>
             {flujo.meses.map((monto, i) => (
@@ -595,8 +479,6 @@ export function FlujoEfectivoPresupuesto({
       </div>
     );
   }
-
-  const canReorder = grouping === "ninguno";
 
   return (
     <div className="space-y-4">
@@ -715,30 +597,6 @@ export function FlujoEfectivoPresupuesto({
                   Salidas
                 </Button>
               </div>
-
-              <div className="hidden sm:block h-6 w-px bg-border" />
-
-              {/* Agrupación */}
-              <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm font-medium whitespace-nowrap">Agrupar:</span>
-                <ToggleGroup
-                  type="single"
-                  value={grouping}
-                  onValueChange={handleGroupingChange}
-                  className="bg-muted p-1 rounded-lg"
-                >
-                  <ToggleGroupItem value="ninguno" className="h-8 px-3 text-xs">
-                    Ninguno
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="cuenta" className="h-8 px-3 text-xs">
-                    Cuenta
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="centro" className="h-8 px-3 text-xs">
-                    Centro
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </div>
             </div>
 
             {/* Fila de acciones */}
@@ -751,12 +609,9 @@ export function FlujoEfectivoPresupuesto({
                 <FileSpreadsheet className="h-4 w-4" />
                 Excel
               </Button>
-              {canReorder && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1 ml-2">
-                  <GripVertical className="h-3 w-3" />
-                  Arrastra para reordenar
-                </span>
-              )}
+              <span className="text-xs text-muted-foreground flex items-center gap-1 ml-2">
+                Haz clic en una cuenta para expandir/contraer
+              </span>
             </div>
           </div>
         </CardContent>
@@ -785,9 +640,7 @@ export function FlujoEfectivoPresupuesto({
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    {canReorder && <TableHead className="w-[40px] sticky left-0 z-10 bg-muted/50"></TableHead>}
-                    <TableHead className={cn("sticky z-10 bg-muted/50 min-w-[250px]", canReorder ? "left-[40px]" : "left-0")}>Concepto</TableHead>
-                    <TableHead className="min-w-[100px]">Cuenta</TableHead>
+                    <TableHead className="sticky left-0 z-10 bg-muted/50 min-w-[300px]">Cuenta / Concepto</TableHead>
                     <TableHead className="min-w-[80px] text-center">Frecuencia</TableHead>
                     {mesesFiltrados.map((mes, i) => (
                       <TableHead key={i} className="min-w-[100px] text-right">
@@ -797,9 +650,9 @@ export function FlujoEfectivoPresupuesto({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {flujosEntradas.length === 0 && flujosSalidas.length === 0 ? (
+                  {gruposCuentasEntradas.length === 0 && gruposCuentasSalidas.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={(canReorder ? 4 : 3) + mesesFiltrados.length} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={2 + mesesFiltrados.length} className="text-center py-8 text-muted-foreground">
                         No hay presupuestos con fechas configuradas
                       </TableCell>
                     </TableRow>
@@ -809,20 +662,17 @@ export function FlujoEfectivoPresupuesto({
                       {mostrarEntradas && (
                         <>
                           <TableRow className="bg-green-100/50 dark:bg-green-950/40">
-                            <TableCell colSpan={(canReorder ? 4 : 3) + mesesFiltrados.length} className="sticky left-0 z-10 bg-green-100/50 dark:bg-green-950/40 font-bold text-green-800 dark:text-green-300">
+                            <TableCell colSpan={2 + mesesFiltrados.length} className="sticky left-0 z-10 bg-green-100/50 dark:bg-green-950/40 font-bold text-green-800 dark:text-green-300">
                               <div className="flex items-center gap-2">
                                 <TrendingUp className="h-4 w-4" />
                                 ENTRADAS DE EFECTIVO
                               </div>
                             </TableCell>
                           </TableRow>
-                          {grouping === "ninguno" 
-                            ? renderFlujoRows(flujosEntradas, "entrada")
-                            : gruposEntradas.map(g => renderGrupo(g, "entrada"))
-                          }
+                          {gruposCuentasEntradas.map(g => renderGrupoCuenta(g, "entrada"))}
                           {/* Subtotal Entradas */}
                           <TableRow className="bg-green-50 dark:bg-green-950/30 font-semibold border-t-2 border-green-200 dark:border-green-800">
-                            <TableCell className="sticky left-0 z-10 bg-green-50 dark:bg-green-950/30 pl-4" colSpan={canReorder ? 4 : 3}>
+                            <TableCell className="sticky left-0 z-10 bg-green-50 dark:bg-green-950/30 pl-4" colSpan={2}>
                               Total Entradas
                             </TableCell>
                             {totalesMensuales.entradas.map((monto, i) => (
@@ -838,20 +688,17 @@ export function FlujoEfectivoPresupuesto({
                       {mostrarSalidas && (
                         <>
                           <TableRow className="bg-red-100/50 dark:bg-red-950/40">
-                            <TableCell colSpan={(canReorder ? 4 : 3) + mesesFiltrados.length} className="sticky left-0 z-10 bg-red-100/50 dark:bg-red-950/40 font-bold text-red-800 dark:text-red-300">
+                            <TableCell colSpan={2 + mesesFiltrados.length} className="sticky left-0 z-10 bg-red-100/50 dark:bg-red-950/40 font-bold text-red-800 dark:text-red-300">
                               <div className="flex items-center gap-2">
                                 <TrendingDown className="h-4 w-4" />
                                 SALIDAS DE EFECTIVO
                               </div>
                             </TableCell>
                           </TableRow>
-                          {grouping === "ninguno" 
-                            ? renderFlujoRows(flujosSalidas, "salida")
-                            : gruposSalidas.map(g => renderGrupo(g, "salida"))
-                          }
+                          {gruposCuentasSalidas.map(g => renderGrupoCuenta(g, "salida"))}
                           {/* Subtotal Salidas */}
                           <TableRow className="bg-red-50 dark:bg-red-950/30 font-semibold border-t-2 border-red-200 dark:border-red-800">
-                            <TableCell className="sticky left-0 z-10 bg-red-50 dark:bg-red-950/30 pl-4" colSpan={canReorder ? 4 : 3}>
+                            <TableCell className="sticky left-0 z-10 bg-red-50 dark:bg-red-950/30 pl-4" colSpan={2}>
                               Total Salidas
                             </TableCell>
                             {totalesMensuales.salidas.map((monto, i) => (
@@ -867,7 +714,7 @@ export function FlujoEfectivoPresupuesto({
                       {filtroTipo === "todos" && (
                         <>
                           <TableRow className="bg-muted/30">
-                            <TableCell colSpan={(canReorder ? 4 : 3) + mesesFiltrados.length} className="sticky left-0 z-10 bg-muted/30 font-bold">
+                            <TableCell colSpan={2 + mesesFiltrados.length} className="sticky left-0 z-10 bg-muted/30 font-bold">
                               <div className="flex items-center gap-2">
                                 <DollarSign className="h-4 w-4" />
                                 FLUJO DE EFECTIVO
@@ -876,7 +723,7 @@ export function FlujoEfectivoPresupuesto({
                           </TableRow>
 
                           <TableRow className="bg-blue-50 dark:bg-blue-950/30 font-semibold">
-                            <TableCell className="sticky left-0 z-10 bg-blue-50 dark:bg-blue-950/30 pl-6" colSpan={canReorder ? 4 : 3}>
+                            <TableCell className="sticky left-0 z-10 bg-blue-50 dark:bg-blue-950/30 pl-6" colSpan={2}>
                               Flujo Neto del Período
                             </TableCell>
                             {totalesMensuales.entradas.map((entrada, i) => {
@@ -893,7 +740,7 @@ export function FlujoEfectivoPresupuesto({
                           </TableRow>
 
                           <TableRow className="bg-primary/10 font-bold text-base border-t-2 border-primary/30">
-                            <TableCell className="sticky left-0 z-10 bg-primary/10 pl-6" colSpan={canReorder ? 4 : 3}>
+                            <TableCell className="sticky left-0 z-10 bg-primary/10 pl-6" colSpan={2}>
                               Saldo Acumulado
                             </TableCell>
                             {totalesMensuales.saldos.map((saldo, i) => (
