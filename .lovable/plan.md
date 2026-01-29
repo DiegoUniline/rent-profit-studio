@@ -1,92 +1,120 @@
 
-# Plan: Corregir Cálculo Proporcional del Flujo de Efectivo por Frecuencia
+# Plan: Mejoras en Programación, Permisos de Presupuestos y Campo Tercero
 
-## Problema Identificado
+## Resumen de Cambios Solicitados
 
-El flujo de efectivo actualmente coloca el **monto total del presupuesto** en cada ocurrencia de la frecuencia, en lugar de **dividirlo proporcionalmente** según el número de ocurrencias en el periodo.
+1. **Programación Financiera**:
+   - Agrupar programaciones por tipo (primero ingresos, luego egresos)
+   - Agregar botón para agrupar por Centro de Negocio o Presupuesto
+   - Guardar preferencia de agrupación por usuario (localStorage)
+   - Las tarjetas KPI deben filtrarse según los filtros seleccionados
 
-### Código Actual (líneas 227-237)
+2. **Presupuestos - Permisos**:
+   - Si el usuario no puede crear presupuestos, ocultar botones de crear y eliminar/desactivar
 
-```typescript
-if (frecuencia === "semanal") {
-  const semanasEnMes = 4;
-  mesesMonto[index] = montoTotal * semanasEnMes;  // Multiplica!
-} else if (frecuencia === "mensual") {
-  mesesMonto[index] = montoTotal;  // Monto completo cada mes
-} else {
-  // Para trimestral, semestral, anual...
-  if (mesesDesdeInicio % frecuenciaEnMeses === 0) {
-    mesesMonto[index] = montoTotal;  // ERROR: Monto completo cada ocurrencia
-  }
-}
+3. **Presupuestos - Campo Tercero**:
+   - El campo "Tercero" ya no es requerido en el formulario de presupuestos
+
+---
+
+## Detalles Técnicos
+
+### 1. Página de Programación (`src/pages/Programacion.tsx`)
+
+**1.1 Agrupación por Tipo (Ingresos/Egresos)**
+- Modificar la visualización de la tabla para mostrar primero los ingresos, luego los egresos
+- Agregar secciones colapsables por tipo cuando no hay otro agrupamiento activo
+
+**1.2 Selector de Agrupación con Persistencia**
+- Agregar un `ToggleGroup` similar al de Presupuestos
+- Opciones: "Sin agrupar" (por defecto muestra Ingresos/Egresos), "Centro de Negocio", "Presupuesto"
+- Guardar selección en `localStorage` con clave `programacion_grouping`
+- Recuperar preferencia al cargar la página
+
+**1.3 Filtrado de Tarjetas KPI**
+- Actualmente los KPIs calculan sobre todas las programaciones
+- Cambiar para usar `filteredProgramaciones` en lugar de `programaciones`
+- Esto afecta: Ingresos Programados, Egresos Programados, Balance Proyectado
+
+### 2. Permisos en Presupuestos
+
+**2.1 Archivo `src/pages/Presupuestos.tsx`**
+- El botón "Nuevo Presupuesto" ya está condicionado a `role === "admin"`
+- Agregar condición para el botón "Crear primer presupuesto" en la vista vacía
+
+**2.2 Archivo `src/components/presupuestos/SortablePresupuestoRow.tsx`**
+- Agregar prop `canDelete` separado de `canEdit`
+- Ocultar botón de desactivar/activar para usuarios no-admin
+- `canEdit` seguirá siendo para admin y contador (editar)
+- `canDelete` será solo para admin (desactivar/activar)
+
+**2.3 Actualización en Presupuestos.tsx**
+- Pasar nueva prop `canDelete={role === "admin"}` al componente
+
+### 3. Campo Tercero Opcional en Presupuestos
+
+**3.1 Archivo `src/components/dialogs/PresupuestoDialog.tsx`**
+- El campo tercero ya es opcional en el formulario (no hay validación requerida en el schema)
+- Solo confirmar que no hay asterisco (*) junto a la etiqueta "Tercero"
+- El campo ya permite valor vacío
+
+---
+
+## Archivos a Modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/pages/Programacion.tsx` | Agregar agrupación, persistencia, filtrar KPIs |
+| `src/pages/Presupuestos.tsx` | Pasar prop `canDelete` al row component |
+| `src/components/presupuestos/SortablePresupuestoRow.tsx` | Agregar prop `canDelete` y ocultar botón desactivar |
+| `src/components/dialogs/PresupuestoDialog.tsx` | Verificar que Tercero no tenga asterisco de requerido |
+
+---
+
+## Lógica de Agrupación en Programación
+
+```text
+Estado inicial:
+- grouping = "tipo" (por defecto)
+- Muestra secciones: "Ingresos" -> lista, "Egresos" -> lista
+
+Opciones de agrupación:
+- "tipo": Agrupa por ingreso/egreso (default)
+- "centro": Agrupa por Centro de Negocio
+- "presupuesto": Agrupa por Presupuesto vinculado
+
+Persistencia:
+localStorage.getItem("programacion_grouping") || "tipo"
 ```
 
-### Ejemplo del Problema
+---
 
-| Configuración | Actual | Esperado |
-|--------------|--------|----------|
-| $30,000 mensual (12 meses) | $30,000 x 12 = $360,000 | $30,000 / 12 = $2,500/mes = $30,000 |
-| $30,000 trimestral (12 meses) | $30,000 x 4 = $120,000 | $30,000 / 4 = $7,500/trim = $30,000 |
-| $60,000 semestral (12 meses) | $60,000 x 2 = $120,000 | $60,000 / 2 = $30,000/sem = $60,000 |
+## Cambios en KPIs Filtrados
 
-## Solución Propuesta
-
-### Lógica de Cálculo Corregida
-
-1. **Calcular número de ocurrencias** en el periodo del presupuesto
-2. **Dividir el monto total** entre las ocurrencias
-3. **Asignar el monto proporcional** en cada ocurrencia
-
-### Archivo a Modificar
-
-`src/components/reportes/FlujoEfectivoPresupuesto.tsx`
-
-### Cambios Específicos
-
-**Antes del loop de meses, calcular:**
-
+**Antes:**
 ```typescript
-// Calcular cuántas ocurrencias hay en el periodo del presupuesto
-const mesesEnPeriodo = differenceInMonths(fechaFin, fechaInicio) + 1;
-let numOcurrencias: number;
-
-if (frecuencia === "semanal") {
-  numOcurrencias = mesesEnPeriodo * 4; // 4 semanas por mes
-} else {
-  numOcurrencias = Math.ceil(mesesEnPeriodo / frecuenciaEnMeses);
-}
-
-// Monto por cada ocurrencia
-const montoPorOcurrencia = numOcurrencias > 0 ? montoTotal / numOcurrencias : montoTotal;
+const kpis = useMemo(() => {
+  const pendientes = programaciones.filter((p) => p.estado === "pendiente");
+  // ...
+}, [programaciones]);
 ```
 
-**Dentro del loop, usar el monto proporcional:**
-
+**Después:**
 ```typescript
-if (frecuencia === "semanal") {
-  // Para semanal: monto semanal * 4 semanas del mes
-  const montoSemanal = montoTotal / (mesesEnPeriodo * 4);
-  mesesMonto[index] = montoSemanal * 4;
-} else if (frecuencia === "mensual") {
-  mesesMonto[index] = montoPorOcurrencia;
-} else {
-  // Trimestral, semestral, anual
-  if (mesesDesdeInicio % frecuenciaEnMeses === 0) {
-    mesesMonto[index] = montoPorOcurrencia;
-  }
-}
+const kpis = useMemo(() => {
+  const pendientes = filteredProgramaciones.filter((p) => p.estado === "pendiente");
+  // ...
+}, [filteredProgramaciones]);
 ```
 
-## Casos de Prueba
+Nota: Los KPIs de Ingresos/Egresos/Balance reflejarán los filtros activos. Las tarjetas de Saldo Bancos y Saldo Cartera ya se filtran por empresa.
 
-| Presupuesto | Periodo | Frecuencia | Ocurrencias | Monto/Ocurrencia | Total |
-|-------------|---------|------------|-------------|------------------|-------|
-| $12,000 | Ene-Dic | Mensual | 12 | $1,000 | $12,000 |
-| $40,000 | Ene-Dic | Trimestral | 4 | $10,000 | $40,000 |
-| $60,000 | Ene-Dic | Semestral | 2 | $30,000 | $60,000 |
-| $100,000 | Ene-Dic | Anual | 1 | $100,000 | $100,000 |
-| $52,000 | Ene-Dic | Semanal | 48 | $1,083.33/sem (~$4,333/mes) | $52,000 |
+---
 
 ## Resultado Esperado
 
-El flujo de efectivo mostrará los montos **proporcionalmente distribuidos** según la frecuencia, asegurando que la suma total de todas las ocurrencias sea igual al presupuesto original (cantidad × precio unitario).
+1. **Programación**: Vista agrupada por tipo (ingresos primero, egresos después) con opción de cambiar agrupación. KPIs respetan filtros.
+
+2. **Presupuestos**: Solo administradores ven botones de crear y desactivar. Contadores solo pueden editar.
+
+3. **Formulario Presupuesto**: Campo Tercero claramente opcional sin asterisco.
