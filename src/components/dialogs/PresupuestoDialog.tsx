@@ -25,7 +25,7 @@ import { z } from "zod";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmpresaDialog } from "./EmpresaDialog";
 import { CuentaDialog } from "./CuentaDialog";
-import { TerceroDialog } from "./TerceroDialog";
+
 import { CentroNegocioDialog } from "./CentroNegocioDialog";
 import { UnidadMedidaDialog } from "./UnidadMedidaDialog";
 
@@ -41,12 +41,6 @@ interface CuentaContable {
   empresa_id: string;
 }
 
-interface Tercero {
-  id: string;
-  razon_social: string;
-  rfc: string;
-  empresa_id: string;
-}
 
 interface CentroNegocio {
   id: string;
@@ -97,7 +91,6 @@ const presupuestoSchema = z.object({
 interface PresupuestoForm {
   empresa_id: string;
   cuenta_id: string;
-  tercero_id: string;
   centro_negocio_id: string;
   unidad_medida_id: string;
   partida: string;
@@ -112,7 +105,6 @@ interface PresupuestoForm {
 const emptyForm: PresupuestoForm = {
   empresa_id: "",
   cuenta_id: "",
-  tercero_id: "",
   centro_negocio_id: "",
   unidad_medida_id: "",
   partida: "",
@@ -137,7 +129,7 @@ export function PresupuestoDialog({
   
   // Related data states
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
-  const [terceros, setTerceros] = useState<Tercero[]>([]);
+  
   const [centros, setCentros] = useState<CentroNegocio[]>([]);
   const [unidades, setUnidades] = useState<UnidadMedida[]>([]);
   const [allEmpresas, setAllEmpresas] = useState<Empresa[]>(empresas);
@@ -145,7 +137,7 @@ export function PresupuestoDialog({
   // Dialog states for inline creation
   const [empresaDialogOpen, setEmpresaDialogOpen] = useState(false);
   const [cuentaDialogOpen, setCuentaDialogOpen] = useState(false);
-  const [terceroDialogOpen, setTerceroDialogOpen] = useState(false);
+  
   const [centroDialogOpen, setCentroDialogOpen] = useState(false);
   const [unidadDialogOpen, setUnidadDialogOpen] = useState(false);
 
@@ -155,7 +147,6 @@ export function PresupuestoDialog({
       loadRelatedData(form.empresa_id);
     } else {
       setCuentas([]);
-      setTerceros([]);
       setCentros([]);
     }
   }, [form.empresa_id]);
@@ -175,7 +166,6 @@ export function PresupuestoDialog({
         setForm({
           empresa_id: presupuesto.empresa_id,
           cuenta_id: presupuesto.cuenta_id || "",
-          tercero_id: presupuesto.tercero_id || "",
           centro_negocio_id: presupuesto.centro_negocio_id || "",
           unidad_medida_id: presupuesto.unidad_medida_id || "",
           partida: presupuesto.partida,
@@ -202,19 +192,13 @@ export function PresupuestoDialog({
   };
 
   const loadRelatedData = async (empresaId: string) => {
-    const [cuentasRes, tercerosRes, centrosRes] = await Promise.all([
+    const [cuentasRes, centrosRes] = await Promise.all([
       supabase
         .from("cuentas_contables")
         .select("id, codigo, nombre, empresa_id")
         .eq("empresa_id", empresaId)
         .eq("activa", true)
         .order("codigo"),
-      supabase
-        .from("terceros")
-        .select("id, razon_social, rfc, empresa_id")
-        .eq("empresa_id", empresaId)
-        .eq("activo", true)
-        .order("razon_social"),
       supabase
         .from("centros_negocio")
         .select("id, codigo, nombre, empresa_id")
@@ -224,7 +208,7 @@ export function PresupuestoDialog({
     ]);
 
     if (cuentasRes.data) setCuentas(cuentasRes.data);
-    if (tercerosRes.data) setTerceros(tercerosRes.data);
+    if (centrosRes.data) setCentros(centrosRes.data);
     if (centrosRes.data) setCentros(centrosRes.data);
   };
 
@@ -275,7 +259,6 @@ export function PresupuestoDialog({
       const data = {
         empresa_id: form.empresa_id,
         cuenta_id: form.cuenta_id || null,
-        tercero_id: form.tercero_id || null,
         centro_negocio_id: form.centro_negocio_id || null,
         unidad_medida_id: form.unidad_medida_id || null,
         partida: form.partida,
@@ -335,10 +318,6 @@ export function PresupuestoDialog({
     setCuentaDialogOpen(false);
   };
 
-  const handleTerceroCreated = () => {
-    if (form.empresa_id) loadRelatedData(form.empresa_id);
-    setTerceroDialogOpen(false);
-  };
 
   const handleCentroCreated = () => {
     if (form.empresa_id) loadRelatedData(form.empresa_id);
@@ -365,11 +344,6 @@ export function PresupuestoDialog({
     sublabel: c.codigo,
   }));
 
-  const terceroOptions = terceros.map((t) => ({
-    id: t.id,
-    label: t.razon_social,
-    sublabel: t.rfc,
-  }));
 
   const centroOptions = centros.map((c) => ({
     id: c.id,
@@ -400,7 +374,7 @@ export function PresupuestoDialog({
               <SearchableSelect
                 value={form.empresa_id}
                 onValueChange={(value) =>
-                  setForm({ ...form, empresa_id: value, cuenta_id: "", tercero_id: "", centro_negocio_id: "" })
+                  setForm({ ...form, empresa_id: value, cuenta_id: "", centro_negocio_id: "" })
                 }
                 options={empresaOptions}
                 placeholder="Seleccionar empresa"
@@ -438,21 +412,6 @@ export function PresupuestoDialog({
               />
             </div>
 
-            {/* Tercero */}
-            <div className="space-y-2">
-              <Label htmlFor="tercero_id">Tercero</Label>
-              <SearchableSelect
-                value={form.tercero_id}
-                onValueChange={(value) => setForm({ ...form, tercero_id: value })}
-                options={terceroOptions}
-                placeholder={form.empresa_id ? "Seleccionar tercero" : "Primero seleccione empresa"}
-                searchPlaceholder="Buscar tercero..."
-                emptyMessage="No se encontraron terceros"
-                disabled={!form.empresa_id}
-                onCreateNew={() => setTerceroDialogOpen(true)}
-                createLabel="Nuevo tercero"
-              />
-            </div>
 
             {/* Centro de Negocios */}
             <div className="space-y-2">
@@ -617,13 +576,6 @@ export function PresupuestoDialog({
         onSuccess={handleCuentaCreated}
       />
 
-      <TerceroDialog
-        open={terceroDialogOpen}
-        onOpenChange={setTerceroDialogOpen}
-        tercero={null}
-        empresas={allEmpresas}
-        onSuccess={handleTerceroCreated}
-      />
 
       <CentroNegocioDialog
         open={centroDialogOpen}

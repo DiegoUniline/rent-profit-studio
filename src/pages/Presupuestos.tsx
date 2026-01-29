@@ -182,7 +182,7 @@ export default function Presupuestos() {
   const [filterCentros, setFilterCentros] = useState<string[]>([]);
   const [filterCuentas, setFilterCuentas] = useState<string[]>([]);
   const [filterPartidas, setFilterPartidas] = useState<string[]>([]);
-  const [filterTerceros, setFilterTerceros] = useState<string[]>([]);
+  
   const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPresupuesto, setEditingPresupuesto] = useState<Presupuesto | null>(null);
@@ -355,7 +355,7 @@ export default function Presupuestos() {
     const centrosMap = new Map<string, { value: string; label: string; sublabel?: string }>();
     const cuentasMap = new Map<string, { value: string; label: string; sublabel?: string }>();
     const partidasSet = new Set<string>();
-    const tercerosMap = new Map<string, { value: string; label: string; sublabel?: string }>();
+    
 
     presupuestosConEjercido.forEach((p) => {
       // Centros de negocio
@@ -378,14 +378,6 @@ export default function Presupuestos() {
       if (p.partida) {
         partidasSet.add(p.partida);
       }
-      // Terceros
-      if (p.terceros?.id) {
-        tercerosMap.set(p.terceros.id, {
-          value: p.terceros.id,
-          label: p.terceros.razon_social,
-          sublabel: p.terceros.rfc,
-        });
-      }
     });
 
     return {
@@ -394,7 +386,6 @@ export default function Presupuestos() {
       partidas: Array.from(partidasSet)
         .sort((a, b) => a.localeCompare(b))
         .map((p) => ({ value: p, label: p })),
-      terceros: Array.from(tercerosMap.values()).sort((a, b) => a.label.localeCompare(b.label)),
     };
   }, [presupuestosConEjercido]);
 
@@ -414,11 +405,11 @@ export default function Presupuestos() {
       const matchesCentro = filterCentros.length === 0 || (p.centro_negocio_id && filterCentros.includes(p.centro_negocio_id));
       const matchesCuenta = filterCuentas.length === 0 || (p.cuenta_id && filterCuentas.includes(p.cuenta_id));
       const matchesPartida = filterPartidas.length === 0 || filterPartidas.includes(p.partida);
-      const matchesTercero = filterTerceros.length === 0 || (p.tercero_id && filterTerceros.includes(p.tercero_id));
       
-      return matchesSearch && matchesCompany && matchesEstado && matchesCentro && matchesCuenta && matchesPartida && matchesTercero;
+      
+      return matchesSearch && matchesCompany && matchesEstado && matchesCentro && matchesCuenta && matchesPartida;
     });
-  }, [presupuestosConEjercido, search, filterCompany, filterEstado, filterCentros, filterCuentas, filterPartidas, filterTerceros]);
+  }, [presupuestosConEjercido, search, filterCompany, filterEstado, filterCentros, filterCuentas, filterPartidas]);
 
   // Generic grouping structure
   interface GroupedData {
@@ -746,14 +737,6 @@ export default function Presupuestos() {
                 searchPlaceholder="Buscar partida..."
                 className="w-full"
               />
-              <MultiFilterSelect
-                values={filterTerceros}
-                onValuesChange={setFilterTerceros}
-                options={filterOptions.terceros}
-                placeholder="Tercero"
-                searchPlaceholder="Buscar tercero..."
-                className="w-full"
-              />
             </div>
             
             {/* Row 3: Grouping buttons */}
@@ -874,7 +857,7 @@ export default function Presupuestos() {
                                 {canEdit && <TableHead className="w-[40px]"></TableHead>}
                                 <TableHead>Partida</TableHead>
                                 <TableHead>Cuenta</TableHead>
-                                <TableHead>Tercero</TableHead>
+                                
                                 <TableHead>Centro</TableHead>
                                 <TableHead className="text-right">Presupuesto</TableHead>
                                 <TableHead className="text-right">Ejercido</TableHead>
