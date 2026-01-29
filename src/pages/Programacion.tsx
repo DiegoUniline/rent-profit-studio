@@ -350,12 +350,17 @@ export default function Programacion() {
       groups[groupKey].totalMonto += Number(p.monto);
     });
 
-    // Sort: for "tipo" grouping, show ingresos first
+    // Sort: for "tipo" grouping, show ingresos first; otherwise alphabetical A-Z
     const sorted = Object.values(groups).sort((a, b) => {
       if (grouping === "tipo") {
         return a.tipo === "ingreso" ? -1 : 1;
       }
-      return a.label.localeCompare(b.label);
+      // Sort alphabetically A-Z, with "Sin..." items at the end
+      const aIsEmpty = a.id === "sin-centro" || a.id === "sin-presupuesto";
+      const bIsEmpty = b.id === "sin-centro" || b.id === "sin-presupuesto";
+      if (aIsEmpty && !bIsEmpty) return 1;
+      if (!aIsEmpty && bIsEmpty) return -1;
+      return a.label.localeCompare(b.label, "es", { sensitivity: "base" });
     });
 
     return sorted;
