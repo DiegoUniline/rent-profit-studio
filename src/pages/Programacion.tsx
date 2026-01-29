@@ -253,7 +253,7 @@ export default function Programacion() {
 
   // Calcular saldos de banco y cartera
   const saldosBancarios = useMemo(() => {
-    // Filtrar por empresa si hay filtro activo
+    // Banco: filtrar por empresa si hay filtro activo
     const cuentasFiltradas = filterEmpresa === "all" 
       ? cuentas 
       : cuentas.filter(c => c.empresa_id === filterEmpresa);
@@ -265,8 +265,8 @@ export default function Programacion() {
       (c.nombre.toLowerCase().includes("banco") || c.nombre.toLowerCase().includes("banorte") || c.nombre.toLowerCase().includes("banamex") || c.nombre.toLowerCase().includes("hsbc") || c.nombre.toLowerCase().includes("santander"))
     );
 
-    // Identificar cuentas de cartera/clientes (100-001-002 = Clientes, o nombre contiene "cartera")
-    const cuentasCartera = cuentasFiltradas.filter(c =>
+    // Cartera: SIEMPRE de todas las empresas (saldo global)
+    const cuentasCartera = cuentas.filter(c =>
       c.codigo.startsWith("100-001-002") || // Clientes
       c.nombre.toLowerCase().includes("cartera") // Cuentas con "cartera" en el nombre
     );
@@ -292,8 +292,12 @@ export default function Programacion() {
     const egresos = pendientes
       .filter((p) => p.tipo === "egreso")
       .reduce((sum, p) => sum + Number(p.monto), 0);
-    return { ingresos, egresos, balance: ingresos - egresos };
-  }, [filteredProgramaciones]);
+    
+    // Balance = Saldo Banco + Saldo Cartera + Ingresos - Egresos
+    const balance = saldosBancarios.banco + saldosBancarios.cartera + ingresos - egresos;
+    
+    return { ingresos, egresos, balance };
+  }, [filteredProgramaciones, saldosBancarios]);
 
   // Grouped programaciones based on selected grouping
   interface GroupedData {
@@ -513,7 +517,7 @@ export default function Programacion() {
                 <div className={`text-2xl font-bold ${kpis.balance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                   {formatCurrency(kpis.balance)}
                 </div>
-                <p className="text-xs text-muted-foreground">Diferencia neta</p>
+                <p className="text-xs text-muted-foreground">Banco + Cartera + Ingresos - Egresos</p>
               </CardContent>
             </Card>
           </div>
