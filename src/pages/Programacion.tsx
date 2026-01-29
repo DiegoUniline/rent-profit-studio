@@ -280,17 +280,18 @@ export default function Programacion() {
       ? cuentas 
       : cuentas.filter(c => c.empresa_id === filterEmpresa);
 
-    // Identificar cuentas de banco (100-001-001 = Caja y Bancos, excluyendo cartera)
-    // Solo cuentas que empiecen con 100-001-001 y contengan "banco" en el nombre
+    // Bancos: cuentas que empiecen con 100-001-001 y NO sean de cartera
     const cuentasBanco = cuentasFiltradas.filter(c =>
       c.codigo.startsWith("100-001-001") &&
-      (c.nombre.toLowerCase().includes("banco") || c.nombre.toLowerCase().includes("banorte") || c.nombre.toLowerCase().includes("banamex") || c.nombre.toLowerCase().includes("hsbc") || c.nombre.toLowerCase().includes("santander"))
+      !c.codigo.startsWith("100-001-002") &&
+      !c.nombre.toLowerCase().includes("cartera")
     );
 
     // Cartera: SIEMPRE de todas las empresas (saldo global)
+    // Solo cuentas que empiecen con 100-001-002 O contengan "cartera" en el nombre
     const cuentasCartera = cuentas.filter(c =>
-      c.codigo.startsWith("100-001-002") || // Clientes
-      c.nombre.toLowerCase().includes("cartera") // Cuentas con "cartera" en el nombre
+      c.codigo.startsWith("100-001-002") ||
+      c.nombre.toLowerCase().includes("cartera")
     );
 
     const calcularSaldo = (cuentasIds: string[]) => {
