@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Plus, Play, Copy, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, Building2, Landmark, X } from "lucide-react";
+import { Plus, Play, Copy, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, Building2, Landmark, X, ChevronDown, ChevronRight, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ProgramacionDialog } from "@/components/dialogs/ProgramacionDialog";
 import { ProyeccionProgramacion } from "@/components/reportes/ProyeccionProgramacion";
 
@@ -105,6 +111,35 @@ export default function Programacion() {
   // Saldos bancarios
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [movimientos, setMovimientos] = useState<AsientoMovimiento[]>([]);
+
+  // Grouping preference with localStorage persistence
+  type GroupingType = "tipo" | "centro" | "presupuesto";
+  const [grouping, setGrouping] = useState<GroupingType>(() => {
+    const saved = localStorage.getItem("programacion_grouping");
+    return (saved as GroupingType) || "tipo";
+  });
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(["ingreso", "egreso"]));
+
+  const handleGroupingChange = (value: string) => {
+    if (value) {
+      const newGrouping = value as GroupingType;
+      setGrouping(newGrouping);
+      localStorage.setItem("programacion_grouping", newGrouping);
+      // Expand all groups when changing grouping
+      const allGroupIds = new Set(groupedProgramaciones.map(g => g.id));
+      setExpandedGroups(allGroupIds);
+    }
+  };
+
+  const toggleGroup = (groupId: string) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupId)) {
+      newExpanded.delete(groupId);
+    } else {
+      newExpanded.add(groupId);
+    }
+    setExpandedGroups(newExpanded);
+  };
 
   useEffect(() => {
     fetchData();
@@ -246,9 +281,9 @@ export default function Programacion() {
     return { banco: saldoBanco, cartera: saldoCartera };
   }, [cuentas, movimientos, filterEmpresa]);
 
-  // KPIs
+  // KPIs - ahora se calculan sobre filteredProgramaciones
   const kpis = useMemo(() => {
-    const pendientes = programaciones.filter((p) => p.estado === "pendiente");
+    const pendientes = filteredProgramaciones.filter((p) => p.estado === "pendiente");
     const ingresos = pendientes
       .filter((p) => p.tipo === "ingreso")
       .reduce((sum, p) => sum + Number(p.monto), 0);
@@ -256,7 +291,69 @@ export default function Programacion() {
       .filter((p) => p.tipo === "egreso")
       .reduce((sum, p) => sum + Number(p.monto), 0);
     return { ingresos, egresos, balance: ingresos - egresos };
-  }, [programaciones]);
+  }, [filteredProgramaciones]);
+
+  // Grouped programaciones based on selected grouping
+  interface GroupedData {
+    id: string;
+    label: string;
+    sublabel?: string;
+    programaciones: Programacion[];
+    totalMonto: number;
+    tipo?: "ingreso" | "egreso";
+  }
+
+  const groupedProgramaciones = useMemo(() => {
+    const groups: Record<string, GroupedData> = {};
+    
+    filteredProgramaciones.forEach((p) => {
+      let groupKey: string;
+      let groupLabel: string;
+      let groupSublabel: string | undefined;
+      let groupTipo: "ingreso" | "egreso" | undefined;
+
+      switch (grouping) {
+        case "centro":
+          groupKey = p.centro_negocio_id || "sin-centro";
+          groupLabel = p.centros_negocio?.nombre || "Sin centro de negocio";
+          groupSublabel = p.centros_negocio?.codigo;
+          break;
+        case "presupuesto":
+          groupKey = p.presupuesto_id || "sin-presupuesto";
+          groupLabel = p.presupuestos?.partida || "Sin presupuesto vinculado";
+          break;
+        case "tipo":
+        default:
+          groupKey = p.tipo;
+          groupLabel = p.tipo === "ingreso" ? "Ingresos" : "Egresos";
+          groupTipo = p.tipo;
+          break;
+      }
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          id: groupKey,
+          label: groupLabel,
+          sublabel: groupSublabel,
+          programaciones: [],
+          totalMonto: 0,
+          tipo: groupTipo,
+        };
+      }
+      groups[groupKey].programaciones.push(p);
+      groups[groupKey].totalMonto += Number(p.monto);
+    });
+
+    // Sort: for "tipo" grouping, show ingresos first
+    const sorted = Object.values(groups).sort((a, b) => {
+      if (grouping === "tipo") {
+        return a.tipo === "ingreso" ? -1 : 1;
+      }
+      return a.label.localeCompare(b.label);
+    });
+
+    return sorted;
+  }, [filteredProgramaciones, grouping]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("es-MX", {
@@ -538,113 +635,185 @@ export default function Programacion() {
             )}
           </div>
 
-          {/* Table */}
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Empresa</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Presupuesto</TableHead>
-                    <TableHead>Centro de Negocio</TableHead>
-                    <TableHead>Tercero</TableHead>
-                    <TableHead className="text-right">Monto</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8">
-                        Cargando...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredProgramaciones.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                        No hay programaciones
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredProgramaciones.map((prog) => (
-                      <TableRow key={prog.id}>
-                        <TableCell className="font-medium">
-                          {formatDateNumeric(prog.fecha_programada)}
-                        </TableCell>
-                        <TableCell>{prog.empresas?.razon_social}</TableCell>
-                        <TableCell>{getTipoBadge(prog.tipo)}</TableCell>
-                        <TableCell>
-                          {prog.presupuestos ? (
-                            <Badge variant="secondary" className="max-w-[200px] truncate">
-                              {prog.presupuestos.partida}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {prog.centros_negocio
-                            ? `${prog.centros_negocio.codigo} - ${prog.centros_negocio.nombre}`
-                            : "-"}
-                        </TableCell>
-                        <TableCell>{prog.terceros?.razon_social || "-"}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(prog.monto)}
-                        </TableCell>
-                        <TableCell>{getEstadoBadge(prog.estado)}</TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-1">
-                            {prog.estado === "pendiente" && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleExecute(prog)}
-                                  title="Ejecutar"
-                                >
-                                  <Play className="h-4 w-4 text-emerald-600" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEdit(prog)}
-                                  title="Editar"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              </>
+          {/* Grouping Toggle */}
+          <div className="flex items-center gap-3 bg-muted/30 rounded-lg p-2">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Layers className="h-4 w-4" />
+              <span>Agrupar por:</span>
+            </div>
+            <ToggleGroup type="single" value={grouping} onValueChange={handleGroupingChange}>
+              <ToggleGroupItem value="tipo" aria-label="Agrupar por tipo" className="text-xs px-3">
+                Tipo
+              </ToggleGroupItem>
+              <ToggleGroupItem value="centro" aria-label="Agrupar por centro" className="text-xs px-3">
+                Centro
+              </ToggleGroupItem>
+              <ToggleGroupItem value="presupuesto" aria-label="Agrupar por presupuesto" className="text-xs px-3">
+                Presupuesto
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+
+          {/* Grouped Tables */}
+          <div className="space-y-4">
+            {loading ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  Cargando...
+                </CardContent>
+              </Card>
+            ) : groupedProgramaciones.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No hay programaciones
+                </CardContent>
+              </Card>
+            ) : (
+              groupedProgramaciones.map((group) => (
+                <Card key={group.id}>
+                  <Collapsible
+                    open={expandedGroups.has(group.id)}
+                    onOpenChange={() => toggleGroup(group.id)}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {expandedGroups.has(group.id) ? (
+                              <ChevronDown className="h-5 w-5" />
+                            ) : (
+                              <ChevronRight className="h-5 w-5" />
                             )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleCopy(prog)}
-                              title="Copiar"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setDeletingId(prog.id);
-                                setDeleteDialogOpen(true);
-                              }}
-                              title="Eliminar"
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <div>
+                              <CardTitle className="text-base flex items-center gap-2">
+                                {group.tipo && (
+                                  group.tipo === "ingreso" ? (
+                                    <TrendingUp className="h-4 w-4 text-emerald-600" />
+                                  ) : (
+                                    <TrendingDown className="h-4 w-4 text-rose-600" />
+                                  )
+                                )}
+                                {group.label}
+                              </CardTitle>
+                              {group.sublabel && (
+                                <p className="text-xs text-muted-foreground font-mono">
+                                  {group.sublabel}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                          <div className="flex items-center gap-4">
+                            <Badge variant="secondary">
+                              {group.programaciones.length} registro(s)
+                            </Badge>
+                            <div className={cn(
+                              "text-lg font-bold font-mono",
+                              group.tipo === "ingreso" ? "text-emerald-600" : 
+                              group.tipo === "egreso" ? "text-rose-600" : "text-foreground"
+                            )}>
+                              {formatCurrency(group.totalMonto)}
+                            </div>
+                          </div>
+                        </div>
+                      </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <CardContent className="pt-0 p-0">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Fecha</TableHead>
+                              <TableHead>Empresa</TableHead>
+                              <TableHead>Tipo</TableHead>
+                              <TableHead>Presupuesto</TableHead>
+                              <TableHead>Centro de Negocio</TableHead>
+                              <TableHead>Tercero</TableHead>
+                              <TableHead className="text-right">Monto</TableHead>
+                              <TableHead>Estado</TableHead>
+                              <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {group.programaciones.map((prog) => (
+                              <TableRow key={prog.id}>
+                                <TableCell className="font-medium">
+                                  {formatDateNumeric(prog.fecha_programada)}
+                                </TableCell>
+                                <TableCell>{prog.empresas?.razon_social}</TableCell>
+                                <TableCell>{getTipoBadge(prog.tipo)}</TableCell>
+                                <TableCell>
+                                  {prog.presupuestos ? (
+                                    <Badge variant="secondary" className="max-w-[200px] truncate">
+                                      {prog.presupuestos.partida}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {prog.centros_negocio
+                                    ? `${prog.centros_negocio.codigo} - ${prog.centros_negocio.nombre}`
+                                    : "-"}
+                                </TableCell>
+                                <TableCell>{prog.terceros?.razon_social || "-"}</TableCell>
+                                <TableCell className="text-right font-mono">
+                                  {formatCurrency(prog.monto)}
+                                </TableCell>
+                                <TableCell>{getEstadoBadge(prog.estado)}</TableCell>
+                                <TableCell>
+                                  <div className="flex justify-end gap-1">
+                                    {prog.estado === "pendiente" && (
+                                      <>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleExecute(prog)}
+                                          title="Ejecutar"
+                                        >
+                                          <Play className="h-4 w-4 text-emerald-600" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleEdit(prog)}
+                                          title="Editar"
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      </>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleCopy(prog)}
+                                      title="Copiar"
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        setDeletingId(prog.id);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                      title="Eliminar"
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </Card>
+              ))
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="proyeccion">

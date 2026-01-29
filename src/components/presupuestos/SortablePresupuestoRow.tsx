@@ -25,6 +25,7 @@ interface Presupuesto {
 interface SortablePresupuestoRowProps {
   presupuesto: Presupuesto;
   canEdit: boolean;
+  canDelete?: boolean;
   formatCurrency: (value: number) => string;
   getProgressColor: (porcentaje: number) => string;
   onEdit: (p: Presupuesto) => void;
@@ -34,6 +35,7 @@ interface SortablePresupuestoRowProps {
 export function SortablePresupuestoRow({
   presupuesto: p,
   canEdit,
+  canDelete = false,
   formatCurrency,
   getProgressColor,
   onEdit,
@@ -172,15 +174,17 @@ export function SortablePresupuestoRow({
             >
               <Edit className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => onToggleActivo(p)}
-              title={p.activo ? "Desactivar" : "Activar"}
-            >
-              <Power className="h-4 w-4" />
-            </Button>
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onToggleActivo(p)}
+                title={p.activo ? "Desactivar" : "Activar"}
+              >
+                <Power className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </TableCell>
       )}

@@ -787,7 +787,7 @@ export default function Presupuestos() {
           <Card>
             <CardContent className="py-10 text-center">
               <p className="text-muted-foreground">No hay presupuestos registrados</p>
-              {canEdit && (
+              {role === "admin" && (
                 <Button onClick={openNew} variant="outline" className="mt-4">
                   Crear primer presupuesto
                 </Button>
@@ -894,6 +894,7 @@ export default function Presupuestos() {
                                     key={p.id}
                                     presupuesto={p}
                                     canEdit={canEdit}
+                                    canDelete={role === "admin"}
                                     formatCurrency={formatCurrency}
                                     getProgressColor={getProgressColor}
                                     onEdit={openEdit}
