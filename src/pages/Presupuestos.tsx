@@ -203,7 +203,7 @@ export default function Presupuestos() {
     }
   };
 
-  const canEdit = role === "admin" || role === "contador";
+  const canEdit = true; // All authenticated users can edit
 
   // DnD state and sensors
   const [activeId, setActiveId] = useState<string | null>(null);
