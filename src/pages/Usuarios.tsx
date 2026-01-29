@@ -13,23 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Users, Edit, Plus, Search } from "lucide-react";
-import { Label } from "@/components/ui/label";
 import { NuevoUsuarioDialog } from "@/components/dialogs/NuevoUsuarioDialog";
+import { EditUsuarioDialog } from "@/components/dialogs/EditUsuarioDialog";
 
 interface UserWithRole {
   id: string;
@@ -58,9 +44,9 @@ export default function Usuarios() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [search, setSearch] = useState("");
   const [nuevoDialogOpen, setNuevoDialogOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
-  const [newRole, setNewRole] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -110,35 +96,9 @@ export default function Usuarios() {
     fetchUsers();
   }, []);
 
-  const handleEditRole = (user: UserWithRole) => {
+  const handleEditUser = (user: UserWithRole) => {
     setEditingUser(user);
-    setNewRole(user.role);
-  };
-
-  const handleSaveRole = async () => {
-    if (!editingUser || !newRole) return;
-
-    const { error } = await supabase
-      .from("user_roles")
-      .update({ role: newRole as "admin" | "contador" | "usuario" })
-      .eq("user_id", editingUser.user_id);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el rol",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    toast({
-      title: "Rol actualizado",
-      description: `El rol de ${editingUser.nombre_completo} ha sido actualizado`,
-    });
-
-    setEditingUser(null);
-    fetchUsers();
+    setEditDialogOpen(true);
   };
 
   const filteredUsers = users.filter(
@@ -219,7 +179,8 @@ export default function Usuarios() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleEditRole(user)}
+                        onClick={() => handleEditUser(user)}
+                        title="Editar usuario"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -232,41 +193,16 @@ export default function Usuarios() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Rol de Usuario</DialogTitle>
-            <DialogDescription>
-              Cambia el rol de {editingUser?.nombre_completo}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Rol</Label>
-              <Select value={newRole} onValueChange={setNewRole}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un rol" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="contador">Contador</SelectItem>
-                  <SelectItem value="usuario">Usuario</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditingUser(null)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSaveRole}>Guardar</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <NuevoUsuarioDialog
         open={nuevoDialogOpen}
         onOpenChange={setNuevoDialogOpen}
+        onSuccess={fetchUsers}
+      />
+
+      <EditUsuarioDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        usuario={editingUser}
         onSuccess={fetchUsers}
       />
     </div>
