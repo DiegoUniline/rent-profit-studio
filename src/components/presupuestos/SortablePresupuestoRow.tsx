@@ -99,13 +99,6 @@ export function SortablePresupuestoRow({
         )}
       </TableCell>
       <TableCell>
-        {p.terceros ? (
-          <span className="text-sm">{p.terceros.razon_social}</span>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        )}
-      </TableCell>
-      <TableCell>
         {p.centros_negocio ? (
           <span className="text-sm" title={p.centros_negocio.codigo}>
             {p.centros_negocio.nombre}
