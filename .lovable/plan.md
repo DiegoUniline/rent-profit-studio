@@ -1,69 +1,93 @@
 
+# Plan: Corregir Cálculo de Saldos en Programación Financiera
 
-# Plan: Agregar "Sin agrupar" en Presupuestos y Verificar Correcciones de Fechas
+## Resumen del Problema
 
-## Resumen de Cambios
+Actualmente en la página de Programación:
 
-1. **Presupuestos - Agregar opción "Sin agrupar"**: Agregar un botón para quitar el agrupamiento y mostrar una lista plana de presupuestos.
+1. **Saldo de Cartera**: Se calcula solo para la empresa filtrada. Debería ser el saldo de **todas las cuentas de cartera de TODAS las empresas** (valor global).
 
-2. **Verificación de Fechas UTC**: Confirmar que todas las fechas del sistema están correctamente manejadas para evitar el problema de día incorrecto.
+2. **Balance Proyectado**: Solo calcula `Ingresos - Egresos`. Debería ser:
+   - **Saldo Banco + Saldo Cartera + Ingresos Programados - Egresos Programados**
 
 ---
 
 ## Cambios Técnicos
 
-### 1. Archivo: `src/pages/Presupuestos.tsx`
+### Archivo: `src/pages/Programacion.tsx`
 
-**Cambio 1.1: Actualizar el tipo GroupingType**
+**Cambio 1: Calcular Saldo de Cartera Global**
 
-Agregar `"ninguno"` como opción de agrupación:
+Modificar el cálculo de `saldosBancarios` para que el saldo de cartera siempre sea de todas las empresas, sin importar el filtro de empresa activo.
 
+Líneas 254-284 - Cambiar de:
 ```typescript
-// Línea 192 - Cambiar de:
-type GroupingType = "partida" | "cuenta" | "centro" | "empresa";
+const saldosBancarios = useMemo(() => {
+  // Filtrar por empresa si hay filtro activo
+  const cuentasFiltradas = filterEmpresa === "all" 
+    ? cuentas 
+    : cuentas.filter(c => c.empresa_id === filterEmpresa);
 
-// A:
-type GroupingType = "partida" | "cuenta" | "centro" | "empresa" | "ninguno";
+  // Cuentas de cartera filtradas por empresa...
+  const cuentasCartera = cuentasFiltradas.filter(...);
 ```
 
-**Cambio 1.2: Actualizar el ToggleGroup en la UI**
-
-Agregar botón "Sin agrupar" al `ToggleGroup` (después de línea 760):
-
+A:
 ```typescript
-<ToggleGroupItem value="ninguno" aria-label="Sin agrupar" className="text-xs px-3">
-  Sin agrupar
-</ToggleGroupItem>
+const saldosBancarios = useMemo(() => {
+  // Banco: filtrar por empresa si hay filtro activo
+  const cuentasFiltradas = filterEmpresa === "all" 
+    ? cuentas 
+    : cuentas.filter(c => c.empresa_id === filterEmpresa);
+
+  // Cartera: SIEMPRE de todas las empresas (saldo global)
+  const cuentasCartera = cuentas.filter(c =>
+    c.codigo.startsWith("100-001-002") ||
+    c.nombre.toLowerCase().includes("cartera")
+  );
 ```
 
-**Cambio 1.3: Modificar la lógica de agrupación**
+**Cambio 2: Calcular Balance Proyectado Correctamente**
 
-Cuando `grouping === "ninguno"`, mostrar una tabla plana sin secciones colapsables. Se agregará una condición antes del mapeo de `groupedData` para renderizar una vista diferente.
+Modificar el cálculo de `kpis` para incluir los saldos de banco y cartera.
 
-**Cambio 1.4: Renderizar vista plana**
+Líneas 287-296 - Cambiar de:
+```typescript
+const kpis = useMemo(() => {
+  const pendientes = filteredProgramaciones.filter((p) => p.estado === "pendiente");
+  const ingresos = pendientes.filter((p) => p.tipo === "ingreso")...;
+  const egresos = pendientes.filter((p) => p.tipo === "egreso")...;
+  return { ingresos, egresos, balance: ingresos - egresos };
+}, [filteredProgramaciones]);
+```
 
-Cuando no hay agrupación activa:
-- Mostrar todos los presupuestos filtrados en una sola tabla
-- Mantener las columnas existentes
-- Agregar columna de "Empresa" para identificar a qué empresa pertenece cada presupuesto
-- Mantener el drag-and-drop funcional
+A:
+```typescript
+const kpis = useMemo(() => {
+  const pendientes = filteredProgramaciones.filter((p) => p.estado === "pendiente");
+  const ingresos = pendientes.filter((p) => p.tipo === "ingreso")...;
+  const egresos = pendientes.filter((p) => p.tipo === "egreso")...;
+  
+  // Balance = Saldo Banco + Saldo Cartera + Ingresos - Egresos
+  const balance = saldosBancarios.banco + saldosBancarios.cartera + ingresos - egresos;
+  
+  return { ingresos, egresos, balance };
+}, [filteredProgramaciones, saldosBancarios]);
+```
 
----
+**Cambio 3: Actualizar descripción del KPI**
 
-## Estado Actual de las Correcciones de Fechas
+Actualizar el texto descriptivo del Balance Proyectado para reflejar la nueva fórmula.
 
-He verificado los archivos y **las correcciones de fechas ya están implementadas**:
+Línea 516 - Cambiar de:
+```typescript
+<p className="text-xs text-muted-foreground">Diferencia neta</p>
+```
 
-| Archivo | Estado | Corrección |
-|---------|--------|------------|
-| `src/components/dialogs/PresupuestoDialog.tsx` | ✅ Correcto | Usa `+ "T00:00:00"` en líneas 175-176 |
-| `src/components/dialogs/ProgramacionDialog.tsx` | ✅ Correcto | Usa `+ "T00:00:00"` en línea 84 |
-| `src/components/reportes/FlujoEfectivoPresupuesto.tsx` | ✅ Correcto | Usa `parseLocalDate()` en líneas 209-210 |
-| `src/pages/Programacion.tsx` | ✅ Correcto | Usa `parseLocalDate()` y `formatDateNumeric()` |
-| `src/lib/accounting-utils.ts` | ✅ Correcto | Usa `+ "T00:00:00"` en línea 116 |
-| `src/components/reportes/ProyeccionProgramacion.tsx` | ✅ Correcto | Usa `parseLocalDate()` en línea 51 |
-
-Los archivos que usan `toLocaleDateString` con fechas como `created_at` de usuarios están bien porque esas son timestamps completos (con hora), no fechas solo YYYY-MM-DD.
+A:
+```typescript
+<p className="text-xs text-muted-foreground">Banco + Cartera + Ingresos - Egresos</p>
+```
 
 ---
 
@@ -71,13 +95,13 @@ Los archivos que usan `toLocaleDateString` con fechas como `created_at` de usuar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/Presupuestos.tsx` | Agregar opción "Sin agrupar" y lógica para vista plana |
+| `src/pages/Programacion.tsx` | Corregir cálculo de cartera global y fórmula de balance proyectado |
 
 ---
 
 ## Resultado Esperado
 
-1. **Presupuestos**: Nueva opción "Sin agrupar" en el selector de agrupación que muestra todos los presupuestos en una tabla plana (sin secciones colapsables), similar a como funciona en Programación.
+1. **Saldo de Cartera**: Mostrará el saldo total de todas las cuentas de cartera de todas las empresas, independientemente del filtro de empresa.
 
-2. **Fechas**: Ya están correctas en todo el sistema. Las fechas como "01/01/2026" se muestran correctamente sin el error de mostrar el día anterior.
-
+2. **Balance Proyectado**: Mostrará la fórmula correcta:
+   - Saldo Banco + Saldo Cartera + Ingresos Programados - Egresos Programados
