@@ -1,98 +1,83 @@
 
-# Plan: Agregar "Limpiar Agrupación" en Programación y Corregir Fechas UTC
 
-## Resumen de Cambios Solicitados
+# Plan: Agregar "Sin agrupar" en Presupuestos y Verificar Correcciones de Fechas
 
-1. **Programación Financiera**:
-   - Agregar opción para limpiar/quitar el agrupamiento actual (mostrar lista plana)
+## Resumen de Cambios
 
-2. **Corrección de Fechas UTC**:
-   - Corregir todos los lugares donde las fechas se muestran con un día de diferencia por conversión UTC
+1. **Presupuestos - Agregar opción "Sin agrupar"**: Agregar un botón para quitar el agrupamiento y mostrar una lista plana de presupuestos.
 
----
-
-## Cambios en Programación
-
-### Archivo: `src/pages/Programacion.tsx`
-
-**Cambio 1: Agregar opción "Sin agrupar" al ToggleGroup**
-
-Actualmente el `ToggleGroup` tiene opciones: "Tipo", "Centro", "Presupuesto"
-
-Se agregará:
-- Nueva opción "Sin agrupar" que muestra todas las programaciones en una lista plana sin secciones colapsables
-- Valor: `"ninguno"` o `null`
-
-**Cambio 2: Actualizar lógica de agrupación**
-
-Cuando `grouping === "ninguno"`:
-- No crear grupos
-- Mostrar directamente la tabla sin secciones colapsables
-- Ordenar por fecha programada (ingresos y egresos mezclados)
-
-**Cambio 3: Actualizar el tipo GroupingType**
-
-```typescript
-type GroupingType = "tipo" | "centro" | "presupuesto" | "ninguno";
-```
+2. **Verificación de Fechas UTC**: Confirmar que todas las fechas del sistema están correctamente manejadas para evitar el problema de día incorrecto.
 
 ---
 
-## Corrección de Fechas UTC
+## Cambios Técnicos
 
-El problema ocurre cuando se usa `new Date("2026-01-01")` - JavaScript lo interpreta como UTC medianoche, lo que en zonas horarias como UTC-6 se convierte en "2025-12-31 18:00:00" mostrando el día anterior.
+### 1. Archivo: `src/pages/Presupuestos.tsx`
 
-### Archivos a Corregir
+**Cambio 1.1: Actualizar el tipo GroupingType**
 
-| Archivo | Línea | Problema | Solución |
-|---------|-------|----------|----------|
-| `src/components/dialogs/PresupuestoDialog.tsx` | 175-176 | `new Date(presupuesto.fecha_inicio)` | Agregar `+ "T00:00:00"` |
-| `src/components/reportes/FlujoEfectivoPresupuesto.tsx` | 208-209 | `new Date(p.fecha_inicio)` | Usar `parseLocalDate()` |
+Agregar `"ninguno"` como opción de agrupación:
 
-### Corrección en PresupuestoDialog.tsx
-
-**Antes:**
 ```typescript
-fecha_inicio: presupuesto.fecha_inicio ? new Date(presupuesto.fecha_inicio) : undefined,
-fecha_fin: presupuesto.fecha_fin ? new Date(presupuesto.fecha_fin) : undefined,
+// Línea 192 - Cambiar de:
+type GroupingType = "partida" | "cuenta" | "centro" | "empresa";
+
+// A:
+type GroupingType = "partida" | "cuenta" | "centro" | "empresa" | "ninguno";
 ```
 
-**Después:**
+**Cambio 1.2: Actualizar el ToggleGroup en la UI**
+
+Agregar botón "Sin agrupar" al `ToggleGroup` (después de línea 760):
+
 ```typescript
-fecha_inicio: presupuesto.fecha_inicio ? new Date(presupuesto.fecha_inicio + "T00:00:00") : undefined,
-fecha_fin: presupuesto.fecha_fin ? new Date(presupuesto.fecha_fin + "T00:00:00") : undefined,
+<ToggleGroupItem value="ninguno" aria-label="Sin agrupar" className="text-xs px-3">
+  Sin agrupar
+</ToggleGroupItem>
 ```
 
-### Corrección en FlujoEfectivoPresupuesto.tsx
+**Cambio 1.3: Modificar la lógica de agrupación**
 
-**Antes:**
-```typescript
-const fechaInicio = new Date(p.fecha_inicio);
-const fechaFin = new Date(p.fecha_fin);
-```
+Cuando `grouping === "ninguno"`, mostrar una tabla plana sin secciones colapsables. Se agregará una condición antes del mapeo de `groupedData` para renderizar una vista diferente.
 
-**Después:**
-```typescript
-import { parseLocalDate } from "@/lib/date-utils";
-// ...
-const fechaInicio = parseLocalDate(p.fecha_inicio);
-const fechaFin = parseLocalDate(p.fecha_fin);
-```
+**Cambio 1.4: Renderizar vista plana**
+
+Cuando no hay agrupación activa:
+- Mostrar todos los presupuestos filtrados en una sola tabla
+- Mantener las columnas existentes
+- Agregar columna de "Empresa" para identificar a qué empresa pertenece cada presupuesto
+- Mantener el drag-and-drop funcional
+
+---
+
+## Estado Actual de las Correcciones de Fechas
+
+He verificado los archivos y **las correcciones de fechas ya están implementadas**:
+
+| Archivo | Estado | Corrección |
+|---------|--------|------------|
+| `src/components/dialogs/PresupuestoDialog.tsx` | ✅ Correcto | Usa `+ "T00:00:00"` en líneas 175-176 |
+| `src/components/dialogs/ProgramacionDialog.tsx` | ✅ Correcto | Usa `+ "T00:00:00"` en línea 84 |
+| `src/components/reportes/FlujoEfectivoPresupuesto.tsx` | ✅ Correcto | Usa `parseLocalDate()` en líneas 209-210 |
+| `src/pages/Programacion.tsx` | ✅ Correcto | Usa `parseLocalDate()` y `formatDateNumeric()` |
+| `src/lib/accounting-utils.ts` | ✅ Correcto | Usa `+ "T00:00:00"` en línea 116 |
+| `src/components/reportes/ProyeccionProgramacion.tsx` | ✅ Correcto | Usa `parseLocalDate()` en línea 51 |
+
+Los archivos que usan `toLocaleDateString` con fechas como `created_at` de usuarios están bien porque esas son timestamps completos (con hora), no fechas solo YYYY-MM-DD.
 
 ---
 
 ## Archivos a Modificar
 
-| Archivo | Cambios |
-|---------|---------|
-| `src/pages/Programacion.tsx` | Agregar opción "Sin agrupar" y lógica para vista plana |
-| `src/components/dialogs/PresupuestoDialog.tsx` | Corregir parsing de fechas con `T00:00:00` |
-| `src/components/reportes/FlujoEfectivoPresupuesto.tsx` | Usar `parseLocalDate()` para fechas de presupuestos |
+| Archivo | Cambio |
+|---------|--------|
+| `src/pages/Presupuestos.tsx` | Agregar opción "Sin agrupar" y lógica para vista plana |
 
 ---
 
 ## Resultado Esperado
 
-1. **Programación**: Nueva opción "Sin agrupar" que muestra todas las programaciones en una sola tabla sin secciones, ordenadas por fecha.
+1. **Presupuestos**: Nueva opción "Sin agrupar" en el selector de agrupación que muestra todos los presupuestos en una tabla plana (sin secciones colapsables), similar a como funciona en Programación.
 
-2. **Fechas**: Las fechas como "01/01/2026" se mostrarán correctamente en todos los componentes, sin importar la zona horaria del usuario.
+2. **Fechas**: Ya están correctas en todo el sistema. Las fechas como "01/01/2026" se muestran correctamente sin el error de mostrar el día anterior.
+
