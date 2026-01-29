@@ -505,7 +505,7 @@ export default function Asientos() {
                             <XCircle className="h-4 w-4" />
                           </Button>
                         )}
-                        {canDelete && asiento.estado === "borrador" && (
+                        {canDelete && (asiento.estado === "borrador" || asiento.estado === "cancelado") && (
                           <Button
                             variant="ghost"
                             size="icon"
