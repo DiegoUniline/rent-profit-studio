@@ -142,6 +142,8 @@ const esNaturalezaDeudora = (codigo: string): boolean => {
 };
 
 // Calculate ejercido based on account nature
+// Cuentas de Balance: ejercido = cuando DISMINUYE la cuenta
+// Cuentas de Resultados: ejercido = cuando se registra el movimiento
 const calcularEjercido = (
   presupuestoId: string,
   cuentaCodigo: string | undefined,
@@ -155,18 +157,31 @@ const calcularEjercido = (
 
   const codigoCuenta = cuentaCodigo || movimientosMatch[0]?.cuentas_contables?.codigo || "";
   
-  // For cuentas 100, 500, 600 (Activo, Costos, Gastos) -> sum debe
-  // For cuentas 200, 300, 400 (Pasivo, Capital, Ingresos) -> sum haber
-  const esDeudora = 
-    codigoCuenta.startsWith("100") || 
-    codigoCuenta.startsWith("500") || 
-    codigoCuenta.startsWith("600") ||
-    codigoCuenta.startsWith("1");
+  // Determinar tipo de cuenta por código
+  const esActivo = codigoCuenta.startsWith("1"); // 100, 1xx
+  const esPasivo = codigoCuenta.startsWith("2"); // 200, 2xx
+  const esCapital = codigoCuenta.startsWith("3"); // 300, 3xx
 
-  if (esDeudora) {
+  if (esActivo) {
+    // Activo disminuye con HABER (cobros, consumos de recursos)
+    return movimientosMatch.reduce((sum, m) => sum + Number(m.haber), 0);
+  } else if (esPasivo) {
+    // Pasivo disminuye con DEBE (pagos de deuda)
+    return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
+  } else if (esCapital) {
+    // Capital: para presupuestos, cuando disminuye (DEBE)
     return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
   } else {
-    return movimientosMatch.reduce((sum, m) => sum + Number(m.haber), 0);
+    // Cuentas de resultados (4 Ingresos, 5 Costos, 6 Gastos)
+    const esCostoGasto = codigoCuenta.startsWith("5") || codigoCuenta.startsWith("6");
+    
+    if (esCostoGasto) {
+      // Costos/Gastos -> suma debe (naturaleza deudora)
+      return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
+    } else {
+      // Ingresos (4xx) -> suma haber (naturaleza acreedora)
+      return movimientosMatch.reduce((sum, m) => sum + Number(m.haber), 0);
+    }
   }
 };
 
