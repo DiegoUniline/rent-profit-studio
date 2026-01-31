@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { formatDateShort } from "@/lib/date-utils";
+import { formatDateShort, parseLocalDate } from "@/lib/date-utils";
+import { DateInput } from "@/components/ui/date-input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -120,6 +122,8 @@ export default function Asientos() {
   const [filterCompany, setFilterCompany] = useState<string>("all");
   const [filterTipo, setFilterTipo] = useState<string>("all");
   const [filterEstado, setFilterEstado] = useState<string>("all");
+  const [filterFechaDesde, setFilterFechaDesde] = useState<Date | undefined>(undefined);
+  const [filterFechaHasta, setFilterFechaHasta] = useState<Date | undefined>(undefined);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingAsiento, setViewingAsiento] = useState<AsientoContable | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -270,9 +274,15 @@ export default function Asientos() {
       const matchesCompany = filterCompany === "all" || a.empresa_id === filterCompany;
       const matchesTipo = filterTipo === "all" || a.tipo === filterTipo;
       const matchesEstado = filterEstado === "all" || a.estado === filterEstado;
-      return matchesSearch && matchesCompany && matchesTipo && matchesEstado;
+      
+      // Filtro por rango de fechas
+      const fechaAsiento = parseLocalDate(a.fecha);
+      const matchesFechaDesde = !filterFechaDesde || fechaAsiento >= filterFechaDesde;
+      const matchesFechaHasta = !filterFechaHasta || fechaAsiento <= filterFechaHasta;
+      
+      return matchesSearch && matchesCompany && matchesTipo && matchesEstado && matchesFechaDesde && matchesFechaHasta;
     });
-  }, [asientos, search, filterCompany, filterTipo, filterEstado]);
+  }, [asientos, search, filterCompany, filterTipo, filterEstado, filterFechaDesde, filterFechaHasta]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -396,6 +406,24 @@ export default function Asientos() {
                 <SelectItem value="cancelado">Cancelado</SelectItem>
               </SelectContent>
             </Select>
+            <div className="flex flex-col gap-1 min-w-[160px]">
+              <Label className="text-xs text-muted-foreground">Desde</Label>
+              <DateInput
+                value={filterFechaDesde}
+                onChange={setFilterFechaDesde}
+                placeholder="dd/mm/aaaa"
+                maxDate={filterFechaHasta}
+              />
+            </div>
+            <div className="flex flex-col gap-1 min-w-[160px]">
+              <Label className="text-xs text-muted-foreground">Hasta</Label>
+              <DateInput
+                value={filterFechaHasta}
+                onChange={setFilterFechaHasta}
+                placeholder="dd/mm/aaaa"
+                minDate={filterFechaDesde}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
