@@ -1,54 +1,92 @@
 
-# Plan: Filtro por Rango de Fechas en Asientos Contables
+# Plan: Corregir Lógica de Ejercido para Cuentas de Balance
 
-## Resumen
-Agregar dos campos de fecha (Desde y Hasta) en la sección de filtros de la página de Asientos Contables para poder filtrar las pólizas por un rango de fechas específico.
+## Problema Identificado
+La función `calcularEjercido` en `src/pages/Presupuestos.tsx` calcula incorrectamente el monto ejercido para cuentas de balance (Activo y Pasivo).
 
-## Cambios Visuales
+**Lógica actual (incorrecta para balance):**
+- Activo (100): suma DEBE (cuando aumenta la cuenta)
+- Pasivo (200): suma HABER (cuando aumenta la cuenta)
 
-La sección de filtros actual se ampliará para incluir:
-- Campo "Desde" (fecha inicial del rango)
-- Campo "Hasta" (fecha final del rango)
-- Ambos campos opcionales - si solo se llena uno, filtra desde/hasta esa fecha
-- Los campos aparecerán junto a los filtros existentes (empresa, tipo, estado)
+**Lógica correcta:**
+- Activo (100): suma HABER (cuando disminuye la cuenta = cobro, uso de recurso)
+- Pasivo (200): suma DEBE (cuando disminuye la cuenta = pago de deuda)
+- Resultados (400, 500, 600): mantener lógica actual (correcta)
 
-## Comportamiento
+## Ejemplo Práctico
+- **Cuenta por cobrar (Activo 100)**: Cuando cobras, la cuenta disminuye (haber) → ese es el ejercido
+- **Cuenta por pagar (Pasivo 200)**: Cuando pagas, la cuenta disminuye (debe) → ese es el ejercido
 
-1. **Sin fechas seleccionadas**: Muestra todos los asientos (comportamiento actual)
-2. **Solo "Desde"**: Muestra asientos desde esa fecha en adelante
-3. **Solo "Hasta"**: Muestra asientos hasta esa fecha
-4. **Ambas fechas**: Muestra asientos dentro del rango (inclusive)
-5. Los totales de las tarjetas (Debe, Haber, Conteo) se actualizarán automáticamente según el filtro
+## Cambios a Realizar
 
----
+### Archivo: `src/pages/Presupuestos.tsx`
 
-## Detalles Técnicos
+Modificar la función `calcularEjercido` (líneas 145-171):
 
-### Archivo a modificar
-`src/pages/Asientos.tsx`
-
-### Cambios específicos
-
-1. **Agregar importación del componente DateInput**
+**Antes:**
 ```typescript
-import { DateInput } from "@/components/ui/date-input";
+const esDeudora = 
+  codigoCuenta.startsWith("100") || 
+  codigoCuenta.startsWith("500") || 
+  codigoCuenta.startsWith("600") ||
+  codigoCuenta.startsWith("1");
+
+if (esDeudora) {
+  return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
+} else {
+  return movimientosMatch.reduce((sum, m) => sum + Number(m.haber), 0);
+}
 ```
 
-2. **Agregar estados para las fechas**
+**Después:**
 ```typescript
-const [filterFechaDesde, setFilterFechaDesde] = useState<Date | undefined>(undefined);
-const [filterFechaHasta, setFilterFechaHasta] = useState<Date | undefined>(undefined);
+// Determinar tipo de cuenta
+const esActivo = codigoCuenta.startsWith("100") || codigoCuenta.startsWith("1");
+const esPasivo = codigoCuenta.startsWith("200") || codigoCuenta.startsWith("2");
+const esCapital = codigoCuenta.startsWith("300") || codigoCuenta.startsWith("3");
+
+// Cuentas de Balance (Activo/Pasivo): el ejercido es cuando DISMINUYE la cuenta
+// Cuentas de Resultados (Ingresos/Costos/Gastos): mantienen lógica original
+
+if (esActivo) {
+  // Activo disminuye con HABER (cobros, consumos)
+  return movimientosMatch.reduce((sum, m) => sum + Number(m.haber), 0);
+} else if (esPasivo) {
+  // Pasivo disminuye con DEBE (pagos de deuda)
+  return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
+} else if (esCapital) {
+  // Capital: para presupuestos, también cuando disminuye (DEBE)
+  return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
+} else {
+  // Cuentas de resultados (400 Ingresos, 500 Costos, 600 Gastos)
+  // Ingresos -> suma haber (naturaleza acreedora)
+  // Costos/Gastos -> suma debe (naturaleza deudora)
+  const esCostoGasto = 
+    codigoCuenta.startsWith("500") || 
+    codigoCuenta.startsWith("600") ||
+    codigoCuenta.startsWith("5") ||
+    codigoCuenta.startsWith("6");
+  
+  if (esCostoGasto) {
+    return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
+  } else {
+    // Ingresos (400)
+    return movimientosMatch.reduce((sum, m) => sum + Number(m.haber), 0);
+  }
+}
 ```
 
-3. **Actualizar lógica de filtrado en `filteredAsientos`**
-- Convertir la fecha del asiento a objeto Date usando `parseLocalDate`
-- Comparar con las fechas del filtro si están definidas
+## Resumen de Lógica Final
 
-4. **Agregar campos de fecha en la UI de filtros**
-- Dos componentes `DateInput` con etiquetas "Desde" y "Hasta"
-- Ancho fijo para mantener consistencia visual
-- Placeholder descriptivo para cada campo
+| Tipo Cuenta | Código | Naturaleza | Ejercido suma |
+|-------------|--------|------------|---------------|
+| Activo | 100, 1xx | Deudora | HABER (disminución) |
+| Pasivo | 200, 2xx | Acreedora | DEBE (disminución) |
+| Capital | 300, 3xx | Acreedora | DEBE (disminución) |
+| Ingresos | 400, 4xx | Acreedora | HABER (aumento = correcto) |
+| Costos | 500, 5xx | Deudora | DEBE (aumento = correcto) |
+| Gastos | 600, 6xx | Deudora | DEBE (aumento = correcto) |
 
-### Validaciones
-- La fecha "Hasta" no puede ser menor que "Desde" (validación visual opcional)
-- Uso de `parseLocalDate` para evitar problemas de zona horaria
+## Notas
+- Las cuentas de resultados (Ingresos, Costos, Gastos) mantienen la lógica actual porque siempre parten de cero
+- Solo se modifica la lógica para cuentas de balance (Activo, Pasivo, Capital)
