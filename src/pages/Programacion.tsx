@@ -95,13 +95,54 @@ export default function Programacion() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Filters
-  const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
-  const [filterTipo, setFilterTipo] = useState<string>("all");
-  const [filterEstado, setFilterEstado] = useState<string>("pendiente");
-  const [filterCentroNegocio, setFilterCentroNegocio] = useState<string>("all");
-  const [filterTercero, setFilterTercero] = useState<string>("all");
-  const [filterFechaDesde, setFilterFechaDesde] = useState<Date | undefined>(undefined);
-  const [filterFechaHasta, setFilterFechaHasta] = useState<Date | undefined>(undefined);
+  const [filterEmpresa, setFilterEmpresa] = useState<string>(() => localStorage.getItem("programacion_filter_empresa") || "all");
+  const [filterTipo, setFilterTipo] = useState<string>(() => localStorage.getItem("programacion_filter_tipo") || "all");
+  const [filterEstado, setFilterEstado] = useState<string>(() => localStorage.getItem("programacion_filter_estado") || "pendiente");
+  const [filterCentroNegocio, setFilterCentroNegocio] = useState<string>(() => localStorage.getItem("programacion_filter_centro") || "all");
+  const [filterTercero, setFilterTercero] = useState<string>(() => localStorage.getItem("programacion_filter_tercero") || "all");
+  const [filterFechaDesde, setFilterFechaDesde] = useState<Date | undefined>(() => {
+    const saved = localStorage.getItem("programacion_filter_fecha_desde");
+    return saved ? new Date(saved) : undefined;
+  });
+  const [filterFechaHasta, setFilterFechaHasta] = useState<Date | undefined>(() => {
+    const saved = localStorage.getItem("programacion_filter_fecha_hasta");
+    return saved ? new Date(saved) : undefined;
+  });
+
+  // Persist filters
+  useEffect(() => {
+    if (filterEmpresa !== "all") localStorage.setItem("programacion_filter_empresa", filterEmpresa);
+    else localStorage.removeItem("programacion_filter_empresa");
+  }, [filterEmpresa]);
+
+  useEffect(() => {
+    if (filterTipo !== "all") localStorage.setItem("programacion_filter_tipo", filterTipo);
+    else localStorage.removeItem("programacion_filter_tipo");
+  }, [filterTipo]);
+
+  useEffect(() => {
+    localStorage.setItem("programacion_filter_estado", filterEstado);
+  }, [filterEstado]);
+
+  useEffect(() => {
+    if (filterCentroNegocio !== "all") localStorage.setItem("programacion_filter_centro", filterCentroNegocio);
+    else localStorage.removeItem("programacion_filter_centro");
+  }, [filterCentroNegocio]);
+
+  useEffect(() => {
+    if (filterTercero !== "all") localStorage.setItem("programacion_filter_tercero", filterTercero);
+    else localStorage.removeItem("programacion_filter_tercero");
+  }, [filterTercero]);
+
+  useEffect(() => {
+    if (filterFechaDesde) localStorage.setItem("programacion_filter_fecha_desde", filterFechaDesde.toISOString());
+    else localStorage.removeItem("programacion_filter_fecha_desde");
+  }, [filterFechaDesde]);
+
+  useEffect(() => {
+    if (filterFechaHasta) localStorage.setItem("programacion_filter_fecha_hasta", filterFechaHasta.toISOString());
+    else localStorage.removeItem("programacion_filter_fecha_hasta");
+  }, [filterFechaHasta]);
   
   // Catalogs for filters
   const [empresas, setEmpresas] = useState<{ id: string; razon_social: string }[]>([]);
@@ -261,6 +302,13 @@ export default function Programacion() {
     setFilterTercero("all");
     setFilterFechaDesde(undefined);
     setFilterFechaHasta(undefined);
+    // Clear localStorage
+    localStorage.removeItem("programacion_filter_empresa");
+    localStorage.removeItem("programacion_filter_tipo");
+    localStorage.removeItem("programacion_filter_centro");
+    localStorage.removeItem("programacion_filter_tercero");
+    localStorage.removeItem("programacion_filter_fecha_desde");
+    localStorage.removeItem("programacion_filter_fecha_hasta");
   };
 
   const hasActiveFilters = filterEmpresa !== "all" || filterTipo !== "all" || filterCentroNegocio !== "all" || filterTercero !== "all" || filterFechaDesde || filterFechaHasta;

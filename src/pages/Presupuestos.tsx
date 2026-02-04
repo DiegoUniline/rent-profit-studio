@@ -192,13 +192,52 @@ export default function Presupuestos() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [movimientos, setMovimientos] = useState<MovimientoConAsiento[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterCompany, setFilterCompany] = useState<string>("all");
-  const [filterCentros, setFilterCentros] = useState<string[]>([]);
-  const [filterCuentas, setFilterCuentas] = useState<string[]>([]);
-  const [filterPartidas, setFilterPartidas] = useState<string[]>([]);
+  const [search, setSearch] = useState(() => localStorage.getItem("presupuestos_filter_search") || "");
+  const [filterCompany, setFilterCompany] = useState<string>(() => localStorage.getItem("presupuestos_filter_company") || "all");
+  const [filterCentros, setFilterCentros] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("presupuestos_filter_centros") || "[]"); } catch { return []; }
+  });
+  const [filterCuentas, setFilterCuentas] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("presupuestos_filter_cuentas") || "[]"); } catch { return []; }
+  });
+  const [filterPartidas, setFilterPartidas] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("presupuestos_filter_partidas") || "[]"); } catch { return []; }
+  });
   
-  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
+  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">(() => {
+    const saved = localStorage.getItem("presupuestos_filter_estado");
+    return (saved === "baja" ? "baja" : "activos");
+  });
+
+  // Persist filters
+  useEffect(() => {
+    if (search) localStorage.setItem("presupuestos_filter_search", search);
+    else localStorage.removeItem("presupuestos_filter_search");
+  }, [search]);
+
+  useEffect(() => {
+    if (filterCompany !== "all") localStorage.setItem("presupuestos_filter_company", filterCompany);
+    else localStorage.removeItem("presupuestos_filter_company");
+  }, [filterCompany]);
+
+  useEffect(() => {
+    if (filterCentros.length > 0) localStorage.setItem("presupuestos_filter_centros", JSON.stringify(filterCentros));
+    else localStorage.removeItem("presupuestos_filter_centros");
+  }, [filterCentros]);
+
+  useEffect(() => {
+    if (filterCuentas.length > 0) localStorage.setItem("presupuestos_filter_cuentas", JSON.stringify(filterCuentas));
+    else localStorage.removeItem("presupuestos_filter_cuentas");
+  }, [filterCuentas]);
+
+  useEffect(() => {
+    if (filterPartidas.length > 0) localStorage.setItem("presupuestos_filter_partidas", JSON.stringify(filterPartidas));
+    else localStorage.removeItem("presupuestos_filter_partidas");
+  }, [filterPartidas]);
+
+  useEffect(() => {
+    localStorage.setItem("presupuestos_filter_estado", filterEstado);
+  }, [filterEstado]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPresupuesto, setEditingPresupuesto] = useState<Presupuesto | null>(null);
   const [expandedEmpresas, setExpandedEmpresas] = useState<Set<string>>(new Set());

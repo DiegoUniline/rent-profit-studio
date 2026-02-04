@@ -68,10 +68,33 @@ export default function Terceros() {
   const [terceros, setTerceros] = useState<Tercero[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
-  const [filterTipo, setFilterTipo] = useState<string>("all");
-  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
+  const [search, setSearch] = useState(() => localStorage.getItem("terceros_filter_search") || "");
+  const [filterEmpresa, setFilterEmpresa] = useState<string>(() => localStorage.getItem("terceros_filter_empresa") || "all");
+  const [filterTipo, setFilterTipo] = useState<string>(() => localStorage.getItem("terceros_filter_tipo") || "all");
+  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">(() => {
+    const saved = localStorage.getItem("terceros_filter_estado");
+    return (saved === "baja" ? "baja" : "activos");
+  });
+
+  // Persist filters
+  useEffect(() => {
+    if (search) localStorage.setItem("terceros_filter_search", search);
+    else localStorage.removeItem("terceros_filter_search");
+  }, [search]);
+
+  useEffect(() => {
+    if (filterEmpresa !== "all") localStorage.setItem("terceros_filter_empresa", filterEmpresa);
+    else localStorage.removeItem("terceros_filter_empresa");
+  }, [filterEmpresa]);
+
+  useEffect(() => {
+    if (filterTipo !== "all") localStorage.setItem("terceros_filter_tipo", filterTipo);
+    else localStorage.removeItem("terceros_filter_tipo");
+  }, [filterTipo]);
+
+  useEffect(() => {
+    localStorage.setItem("terceros_filter_estado", filterEstado);
+  }, [filterEstado]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editingTercero, setEditingTercero] = useState<Tercero | null>(null);

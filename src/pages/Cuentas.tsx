@@ -75,9 +75,27 @@ export default function Cuentas() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [saldos, setSaldos] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
-  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
+  const [search, setSearch] = useState(() => localStorage.getItem("cuentas_filter_search") || "");
+  const [filterEmpresa, setFilterEmpresa] = useState<string>(() => localStorage.getItem("cuentas_filter_empresa") || "all");
+  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">(() => {
+    const saved = localStorage.getItem("cuentas_filter_estado");
+    return (saved === "baja" ? "baja" : "activos");
+  });
+
+  // Persist filters
+  useEffect(() => {
+    if (search) localStorage.setItem("cuentas_filter_search", search);
+    else localStorage.removeItem("cuentas_filter_search");
+  }, [search]);
+
+  useEffect(() => {
+    if (filterEmpresa !== "all") localStorage.setItem("cuentas_filter_empresa", filterEmpresa);
+    else localStorage.removeItem("cuentas_filter_empresa");
+  }, [filterEmpresa]);
+
+  useEffect(() => {
+    localStorage.setItem("cuentas_filter_estado", filterEstado);
+  }, [filterEstado]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCuenta, setEditingCuenta] = useState<CuentaContable | null>(null);
 
