@@ -42,9 +42,27 @@ export default function CentrosNegocio() {
   const [centros, setCentros] = useState<CentroNegocio[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterEmpresa, setFilterEmpresa] = useState<string>("all");
-  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
+  const [search, setSearch] = useState(() => localStorage.getItem("centros_filter_search") || "");
+  const [filterEmpresa, setFilterEmpresa] = useState<string>(() => localStorage.getItem("centros_filter_empresa") || "all");
+  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">(() => {
+    const saved = localStorage.getItem("centros_filter_estado");
+    return (saved === "baja" ? "baja" : "activos");
+  });
+
+  // Persist filters
+  useEffect(() => {
+    if (search) localStorage.setItem("centros_filter_search", search);
+    else localStorage.removeItem("centros_filter_search");
+  }, [search]);
+
+  useEffect(() => {
+    if (filterEmpresa !== "all") localStorage.setItem("centros_filter_empresa", filterEmpresa);
+    else localStorage.removeItem("centros_filter_empresa");
+  }, [filterEmpresa]);
+
+  useEffect(() => {
+    localStorage.setItem("centros_filter_estado", filterEstado);
+  }, [filterEstado]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCentro, setEditingCentro] = useState<CentroNegocio | null>(null);
 

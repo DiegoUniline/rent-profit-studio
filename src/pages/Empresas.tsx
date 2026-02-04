@@ -110,8 +110,21 @@ export default function Empresas() {
   const { toast } = useToast();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">("activos");
+  const [search, setSearch] = useState(() => localStorage.getItem("empresas_filter_search") || "");
+  const [filterEstado, setFilterEstado] = useState<"activos" | "baja">(() => {
+    const saved = localStorage.getItem("empresas_filter_estado");
+    return (saved === "baja" ? "baja" : "activos");
+  });
+
+  // Persist filters
+  useEffect(() => {
+    if (search) localStorage.setItem("empresas_filter_search", search);
+    else localStorage.removeItem("empresas_filter_search");
+  }, [search]);
+
+  useEffect(() => {
+    localStorage.setItem("empresas_filter_estado", filterEstado);
+  }, [filterEstado]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editingEmpresa, setEditingEmpresa] = useState<Empresa | null>(null);
