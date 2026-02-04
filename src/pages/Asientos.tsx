@@ -118,12 +118,28 @@ export default function Asientos() {
   const [asientos, setAsientos] = useState<AsientoContable[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterCompany, setFilterCompany] = useState<string>("all");
-  const [filterTipo, setFilterTipo] = useState<string>("all");
-  const [filterEstado, setFilterEstado] = useState<string>("all");
-  const [filterFechaDesde, setFilterFechaDesde] = useState<Date | undefined>(undefined);
-  const [filterFechaHasta, setFilterFechaHasta] = useState<Date | undefined>(undefined);
+  
+  // Load filters from localStorage on mount
+  const [search, setSearch] = useState(() => {
+    return localStorage.getItem("asientos_filter_search") || "";
+  });
+  const [filterCompany, setFilterCompany] = useState<string>(() => {
+    return localStorage.getItem("asientos_filter_company") || "all";
+  });
+  const [filterTipo, setFilterTipo] = useState<string>(() => {
+    return localStorage.getItem("asientos_filter_tipo") || "all";
+  });
+  const [filterEstado, setFilterEstado] = useState<string>(() => {
+    return localStorage.getItem("asientos_filter_estado") || "all";
+  });
+  const [filterFechaDesde, setFilterFechaDesde] = useState<Date | undefined>(() => {
+    const saved = localStorage.getItem("asientos_filter_fecha_desde");
+    return saved ? new Date(saved) : undefined;
+  });
+  const [filterFechaHasta, setFilterFechaHasta] = useState<Date | undefined>(() => {
+    const saved = localStorage.getItem("asientos_filter_fecha_hasta");
+    return saved ? new Date(saved) : undefined;
+  });
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingAsiento, setViewingAsiento] = useState<AsientoContable | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -132,9 +148,41 @@ export default function Asientos() {
   const [pendingDeleteAsiento, setPendingDeleteAsiento] = useState<AsientoContable | null>(null);
 
   const canEdit = role === "admin" || role === "contador";
-  // Now contadores can also see delete button, but they need admin code
   const canDelete = role === "admin" || role === "contador";
   const isAdmin = role === "admin";
+
+  // Persist filters to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem("asientos_filter_search", search);
+  }, [search]);
+
+  useEffect(() => {
+    localStorage.setItem("asientos_filter_company", filterCompany);
+  }, [filterCompany]);
+
+  useEffect(() => {
+    localStorage.setItem("asientos_filter_tipo", filterTipo);
+  }, [filterTipo]);
+
+  useEffect(() => {
+    localStorage.setItem("asientos_filter_estado", filterEstado);
+  }, [filterEstado]);
+
+  useEffect(() => {
+    if (filterFechaDesde) {
+      localStorage.setItem("asientos_filter_fecha_desde", filterFechaDesde.toISOString());
+    } else {
+      localStorage.removeItem("asientos_filter_fecha_desde");
+    }
+  }, [filterFechaDesde]);
+
+  useEffect(() => {
+    if (filterFechaHasta) {
+      localStorage.setItem("asientos_filter_fecha_hasta", filterFechaHasta.toISOString());
+    } else {
+      localStorage.removeItem("asientos_filter_fecha_hasta");
+    }
+  }, [filterFechaHasta]);
 
   useEffect(() => {
     fetchData();
