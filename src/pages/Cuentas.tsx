@@ -161,10 +161,57 @@ export default function Cuentas() {
   }, []);
 
   // Extended type for consolidated accounts
-  type CuentaConsolidada = CuentaContable & { saldoConsolidado?: number };
+  type CuentaConsolidada = CuentaContable & { saldoConsolidado?: number; saldoAcumulado?: number };
+
+  // Helper: Check if a code is a child of another code
+  const isChildOf = (childCode: string, parentCode: string): boolean => {
+    const childClean = childCode.replace(/[^0-9]/g, "").padEnd(12, "0");
+    const parentClean = parentCode.replace(/[^0-9]/g, "").padEnd(12, "0");
+    const parentLevel = getCodeLevel(parentCode);
+    
+    // Parent prefix based on level
+    let prefixLength = 0;
+    if (parentLevel === 1) prefixLength = 3;
+    else if (parentLevel === 2) prefixLength = 6;
+    else if (parentLevel === 3) prefixLength = 9;
+    else return false; // Level 4 can't have children
+    
+    // Child must start with parent's prefix and be a deeper level
+    return childClean.slice(0, prefixLength) === parentClean.slice(0, prefixLength) &&
+           getCodeLevel(childCode) > parentLevel;
+  };
+
+  // Calculate accumulated balances for titulo accounts
+  const calculateAccumulatedBalances = (
+    cuentasList: CuentaContable[], 
+    saldosMap: Map<string, number>,
+    isConsolidated: boolean
+  ): Map<string, number> => {
+    const accumulated = new Map<string, number>();
+    
+    cuentasList.forEach(cuenta => {
+      if (cuenta.clasificacion === "titulo") {
+        // Sum all descendant saldo accounts
+        let total = 0;
+        cuentasList.forEach(child => {
+          if (child.clasificacion === "saldo" && isChildOf(child.codigo, cuenta.codigo)) {
+            if (isConsolidated) {
+              // In consolidated view, we need to sum across all accounts with this code
+              total += saldosMap.get(child.id) || 0;
+            } else {
+              total += saldosMap.get(child.id) || 0;
+            }
+          }
+        });
+        accumulated.set(cuenta.id, total);
+      }
+    });
+    
+    return accumulated;
+  };
 
   // Filter and organize cuentas hierarchically
-  const { filteredCuentas, stats, isConsolidated } = useMemo(() => {
+  const { filteredCuentas, stats, isConsolidated, accumulatedBalances } = useMemo(() => {
     let filtered = cuentas;
     
     // Filter by estado first
@@ -191,6 +238,9 @@ export default function Cuentas() {
     if (filterEmpresa !== "all") {
       filtered = filtered.filter(c => c.empresa_id === filterEmpresa);
       
+      // Calculate accumulated balances for titulo accounts
+      const accumulated = calculateAccumulatedBalances(filtered, saldos, false);
+      
       // Aplicar búsqueda
       if (search) {
         filtered = filtered.filter(c => 
@@ -199,7 +249,12 @@ export default function Cuentas() {
         );
       }
       
-      return { filteredCuentas: filtered as CuentaConsolidada[], stats, isConsolidated: false };
+      return { 
+        filteredCuentas: filtered as CuentaConsolidada[], 
+        stats, 
+        isConsolidated: false,
+        accumulatedBalances: accumulated
+      };
     }
     
     // CONSOLIDACIÓN: Agrupar por código cuando es "Todas"
@@ -225,6 +280,20 @@ export default function Cuentas() {
     let consolidadas = Array.from(cuentasAgrupadas.values())
       .sort((a, b) => a.codigo.localeCompare(b.codigo));
     
+    // Calculate accumulated balances for consolidated titulo accounts
+    const accumulatedConsolidated = new Map<string, number>();
+    consolidadas.forEach(cuenta => {
+      if (cuenta.clasificacion === "titulo") {
+        let total = 0;
+        consolidadas.forEach(child => {
+          if (child.clasificacion === "saldo" && isChildOf(child.codigo, cuenta.codigo)) {
+            total += child.saldoConsolidado || 0;
+          }
+        });
+        accumulatedConsolidated.set(cuenta.codigo, total);
+      }
+    });
+    
     // Aplicar búsqueda
     if (search) {
       consolidadas = consolidadas.filter(c => 
@@ -236,7 +305,8 @@ export default function Cuentas() {
     return { 
       filteredCuentas: consolidadas, 
       stats,
-      isConsolidated: true 
+      isConsolidated: true,
+      accumulatedBalances: accumulatedConsolidated
     };
   }, [cuentas, filterEmpresa, filterEstado, search, saldos]);
 
@@ -390,10 +460,23 @@ export default function Cuentas() {
                 <TableBody>
                 {filteredCuentas.map((cuenta) => {
                     const level = getCodeLevel(cuenta.codigo);
-                    const saldo = isConsolidated 
-                      ? (cuenta.saldoConsolidado || 0) 
-                      : (saldos.get(cuenta.id) || 0);
-                    const showSaldo = cuenta.clasificacion === "saldo";
+                    
+                    // Determine balance to show
+                    let saldo = 0;
+                    if (cuenta.clasificacion === "saldo") {
+                      // Saldo accounts show their own balance
+                      saldo = isConsolidated 
+                        ? (cuenta.saldoConsolidado || 0) 
+                        : (saldos.get(cuenta.id) || 0);
+                    } else {
+                      // Titulo accounts show accumulated balance from children
+                      saldo = isConsolidated
+                        ? (accumulatedBalances.get(cuenta.codigo) || 0)
+                        : (accumulatedBalances.get(cuenta.id) || 0);
+                    }
+                    
+                    // Always show balance for both titulo (accumulated) and saldo (direct)
+                    const showSaldo = true;
                     
                     return (
                       <TableRow 
