@@ -443,6 +443,44 @@ export default function Presupuestos() {
     };
   }, [presupuestosConEjercido]);
 
+  // Validate and clean up stale filter values when data loads
+  useEffect(() => {
+    if (presupuestosConEjercido.length === 0 || loading) return;
+    
+    // Get valid IDs from current data
+    const validCentroIds = new Set(presupuestosConEjercido.map(p => p.centro_negocio_id).filter(Boolean));
+    const validCuentaIds = new Set(presupuestosConEjercido.map(p => p.cuenta_id).filter(Boolean));
+    const validPartidas = new Set(presupuestosConEjercido.map(p => p.partida));
+    const validEmpresaIds = new Set(presupuestosConEjercido.map(p => p.empresa_id));
+    
+    // Clean up stale centro filters
+    const validCentros = filterCentros.filter(id => validCentroIds.has(id));
+    if (validCentros.length !== filterCentros.length) {
+      setFilterCentros(validCentros);
+      if (validCentros.length === 0) localStorage.removeItem("presupuestos_filter_centros");
+    }
+    
+    // Clean up stale cuenta filters
+    const validCuentas = filterCuentas.filter(id => validCuentaIds.has(id));
+    if (validCuentas.length !== filterCuentas.length) {
+      setFilterCuentas(validCuentas);
+      if (validCuentas.length === 0) localStorage.removeItem("presupuestos_filter_cuentas");
+    }
+    
+    // Clean up stale partida filters
+    const validPartidasFiltered = filterPartidas.filter(p => validPartidas.has(p));
+    if (validPartidasFiltered.length !== filterPartidas.length) {
+      setFilterPartidas(validPartidasFiltered);
+      if (validPartidasFiltered.length === 0) localStorage.removeItem("presupuestos_filter_partidas");
+    }
+    
+    // Clean up stale empresa filter
+    if (filterCompany !== "all" && !validEmpresaIds.has(filterCompany)) {
+      setFilterCompany("all");
+      localStorage.removeItem("presupuestos_filter_company");
+    }
+  }, [presupuestosConEjercido, loading]);
+
   // Filter presupuestos
   const filteredPresupuestos = useMemo(() => {
     return presupuestosConEjercido.filter((p) => {
