@@ -1,92 +1,98 @@
 
-# Plan: Corregir Lógica de Ejercido para Cuentas de Balance
+# Plan: Consolidar Cuentas Contables en Vista "Todas las Empresas"
 
-## Problema Identificado
-La función `calcularEjercido` en `src/pages/Presupuestos.tsx` calcula incorrectamente el monto ejercido para cuentas de balance (Activo y Pasivo).
+## Problema Actual
+Cuando el usuario selecciona "Todas las empresas":
+- Las cuentas se repiten (una por cada empresa que tenga ese código)
+- Por ejemplo, si 3 empresas tienen la cuenta `100-000-000-000`, aparece 3 veces
+- Los saldos no se consolidan
 
-**Lógica actual (incorrecta para balance):**
-- Activo (100): suma DEBE (cuando aumenta la cuenta)
-- Pasivo (200): suma HABER (cuando aumenta la cuenta)
-
-**Lógica correcta:**
-- Activo (100): suma HABER (cuando disminuye la cuenta = cobro, uso de recurso)
-- Pasivo (200): suma DEBE (cuando disminuye la cuenta = pago de deuda)
-- Resultados (400, 500, 600): mantener lógica actual (correcta)
-
-## Ejemplo Práctico
-- **Cuenta por cobrar (Activo 100)**: Cuando cobras, la cuenta disminuye (haber) → ese es el ejercido
-- **Cuenta por pagar (Pasivo 200)**: Cuando pagas, la cuenta disminuye (debe) → ese es el ejercido
+## Solución
+Cuando `filterEmpresa === "all"`:
+1. Agrupar las cuentas por código
+2. Mostrar cada código una sola vez
+3. Sumar los saldos de todas las empresas para ese código
+4. Ocultar botones de editar/eliminar (ya que sería ambiguo cuál cuenta editar)
 
 ## Cambios a Realizar
 
-### Archivo: `src/pages/Presupuestos.tsx`
+### Archivo: `src/pages/Cuentas.tsx`
 
-Modificar la función `calcularEjercido` (líneas 145-171):
+**Modificar el `useMemo` de `filteredCuentas`** para incluir lógica de consolidación:
 
-**Antes:**
 ```typescript
-const esDeudora = 
-  codigoCuenta.startsWith("100") || 
-  codigoCuenta.startsWith("500") || 
-  codigoCuenta.startsWith("600") ||
-  codigoCuenta.startsWith("1");
-
-if (esDeudora) {
-  return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
-} else {
-  return movimientosMatch.reduce((sum, m) => sum + Number(m.haber), 0);
-}
-```
-
-**Después:**
-```typescript
-// Determinar tipo de cuenta
-const esActivo = codigoCuenta.startsWith("100") || codigoCuenta.startsWith("1");
-const esPasivo = codigoCuenta.startsWith("200") || codigoCuenta.startsWith("2");
-const esCapital = codigoCuenta.startsWith("300") || codigoCuenta.startsWith("3");
-
-// Cuentas de Balance (Activo/Pasivo): el ejercido es cuando DISMINUYE la cuenta
-// Cuentas de Resultados (Ingresos/Costos/Gastos): mantienen lógica original
-
-if (esActivo) {
-  // Activo disminuye con HABER (cobros, consumos)
-  return movimientosMatch.reduce((sum, m) => sum + Number(m.haber), 0);
-} else if (esPasivo) {
-  // Pasivo disminuye con DEBE (pagos de deuda)
-  return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
-} else if (esCapital) {
-  // Capital: para presupuestos, también cuando disminuye (DEBE)
-  return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
-} else {
-  // Cuentas de resultados (400 Ingresos, 500 Costos, 600 Gastos)
-  // Ingresos -> suma haber (naturaleza acreedora)
-  // Costos/Gastos -> suma debe (naturaleza deudora)
-  const esCostoGasto = 
-    codigoCuenta.startsWith("500") || 
-    codigoCuenta.startsWith("600") ||
-    codigoCuenta.startsWith("5") ||
-    codigoCuenta.startsWith("6");
+const { filteredCuentas, stats, isConsolidated } = useMemo(() => {
+  let filtered = cuentas;
   
-  if (esCostoGasto) {
-    return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
-  } else {
-    // Ingresos (400)
-    return movimientosMatch.reduce((sum, m) => sum + Number(m.haber), 0);
+  // Filter by estado primero
+  filtered = filtered.filter(c => filterEstado === "activos" ? c.activa : !c.activa);
+  
+  // Si es una empresa específica, filtrar normalmente
+  if (filterEmpresa !== "all") {
+    filtered = filtered.filter(c => c.empresa_id === filterEmpresa);
+    
+    // Aplicar búsqueda
+    if (search) {
+      filtered = filtered.filter(c => 
+        c.codigo.toLowerCase().includes(search.toLowerCase()) ||
+        c.nombre.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    
+    return { filteredCuentas: filtered, stats: {...}, isConsolidated: false };
   }
-}
+  
+  // CONSOLIDACIÓN: Agrupar por código cuando es "Todas"
+  const cuentasAgrupadas = new Map<string, CuentaContable & { saldoConsolidado: number }>();
+  
+  filtered.forEach(cuenta => {
+    const existing = cuentasAgrupadas.get(cuenta.codigo);
+    const saldoCuenta = saldos.get(cuenta.id) || 0;
+    
+    if (existing) {
+      // Sumar el saldo al existente
+      existing.saldoConsolidado += saldoCuenta;
+    } else {
+      // Primera vez que vemos este código
+      cuentasAgrupadas.set(cuenta.codigo, {
+        ...cuenta,
+        saldoConsolidado: saldoCuenta
+      });
+    }
+  });
+  
+  // Convertir a array y ordenar
+  let consolidadas = Array.from(cuentasAgrupadas.values())
+    .sort((a, b) => a.codigo.localeCompare(b.codigo));
+  
+  // Aplicar búsqueda
+  if (search) {
+    consolidadas = consolidadas.filter(c => 
+      c.codigo.toLowerCase().includes(search.toLowerCase()) ||
+      c.nombre.toLowerCase().includes(search.toLowerCase())
+    );
+  }
+  
+  return { 
+    filteredCuentas: consolidadas, 
+    stats: {...},
+    isConsolidated: true 
+  };
+}, [cuentas, filterEmpresa, filterEstado, search, saldos]);
 ```
 
-## Resumen de Lógica Final
+**Modificar la renderización de la tabla:**
+- Usar `saldoConsolidado` cuando `isConsolidated === true`
+- Ocultar botones de editar/eliminar en modo consolidado
+- Agregar indicador visual de que es vista consolidada
 
-| Tipo Cuenta | Código | Naturaleza | Ejercido suma |
-|-------------|--------|------------|---------------|
-| Activo | 100, 1xx | Deudora | HABER (disminución) |
-| Pasivo | 200, 2xx | Acreedora | DEBE (disminución) |
-| Capital | 300, 3xx | Acreedora | DEBE (disminución) |
-| Ingresos | 400, 4xx | Acreedora | HABER (aumento = correcto) |
-| Costos | 500, 5xx | Deudora | DEBE (aumento = correcto) |
-| Gastos | 600, 6xx | Deudora | DEBE (aumento = correcto) |
+## Comportamiento Final
 
-## Notas
-- Las cuentas de resultados (Ingresos, Costos, Gastos) mantienen la lógica actual porque siempre parten de cero
-- Solo se modifica la lógica para cuentas de balance (Activo, Pasivo, Capital)
+| Filtro | Cuentas mostradas | Saldo | Acciones |
+|--------|-------------------|-------|----------|
+| Empresa específica | Solo de esa empresa | Saldo individual | Editar/Eliminar visible |
+| Todas las empresas | Una por código (consolidado) | Suma de todas las empresas | Sin acciones (solo lectura) |
+
+## Indicador Visual
+- Agregar un badge o texto pequeño indicando "Vista consolidada" cuando `filterEmpresa === "all"`
+- Esto ayuda al usuario a entender que está viendo datos agregados
