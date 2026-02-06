@@ -160,40 +160,85 @@ export default function Cuentas() {
     fetchData();
   }, []);
 
+  // Extended type for consolidated accounts
+  type CuentaConsolidada = CuentaContable & { saldoConsolidado?: number };
+
   // Filter and organize cuentas hierarchically
-  const { filteredCuentas, stats } = useMemo(() => {
+  const { filteredCuentas, stats, isConsolidated } = useMemo(() => {
     let filtered = cuentas;
     
-    // Filter by empresa first
-    if (filterEmpresa !== "all") {
-      filtered = filtered.filter(c => c.empresa_id === filterEmpresa);
-    }
-    
-    // Filter by estado
+    // Filter by estado first
     filtered = filtered.filter(c => filterEstado === "activos" ? c.activa : !c.activa);
     
-    // Filter by search if provided
-    if (search) {
-      filtered = filtered.filter(c => 
-        c.codigo.toLowerCase().includes(search.toLowerCase()) ||
-        c.nombre.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-    // Always show all accounts - no collapse/expand logic
-    
-    // Calculate stats
+    // Calculate stats from base filtered data
     const baseCuentas = cuentas.filter(c => 
       (filterEmpresa === "all" || c.empresa_id === filterEmpresa) &&
       (filterEstado === "activos" ? c.activa : !c.activa)
     );
     const stats = {
-      total: baseCuentas.length,
-      titulos: baseCuentas.filter(c => c.clasificacion === "titulo").length,
-      saldos: baseCuentas.filter(c => c.clasificacion === "saldo").length,
+      total: filterEmpresa === "all" 
+        ? new Set(baseCuentas.map(c => c.codigo)).size 
+        : baseCuentas.length,
+      titulos: filterEmpresa === "all"
+        ? new Set(baseCuentas.filter(c => c.clasificacion === "titulo").map(c => c.codigo)).size
+        : baseCuentas.filter(c => c.clasificacion === "titulo").length,
+      saldos: filterEmpresa === "all"
+        ? new Set(baseCuentas.filter(c => c.clasificacion === "saldo").map(c => c.codigo)).size
+        : baseCuentas.filter(c => c.clasificacion === "saldo").length,
     };
     
-    return { filteredCuentas: filtered, stats };
-  }, [cuentas, filterEmpresa, filterEstado, search]);
+    // Si es una empresa específica, filtrar normalmente
+    if (filterEmpresa !== "all") {
+      filtered = filtered.filter(c => c.empresa_id === filterEmpresa);
+      
+      // Aplicar búsqueda
+      if (search) {
+        filtered = filtered.filter(c => 
+          c.codigo.toLowerCase().includes(search.toLowerCase()) ||
+          c.nombre.toLowerCase().includes(search.toLowerCase())
+        );
+      }
+      
+      return { filteredCuentas: filtered as CuentaConsolidada[], stats, isConsolidated: false };
+    }
+    
+    // CONSOLIDACIÓN: Agrupar por código cuando es "Todas"
+    const cuentasAgrupadas = new Map<string, CuentaConsolidada>();
+    
+    filtered.forEach(cuenta => {
+      const existing = cuentasAgrupadas.get(cuenta.codigo);
+      const saldoCuenta = saldos.get(cuenta.id) || 0;
+      
+      if (existing) {
+        // Sumar el saldo al existente
+        existing.saldoConsolidado = (existing.saldoConsolidado || 0) + saldoCuenta;
+      } else {
+        // Primera vez que vemos este código
+        cuentasAgrupadas.set(cuenta.codigo, {
+          ...cuenta,
+          saldoConsolidado: saldoCuenta
+        });
+      }
+    });
+    
+    // Convertir a array y ordenar
+    let consolidadas = Array.from(cuentasAgrupadas.values())
+      .sort((a, b) => a.codigo.localeCompare(b.codigo));
+    
+    // Aplicar búsqueda
+    if (search) {
+      consolidadas = consolidadas.filter(c => 
+        c.codigo.toLowerCase().includes(search.toLowerCase()) ||
+        c.nombre.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    
+    return { 
+      filteredCuentas: consolidadas, 
+      stats,
+      isConsolidated: true 
+    };
+  }, [cuentas, filterEmpresa, filterEstado, search, saldos]);
 
 
   const openNew = () => {
@@ -281,6 +326,11 @@ export default function Cuentas() {
             <CardTitle className="flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-primary" />
               Cuentas Contables
+              {isConsolidated && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  Vista consolidada
+                </Badge>
+              )}
             </CardTitle>
             <div className="flex flex-wrap gap-2">
               <div className="relative w-48">
@@ -334,18 +384,20 @@ export default function Cuentas() {
                     <TableHead className="w-[100px]">Naturaleza</TableHead>
                     <TableHead className="w-[100px]">Tipo</TableHead>
                     <TableHead className="w-[130px] text-right">Saldo</TableHead>
-                    {canEdit && <TableHead className="w-[100px] text-right">Acciones</TableHead>}
+                    {canEdit && !isConsolidated && <TableHead className="w-[100px] text-right">Acciones</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                 {filteredCuentas.map((cuenta) => {
                     const level = getCodeLevel(cuenta.codigo);
-                    const saldo = saldos.get(cuenta.id) || 0;
+                    const saldo = isConsolidated 
+                      ? (cuenta.saldoConsolidado || 0) 
+                      : (saldos.get(cuenta.id) || 0);
                     const showSaldo = cuenta.clasificacion === "saldo";
                     
                     return (
                       <TableRow 
-                        key={cuenta.id} 
+                        key={isConsolidated ? cuenta.codigo : cuenta.id} 
                         className={levelColors[level] || ""}
                       >
                         <TableCell>
@@ -380,7 +432,7 @@ export default function Cuentas() {
                             <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
-                        {canEdit && (
+                        {canEdit && !isConsolidated && (
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button variant="ghost" size="icon" onClick={() => openEdit(cuenta)}>
