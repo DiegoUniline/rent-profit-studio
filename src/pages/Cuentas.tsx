@@ -459,7 +459,7 @@ export default function Cuentas() {
                     <TableHead className="w-[100px]">Naturaleza</TableHead>
                     <TableHead className="w-[100px]">Tipo</TableHead>
                     <TableHead className="w-[130px] text-right">Saldo</TableHead>
-                    {canEdit && !isConsolidated && <TableHead className="w-[100px] text-right">Acciones</TableHead>}
+                    {!isConsolidated && <TableHead className="w-[120px] text-right">Acciones</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -526,7 +526,7 @@ export default function Cuentas() {
                             <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
-                        {canEdit && !isConsolidated && (
+                        {!isConsolidated && (
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
                               {canViewDetail && (
@@ -539,9 +539,11 @@ export default function Cuentas() {
                                   <Eye className="h-4 w-4" />
                                 </Button>
                               )}
-                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(cuenta); }}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
+                              {canEdit && (
+                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(cuenta); }}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              )}
                               {canDelete && (
                                 <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(cuenta); }}>
                                   <Trash2 className="h-4 w-4 text-destructive" />
