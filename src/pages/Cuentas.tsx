@@ -294,6 +294,9 @@ export default function Cuentas() {
       }
     });
     
+    // En vista consolidada, ocultar cuentas de saldo (solo mostrar títulos)
+    consolidadas = consolidadas.filter(c => c.clasificacion === "titulo");
+    
     // Aplicar búsqueda
     if (search) {
       consolidadas = consolidadas.filter(c => 
@@ -302,7 +305,7 @@ export default function Cuentas() {
       );
     }
     
-    return { 
+    return {
       filteredCuentas: consolidadas, 
       stats,
       isConsolidated: true,
