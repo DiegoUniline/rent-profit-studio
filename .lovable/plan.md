@@ -1,98 +1,74 @@
 
-# Plan: Consolidar Cuentas Contables en Vista "Todas las Empresas"
+# Plan: Ocultar Nombre en Cuentas de Saldo en Vista Consolidada
 
-## Problema Actual
-Cuando el usuario selecciona "Todas las empresas":
-- Las cuentas se repiten (una por cada empresa que tenga ese código)
-- Por ejemplo, si 3 empresas tienen la cuenta `100-000-000-000`, aparece 3 veces
-- Los saldos no se consolidan
+## Problema Identificado
+En la vista consolidada ("Todas las empresas"):
+- Las cuentas de tipo **Saldo** (nivel 4) muestran el nombre de cuenta de una empresa específica
+- Esto es incorrecto porque el saldo consolidado agrupa valores de múltiples empresas
+- Cada empresa puede tener nombres diferentes para la misma cuenta
 
-## Solución
-Cuando `filterEmpresa === "all"`:
-1. Agrupar las cuentas por código
-2. Mostrar cada código una sola vez
-3. Sumar los saldos de todas las empresas para ese código
-4. Ocultar botones de editar/eliminar (ya que sería ambiguo cuál cuenta editar)
+## Comportamiento Correcto
+| Vista | Cuenta Titulo | Cuenta Saldo |
+|-------|---------------|--------------|
+| Empresa específica | Codigo + Nombre + Saldo acumulado | Codigo + Nombre + Saldo directo |
+| Consolidada | Codigo + Nombre + Saldo acumulado | Codigo + **Sin nombre** + Saldo consolidado |
 
-## Cambios a Realizar
+## Cambio a Realizar
 
 ### Archivo: `src/pages/Cuentas.tsx`
 
-**Modificar el `useMemo` de `filteredCuentas`** para incluir lógica de consolidación:
+Modificar la celda del nombre en la renderización de la tabla (líneas 494-501):
 
-```typescript
-const { filteredCuentas, stats, isConsolidated } = useMemo(() => {
-  let filtered = cuentas;
-  
-  // Filter by estado primero
-  filtered = filtered.filter(c => filterEstado === "activos" ? c.activa : !c.activa);
-  
-  // Si es una empresa específica, filtrar normalmente
-  if (filterEmpresa !== "all") {
-    filtered = filtered.filter(c => c.empresa_id === filterEmpresa);
-    
-    // Aplicar búsqueda
-    if (search) {
-      filtered = filtered.filter(c => 
-        c.codigo.toLowerCase().includes(search.toLowerCase()) ||
-        c.nombre.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-    
-    return { filteredCuentas: filtered, stats: {...}, isConsolidated: false };
-  }
-  
-  // CONSOLIDACIÓN: Agrupar por código cuando es "Todas"
-  const cuentasAgrupadas = new Map<string, CuentaContable & { saldoConsolidado: number }>();
-  
-  filtered.forEach(cuenta => {
-    const existing = cuentasAgrupadas.get(cuenta.codigo);
-    const saldoCuenta = saldos.get(cuenta.id) || 0;
-    
-    if (existing) {
-      // Sumar el saldo al existente
-      existing.saldoConsolidado += saldoCuenta;
-    } else {
-      // Primera vez que vemos este código
-      cuentasAgrupadas.set(cuenta.codigo, {
-        ...cuenta,
-        saldoConsolidado: saldoCuenta
-      });
-    }
-  });
-  
-  // Convertir a array y ordenar
-  let consolidadas = Array.from(cuentasAgrupadas.values())
-    .sort((a, b) => a.codigo.localeCompare(b.codigo));
-  
-  // Aplicar búsqueda
-  if (search) {
-    consolidadas = consolidadas.filter(c => 
-      c.codigo.toLowerCase().includes(search.toLowerCase()) ||
-      c.nombre.toLowerCase().includes(search.toLowerCase())
-    );
-  }
-  
-  return { 
-    filteredCuentas: consolidadas, 
-    stats: {...},
-    isConsolidated: true 
-  };
-}, [cuentas, filterEmpresa, filterEstado, search, saldos]);
+**Antes:**
+```tsx
+<TableCell>
+  <span 
+    className="inline-block"
+    style={{ paddingLeft: `${(level - 1) * 24}px` }}
+  >
+    {cuenta.nombre}
+  </span>
+</TableCell>
 ```
 
-**Modificar la renderización de la tabla:**
-- Usar `saldoConsolidado` cuando `isConsolidated === true`
-- Ocultar botones de editar/eliminar en modo consolidado
-- Agregar indicador visual de que es vista consolidada
+**Después:**
+```tsx
+<TableCell>
+  <span 
+    className="inline-block"
+    style={{ paddingLeft: `${(level - 1) * 24}px` }}
+  >
+    {/* En vista consolidada, no mostrar nombre para cuentas de saldo */}
+    {isConsolidated && cuenta.clasificacion === "saldo" 
+      ? <span className="text-muted-foreground italic">—</span>
+      : cuenta.nombre
+    }
+  </span>
+</TableCell>
+```
 
-## Comportamiento Final
+## Resultado Visual
 
-| Filtro | Cuentas mostradas | Saldo | Acciones |
-|--------|-------------------|-------|----------|
-| Empresa específica | Solo de esa empresa | Saldo individual | Editar/Eliminar visible |
-| Todas las empresas | Una por código (consolidado) | Suma de todas las empresas | Sin acciones (solo lectura) |
+**Vista consolidada:**
+```
+100-000-000-000  ACTIVO                    Titulo   $1,000,000
+100-100-000-000  Activo Circulante         Titulo     $500,000
+100-100-100-000  Caja y Bancos             Titulo     $200,000
+100-100-100-001  —                         Saldo      $150,000
+100-100-100-002  —                         Saldo       $50,000
+```
 
-## Indicador Visual
-- Agregar un badge o texto pequeño indicando "Vista consolidada" cuando `filterEmpresa === "all"`
-- Esto ayuda al usuario a entender que está viendo datos agregados
+**Vista empresa específica (sin cambios):**
+```
+100-000-000-000  ACTIVO                    Titulo   $1,000,000
+100-100-000-000  Activo Circulante         Titulo     $500,000
+100-100-100-000  Caja y Bancos             Titulo     $200,000
+100-100-100-001  Banco Nacional MXN        Saldo      $150,000
+100-100-100-002  Caja General              Saldo       $50,000
+```
+
+## Beneficios
+- Se evita mostrar nombres incorrectos o parciales en vista consolidada
+- Se mantiene coherencia visual con un guión (—) indicando que no aplica
+- No genera confusión cuando varias empresas usan la misma cuenta contable
+- Vista por empresa específica mantiene su comportamiento actual completo
