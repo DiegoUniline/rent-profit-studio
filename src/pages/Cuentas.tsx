@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -16,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FilterSelect } from "@/components/ui/filter-select";
-import { BookOpen, Plus, Edit, Trash2, Search } from "lucide-react";
+import { BookOpen, Plus, Edit, Trash2, Search, Eye } from "lucide-react";
 import { CuentaDialog } from "@/components/dialogs/CuentaDialog";
 import { formatCurrency } from "@/lib/accounting-utils";
 
@@ -69,6 +70,7 @@ interface SaldoCuenta {
 }
 
 export default function Cuentas() {
+  const navigate = useNavigate();
   const { role } = useAuth();
   const { toast } = useToast();
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
@@ -481,10 +483,13 @@ export default function Cuentas() {
                     // Always show balance for both titulo (accumulated) and saldo (direct)
                     const showSaldo = true;
                     
+                    const canViewDetail = !isConsolidated && cuenta.clasificacion === "saldo";
+                    
                     return (
                       <TableRow 
                         key={isConsolidated ? cuenta.codigo : cuenta.id} 
-                        className={levelColors[level] || ""}
+                        className={`${levelColors[level] || ""} ${canViewDetail ? "cursor-pointer hover:bg-muted/50" : ""}`}
+                        onClick={canViewDetail ? () => navigate(`/cuentas/${cuenta.id}`) : undefined}
                       >
                         <TableCell>
                           <code className="text-sm font-mono">
@@ -524,11 +529,21 @@ export default function Cuentas() {
                         {canEdit && !isConsolidated && (
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => openEdit(cuenta)}>
+                              {canViewDetail && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={(e) => { e.stopPropagation(); navigate(`/cuentas/${cuenta.id}`); }}
+                                  title="Ver movimientos"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(cuenta); }}>
                                 <Edit className="h-4 w-4" />
                               </Button>
                               {canDelete && (
-                                <Button variant="ghost" size="icon" onClick={() => handleDelete(cuenta)}>
+                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(cuenta); }}>
                                   <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                               )}

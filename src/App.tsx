@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Usuarios from "./pages/Usuarios";
 import Empresas from "./pages/Empresas";
 import Cuentas from "./pages/Cuentas";
+import CuentaDetalle from "./pages/CuentaDetalle";
 import Perfil from "./pages/Perfil";
 import CentrosNegocio from "./pages/CentrosNegocio";
 import Terceros from "./pages/Terceros";
@@ -104,6 +105,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["admin", "contador"]}>
             <Cuentas />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cuentas/:id"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "contador"]}>
+            <CuentaDetalle />
           </ProtectedRoute>
         }
       />
