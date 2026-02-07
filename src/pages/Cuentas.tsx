@@ -493,7 +493,10 @@ export default function Cuentas() {
                             className="inline-block"
                             style={{ paddingLeft: `${(level - 1) * 24}px` }}
                           >
-                            {cuenta.nombre}
+                            {isConsolidated && cuenta.clasificacion === "saldo" 
+                              ? <span className="text-muted-foreground italic">—</span>
+                              : cuenta.nombre
+                            }
                           </span>
                         </TableCell>
                         <TableCell>
