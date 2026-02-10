@@ -103,26 +103,39 @@ export default function CuentaDetalle() {
       
       setCuenta(cuentaData);
       
-      // Fetch movements for this account
-      const { data: movimientosData, error: movError } = await supabase
-        .from("asiento_movimientos")
-        .select(`
-          id,
-          asiento_id,
-          cuenta_id,
-          debe,
-          haber,
-          partida,
-          asientos_contables (
+      // Fetch all movements for this account (paginated to avoid 1000-row limit)
+      const PAGE_SIZE = 1000;
+      let allMovimientos: any[] = [];
+      let from = 0;
+      let hasMore = true;
+      let movError = null;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("asiento_movimientos")
+          .select(`
             id,
-            numero_asiento,
-            fecha,
-            estado,
-            tipo,
-            observaciones
-          )
-        `)
-        .eq("cuenta_id", id);
+            asiento_id,
+            cuenta_id,
+            debe,
+            haber,
+            partida,
+            asientos_contables (
+              id,
+              numero_asiento,
+              fecha,
+              estado,
+              tipo,
+              observaciones
+            )
+          `)
+          .eq("cuenta_id", id)
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) { movError = error; break; }
+        allMovimientos = allMovimientos.concat(data || []);
+        hasMore = (data?.length || 0) === PAGE_SIZE;
+        from += PAGE_SIZE;
+      }
+      const movimientosData = allMovimientos;
       
       if (!movError && movimientosData) {
         // Transform nested data
