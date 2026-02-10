@@ -104,13 +104,32 @@ export default function Cuentas() {
   const fetchData = async () => {
     setLoading(true);
     
+    // Helper to fetch all rows with pagination (Supabase limits to 1000)
+    const fetchAllMovimientos = async () => {
+      const PAGE_SIZE = 1000;
+      let allData: { cuenta_id: string; debe: number; haber: number; asiento_id: string }[] = [];
+      let from = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("asiento_movimientos")
+          .select("cuenta_id, debe, haber, asiento_id")
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) return { data: null, error };
+        allData = allData.concat(data || []);
+        hasMore = (data?.length || 0) === PAGE_SIZE;
+        from += PAGE_SIZE;
+      }
+      return { data: allData, error: null };
+    };
+
     const [cuentasRes, empresasRes, movimientosRes, asientosRes] = await Promise.all([
       supabase
         .from("cuentas_contables")
         .select("*, empresas(id, razon_social)")
         .order("codigo"),
       supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social"),
-      supabase.from("asiento_movimientos").select("cuenta_id, debe, haber, asiento_id"),
+      fetchAllMovimientos(),
       supabase.from("asientos_contables").select("id, estado").eq("estado", "aplicado"),
     ]);
 
