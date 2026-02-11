@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DateInput } from "@/components/ui/date-input";
+import { FilterSelect } from "@/components/ui/filter-select";
 import {
   Table,
   TableBody,
@@ -44,6 +45,10 @@ interface Movimiento {
     estado: string;
     tipo: string;
     observaciones: string | null;
+    tercero_id: string | null;
+    centro_negocio_id: string | null;
+    terceros?: { id: string; razon_social: string } | null;
+    centros_negocio?: { id: string; nombre: string; codigo: string } | null;
   };
 }
 
@@ -56,7 +61,7 @@ export default function CuentaDetalle() {
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Date filters - persist in localStorage
+  // Date filters
   const [fechaDesde, setFechaDesde] = useState<Date | undefined>(() => {
     const saved = localStorage.getItem("cuenta_detalle_fecha_desde");
     return saved ? parseLocalDate(saved) : undefined;
@@ -65,8 +70,14 @@ export default function CuentaDetalle() {
     const saved = localStorage.getItem("cuenta_detalle_fecha_hasta");
     return saved ? parseLocalDate(saved) : undefined;
   });
+  const [filterCentro, setFilterCentro] = useState<string>(() => 
+    localStorage.getItem("cuenta_detalle_centro") || "all"
+  );
+  const [filterTercero, setFilterTercero] = useState<string>(() => 
+    localStorage.getItem("cuenta_detalle_tercero") || "all"
+  );
 
-  // Persist date filters
+  // Persist filters
   useEffect(() => {
     if (fechaDesde) localStorage.setItem("cuenta_detalle_fecha_desde", format(fechaDesde, "yyyy-MM-dd"));
     else localStorage.removeItem("cuenta_detalle_fecha_desde");
@@ -77,6 +88,16 @@ export default function CuentaDetalle() {
     else localStorage.removeItem("cuenta_detalle_fecha_hasta");
   }, [fechaHasta]);
 
+  useEffect(() => {
+    if (filterCentro !== "all") localStorage.setItem("cuenta_detalle_centro", filterCentro);
+    else localStorage.removeItem("cuenta_detalle_centro");
+  }, [filterCentro]);
+
+  useEffect(() => {
+    if (filterTercero !== "all") localStorage.setItem("cuenta_detalle_tercero", filterTercero);
+    else localStorage.removeItem("cuenta_detalle_tercero");
+  }, [filterTercero]);
+
   // Fetch account and movements
   useEffect(() => {
     const fetchData = async () => {
@@ -84,7 +105,6 @@ export default function CuentaDetalle() {
       
       setLoading(true);
       
-      // Fetch account details
       const { data: cuentaData, error: cuentaError } = await supabase
         .from("cuentas_contables")
         .select("*, empresas(id, razon_social)")
@@ -103,7 +123,7 @@ export default function CuentaDetalle() {
       
       setCuenta(cuentaData);
       
-      // Fetch all movements for this account (paginated to avoid 1000-row limit)
+      // Fetch all movements with full asiento data including tercero and centro_negocio
       const PAGE_SIZE = 1000;
       let allMovimientos: any[] = [];
       let from = 0;
@@ -125,7 +145,11 @@ export default function CuentaDetalle() {
               fecha,
               estado,
               tipo,
-              observaciones
+              observaciones,
+              tercero_id,
+              centro_negocio_id,
+              terceros (id, razon_social),
+              centros_negocio (id, nombre, codigo)
             )
           `)
           .eq("cuenta_id", id)
@@ -135,11 +159,9 @@ export default function CuentaDetalle() {
         hasMore = (data?.length || 0) === PAGE_SIZE;
         from += PAGE_SIZE;
       }
-      const movimientosData = allMovimientos;
       
-      if (!movError && movimientosData) {
-        // Transform nested data
-        const transformed = movimientosData.map(m => ({
+      if (!movError) {
+        const transformed = allMovimientos.map(m => ({
           ...m,
           asiento: m.asientos_contables as Movimiento["asiento"]
         }));
@@ -152,10 +174,45 @@ export default function CuentaDetalle() {
     fetchData();
   }, [id, navigate, toast]);
 
-  // Filter movements by date range and only applied entries
+  // Extract unique centros and terceros from applied movements for filter options
+  const { centroOptions, terceroOptions } = useMemo(() => {
+    const centrosMap = new Map<string, string>();
+    const tercerosMap = new Map<string, string>();
+    
+    movimientos.forEach(m => {
+      if (m.asiento?.estado !== "aplicado") return;
+      if (m.asiento?.centros_negocio) {
+        const cn = m.asiento.centros_negocio;
+        centrosMap.set(cn.id, `${cn.codigo} - ${cn.nombre}`);
+      }
+      if (m.asiento?.terceros) {
+        const t = m.asiento.terceros;
+        tercerosMap.set(t.id, t.razon_social);
+      }
+    });
+    
+    return {
+      centroOptions: Array.from(centrosMap.entries()).map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label)),
+      terceroOptions: Array.from(tercerosMap.entries()).map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label)),
+    };
+  }, [movimientos]);
+
+  // Validate persisted filter values
+  useEffect(() => {
+    if (filterCentro !== "all" && centroOptions.length > 0 && !centroOptions.find(o => o.value === filterCentro)) {
+      setFilterCentro("all");
+    }
+  }, [centroOptions, filterCentro]);
+
+  useEffect(() => {
+    if (filterTercero !== "all" && terceroOptions.length > 0 && !terceroOptions.find(o => o.value === filterTercero)) {
+      setFilterTercero("all");
+    }
+  }, [terceroOptions, filterTercero]);
+
+  // Filter movements
   const filteredMovimientos = useMemo(() => {
     return movimientos.filter(m => {
-      // Only show applied entries
       if (m.asiento?.estado !== "aplicado") return false;
       
       const fechaAsiento = m.asiento?.fecha;
@@ -167,17 +224,24 @@ export default function CuentaDetalle() {
       if (fechaDesdeStr && fechaAsiento < fechaDesdeStr) return false;
       if (fechaHastaStr && fechaAsiento > fechaHastaStr) return false;
       
+      if (filterCentro !== "all") {
+        if (m.asiento?.centro_negocio_id !== filterCentro) return false;
+      }
+      
+      if (filterTercero !== "all") {
+        if (m.asiento?.tercero_id !== filterTercero) return false;
+      }
+      
       return true;
     }).sort((a, b) => {
-      // Sort by date descending, then by asiento number
       const dateA = a.asiento?.fecha || "";
       const dateB = b.asiento?.fecha || "";
       if (dateA !== dateB) return dateB.localeCompare(dateA);
       return (b.asiento?.numero_asiento || 0) - (a.asiento?.numero_asiento || 0);
     });
-  }, [movimientos, fechaDesde, fechaHasta]);
+  }, [movimientos, fechaDesde, fechaHasta, filterCentro, filterTercero]);
 
-  // Calculate balance based on filtered movements
+  // Calculate totals
   const { saldo, totalDebe, totalHaber } = useMemo(() => {
     let totalDebe = 0;
     let totalHaber = 0;
@@ -187,7 +251,6 @@ export default function CuentaDetalle() {
       totalHaber += Number(m.haber) || 0;
     });
     
-    // Calculate balance based on account nature
     const saldo = cuenta?.naturaleza === "deudora" 
       ? totalDebe - totalHaber 
       : totalHaber - totalDebe;
@@ -198,7 +261,11 @@ export default function CuentaDetalle() {
   const clearFilters = () => {
     setFechaDesde(undefined);
     setFechaHasta(undefined);
+    setFilterCentro("all");
+    setFilterTercero("all");
   };
+
+  const hasActiveFilters = fechaDesde || fechaHasta || filterCentro !== "all" || filterTercero !== "all";
 
   const tipoColors: Record<string, string> = {
     ingreso: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
@@ -277,7 +344,35 @@ export default function CuentaDetalle() {
                 placeholder="dd/mm/aaaa"
               />
             </div>
-            {(fechaDesde || fechaHasta) && (
+            {centroOptions.length > 0 && (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Centro de Negocio</label>
+                <FilterSelect
+                  value={filterCentro}
+                  onValueChange={setFilterCentro}
+                  options={centroOptions}
+                  placeholder="Todos los centros"
+                  searchPlaceholder="Buscar centro..."
+                  allOption={{ value: "all", label: "Todos los centros" }}
+                  className="w-52"
+                />
+              </div>
+            )}
+            {terceroOptions.length > 0 && (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Tercero</label>
+                <FilterSelect
+                  value={filterTercero}
+                  onValueChange={setFilterTercero}
+                  options={terceroOptions}
+                  placeholder="Todos los terceros"
+                  searchPlaceholder="Buscar tercero..."
+                  allOption={{ value: "all", label: "Todos los terceros" }}
+                  className="w-52"
+                />
+              </div>
+            )}
+            {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters}>
                 Limpiar
               </Button>
@@ -343,21 +438,24 @@ export default function CuentaDetalle() {
               <p className="text-muted-foreground">
                 {movimientos.length === 0 
                   ? "Esta cuenta no tiene movimientos" 
-                  : "No hay movimientos en el rango de fechas seleccionado"}
+                  : "No hay movimientos con los filtros seleccionados"}
               </p>
             </div>
           ) : (
-            <div className="border rounded-lg overflow-hidden">
+            <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[100px]">Fecha</TableHead>
                     <TableHead className="w-[80px]">Póliza</TableHead>
-                    <TableHead className="w-[80px]">Tipo</TableHead>
+                    <TableHead className="w-[60px]">Tipo</TableHead>
                     <TableHead>Partida</TableHead>
-                    <TableHead className="text-right w-[130px]">Debe</TableHead>
-                    <TableHead className="text-right w-[130px]">Haber</TableHead>
-                    <TableHead className="w-[60px]"></TableHead>
+                    <TableHead>Tercero</TableHead>
+                    <TableHead>Centro Neg.</TableHead>
+                    <TableHead>Observaciones</TableHead>
+                    <TableHead className="text-right w-[120px]">Debe</TableHead>
+                    <TableHead className="text-right w-[120px]">Haber</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -378,8 +476,19 @@ export default function CuentaDetalle() {
                           {mov.asiento?.tipo === "ingreso" ? "I" : mov.asiento?.tipo === "egreso" ? "E" : "D"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="max-w-[300px] truncate" title={mov.partida}>
+                      <TableCell className="max-w-[200px] truncate" title={mov.partida}>
                         {mov.partida}
+                      </TableCell>
+                      <TableCell className="max-w-[180px] truncate" title={mov.asiento?.terceros?.razon_social || ""}>
+                        {mov.asiento?.terceros?.razon_social || <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="max-w-[150px] truncate" title={mov.asiento?.centros_negocio ? `${mov.asiento.centros_negocio.codigo} - ${mov.asiento.centros_negocio.nombre}` : ""}>
+                        {mov.asiento?.centros_negocio 
+                          ? `${mov.asiento.centros_negocio.codigo} - ${mov.asiento.centros_negocio.nombre}`
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={mov.asiento?.observaciones || ""}>
+                        {mov.asiento?.observaciones || <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {Number(mov.debe) > 0 ? formatCurrency(mov.debe) : "—"}
