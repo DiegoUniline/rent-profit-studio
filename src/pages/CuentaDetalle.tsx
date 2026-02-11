@@ -236,8 +236,8 @@ export default function CuentaDetalle() {
     }).sort((a, b) => {
       const dateA = a.asiento?.fecha || "";
       const dateB = b.asiento?.fecha || "";
-      if (dateA !== dateB) return dateB.localeCompare(dateA);
-      return (b.asiento?.numero_asiento || 0) - (a.asiento?.numero_asiento || 0);
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return (a.asiento?.numero_asiento || 0) - (b.asiento?.numero_asiento || 0);
     });
   }, [movimientos, fechaDesde, fechaHasta, filterCentro, filterTercero]);
 
