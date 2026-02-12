@@ -3,7 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Edit, Power, GripVertical, AlertTriangle } from "lucide-react";
+import { Edit, Power, GripVertical, AlertTriangle, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Presupuesto {
@@ -30,6 +30,7 @@ interface SortablePresupuestoRowProps {
   getProgressColor: (porcentaje: number) => string;
   onEdit: (p: Presupuesto) => void;
   onToggleActivo: (p: Presupuesto) => void;
+  onViewEjercido?: (p: Presupuesto) => void;
 }
 
 export function SortablePresupuestoRow({
@@ -40,6 +41,7 @@ export function SortablePresupuestoRow({
   getProgressColor,
   onEdit,
   onToggleActivo,
+  onViewEjercido,
 }: SortablePresupuestoRowProps) {
   const {
     attributes,
@@ -155,32 +157,45 @@ export function SortablePresupuestoRow({
           <Badge variant="secondary">Inactivo</Badge>
         )}
       </TableCell>
-      {canEdit && (
-        <TableCell className="text-right">
-          <div className="flex justify-end gap-1">
+      <TableCell className="text-right">
+        <div className="flex justify-end gap-1">
+          {onViewEjercido && (
             <Button
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              onClick={() => onEdit(p)}
-              title="Editar"
+              onClick={() => onViewEjercido(p)}
+              title="Ver ejercido"
             >
-              <Edit className="h-4 w-4" />
+              <Eye className="h-4 w-4" />
             </Button>
-            {canDelete && (
+          )}
+          {canEdit && (
+            <>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                onClick={() => onToggleActivo(p)}
-                title={p.activo ? "Desactivar" : "Activar"}
+                onClick={() => onEdit(p)}
+                title="Editar"
               >
-                <Power className="h-4 w-4" />
+                <Edit className="h-4 w-4" />
               </Button>
-            )}
-          </div>
-        </TableCell>
-      )}
+              {canDelete && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => onToggleActivo(p)}
+                  title={p.activo ? "Desactivar" : "Activar"}
+                >
+                  <Power className="h-4 w-4" />
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      </TableCell>
     </TableRow>
   );
 }
