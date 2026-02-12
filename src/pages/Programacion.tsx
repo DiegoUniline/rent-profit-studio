@@ -231,24 +231,40 @@ export default function Programacion() {
     
     if (cuentasData) setCuentas(cuentasData);
 
-    // Fetch movimientos de asientos aplicados
-    const { data: movimientosData } = await supabase
-      .from("asiento_movimientos")
-      .select(`
-        cuenta_id,
-        debe,
-        haber,
-        asientos_contables!inner(estado)
-      `)
-      .eq("asientos_contables.estado", "aplicado");
+    // Fetch ALL movimientos de asientos aplicados (con paginación para superar límite de 1000)
+    const PAGE_SIZE = 1000;
+    let allMovimientos: AsientoMovimiento[] = [];
+    let from = 0;
+    let hasMore = true;
 
-    if (movimientosData) {
-      setMovimientos(movimientosData.map(m => ({
-        cuenta_id: m.cuenta_id,
-        debe: Number(m.debe),
-        haber: Number(m.haber),
-      })));
+    while (hasMore) {
+      const { data: batch } = await supabase
+        .from("asiento_movimientos")
+        .select(`
+          cuenta_id,
+          debe,
+          haber,
+          asientos_contables!inner(estado)
+        `)
+        .eq("asientos_contables.estado", "aplicado")
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (batch && batch.length > 0) {
+        allMovimientos = allMovimientos.concat(
+          batch.map(m => ({
+            cuenta_id: m.cuenta_id,
+            debe: Number(m.debe),
+            haber: Number(m.haber),
+          }))
+        );
+        hasMore = batch.length === PAGE_SIZE;
+        from += PAGE_SIZE;
+      } else {
+        hasMore = false;
+      }
     }
+
+    setMovimientos(allMovimientos);
   };
 
   // Filter centros and terceros by selected empresa
