@@ -38,8 +38,10 @@ import {
   AlertTriangle,
   GripVertical,
   Layers,
+  Eye,
 } from "lucide-react";
 import { PresupuestoDialog } from "@/components/dialogs/PresupuestoDialog";
+import { EjercidoViewDialog } from "@/components/dialogs/EjercidoViewDialog";
 import { SortablePresupuestoRow } from "@/components/presupuestos/SortablePresupuestoRow";
 import {
   DndContext,
@@ -240,6 +242,8 @@ export default function Presupuestos() {
   }, [filterEstado]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPresupuesto, setEditingPresupuesto] = useState<Presupuesto | null>(null);
+  const [ejercidoDialogOpen, setEjercidoDialogOpen] = useState(false);
+  const [viewingPresupuesto, setViewingPresupuesto] = useState<Presupuesto | null>(null);
   const [expandedEmpresas, setExpandedEmpresas] = useState<Set<string>>(new Set());
   
   // Grouping preference with localStorage persistence
@@ -386,6 +390,11 @@ export default function Presupuestos() {
   const openEdit = (presupuesto: Presupuesto) => {
     setEditingPresupuesto(presupuesto);
     setDialogOpen(true);
+  };
+
+  const openEjercidoView = (presupuesto: Presupuesto) => {
+    setViewingPresupuesto(presupuesto);
+    setEjercidoDialogOpen(true);
   };
 
   const toggleEmpresa = (empresaId: string) => {
@@ -907,7 +916,7 @@ export default function Presupuestos() {
                       <TableHead className="text-right">Por Ejercer</TableHead>
                       <TableHead className="w-[120px]">Avance</TableHead>
                       <TableHead>Estado</TableHead>
-                      {canEdit && <TableHead className="text-right">Acciones</TableHead>}
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -993,32 +1002,43 @@ export default function Presupuestos() {
                               <Badge variant="secondary">Inactivo</Badge>
                             )}
                           </TableCell>
-                          {canEdit && (
-                            <TableCell className="text-right">
+                          <TableCell className="text-right">
                               <div className="flex justify-end gap-1">
                                 <Button
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7"
-                                  onClick={() => openEdit(p)}
-                                  title="Editar"
+                                  onClick={() => openEjercidoView(p)}
+                                  title="Ver ejercido"
                                 >
-                                  <Edit className="h-4 w-4" />
+                                  <Eye className="h-4 w-4" />
                                 </Button>
-                                {role === "admin" && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => handleToggleActivo(p)}
-                                    title={p.activo ? "Desactivar" : "Activar"}
-                                  >
-                                    <Power className="h-4 w-4" />
-                                  </Button>
+                                {canEdit && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => openEdit(p)}
+                                      title="Editar"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    {role === "admin" && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={() => handleToggleActivo(p)}
+                                        title={p.activo ? "Desactivar" : "Activar"}
+                                      >
+                                        <Power className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </TableCell>
-                          )}
                         </TableRow>
                       );
                     })}
@@ -1115,7 +1135,7 @@ export default function Presupuestos() {
                                 <TableHead className="text-right">Por Ejercer</TableHead>
                                 <TableHead className="w-[120px]">Avance</TableHead>
                                 <TableHead>Estado</TableHead>
-                                {canEdit && <TableHead className="text-right">Acciones</TableHead>}
+                                <TableHead className="text-right">Acciones</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1133,6 +1153,7 @@ export default function Presupuestos() {
                                     getProgressColor={getProgressColor}
                                     onEdit={openEdit}
                                     onToggleActivo={handleToggleActivo}
+                                    onViewEjercido={openEjercidoView}
                                   />
                                 ))}
                               </SortableContext>
@@ -1162,13 +1183,21 @@ export default function Presupuestos() {
         )}
       </div>
 
-      {/* Dialog */}
+      {/* Dialogs */}
       <PresupuestoDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         presupuesto={editingPresupuesto}
         empresas={empresas}
         onSuccess={fetchData}
+      />
+
+      <EjercidoViewDialog
+        open={ejercidoDialogOpen}
+        onOpenChange={setEjercidoDialogOpen}
+        presupuestoId={viewingPresupuesto?.id || null}
+        presupuestoPartida={viewingPresupuesto?.partida || ""}
+        cuentaCodigo={viewingPresupuesto?.cuentas_contables?.codigo}
       />
     </div>
   );
