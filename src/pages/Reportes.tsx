@@ -177,13 +177,27 @@ export default function Reportes() {
       let movimientosData: any[] = [];
 
       if (asientosIds.length > 0) {
-        const { data: movData, error: movError } = await supabase
-          .from("asiento_movimientos")
-          .select("*")
-          .in("asiento_id", asientosIds);
+        // Paginate to get ALL movements (bypass 1000-row limit)
+        const PAGE_SIZE = 1000;
+        let from = 0;
+        let hasMore = true;
 
-        if (movError) throw movError;
-        movimientosData = movData || [];
+        while (hasMore) {
+          const { data: batch, error: movError } = await supabase
+            .from("asiento_movimientos")
+            .select("*")
+            .in("asiento_id", asientosIds)
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (movError) throw movError;
+          if (batch && batch.length > 0) {
+            movimientosData = movimientosData.concat(batch);
+            hasMore = batch.length === PAGE_SIZE;
+            from += PAGE_SIZE;
+          } else {
+            hasMore = false;
+          }
+        }
       }
 
       setCuentas(cuentasData as CuentaContable[]);

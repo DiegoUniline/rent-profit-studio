@@ -205,29 +205,67 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
 
   // Load account balance when editing
   const loadSaldoCuenta = async (cuentaId: string, naturaleza: "deudora" | "acreedora") => {
-    const [movimientosRes, asientosRes] = await Promise.all([
-      supabase.from("asiento_movimientos").select("debe, haber, asiento_id").eq("cuenta_id", cuentaId),
-      supabase.from("asientos_contables").select("id").eq("estado", "aplicado"),
-    ]);
+    // Paginate movements to bypass 1000-row limit
+    const PAGE_SIZE = 1000;
+    let allMovimientos: { debe: number; haber: number; asiento_id: string }[] = [];
+    let from = 0;
+    let hasMore = true;
 
-    if (!movimientosRes.error && !asientosRes.error) {
-      const asientosAplicados = new Set(asientosRes.data?.map(a => a.id) || []);
-      let saldo = 0;
+    while (hasMore) {
+      const { data: batch, error } = await supabase
+        .from("asiento_movimientos")
+        .select("debe, haber, asiento_id")
+        .eq("cuenta_id", cuentaId)
+        .range(from, from + PAGE_SIZE - 1);
 
-      (movimientosRes.data || []).forEach(mov => {
-        if (asientosAplicados.has(mov.asiento_id)) {
-          const debe = Number(mov.debe) || 0;
-          const haber = Number(mov.haber) || 0;
-          if (naturaleza === 'deudora') {
-            saldo += debe - haber;
-          } else {
-            saldo += haber - debe;
-          }
-        }
-      });
-
-      setSaldoCuenta(saldo);
+      if (error) break;
+      if (batch && batch.length > 0) {
+        allMovimientos = allMovimientos.concat(batch);
+        hasMore = batch.length === PAGE_SIZE;
+        from += PAGE_SIZE;
+      } else {
+        hasMore = false;
+      }
     }
+
+    // Also paginate asientos aplicados
+    let allAsientos: { id: string }[] = [];
+    from = 0;
+    hasMore = true;
+
+    while (hasMore) {
+      const { data: batch, error } = await supabase
+        .from("asientos_contables")
+        .select("id")
+        .eq("estado", "aplicado")
+        .range(from, from + PAGE_SIZE - 1);
+
+      if (error) break;
+      if (batch && batch.length > 0) {
+        allAsientos = allAsientos.concat(batch);
+        hasMore = batch.length === PAGE_SIZE;
+        from += PAGE_SIZE;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    const asientosAplicados = new Set(allAsientos.map(a => a.id));
+    let saldo = 0;
+
+    allMovimientos.forEach(mov => {
+      if (asientosAplicados.has(mov.asiento_id)) {
+        const debe = Number(mov.debe) || 0;
+        const haber = Number(mov.haber) || 0;
+        if (naturaleza === 'deudora') {
+          saldo += debe - haber;
+        } else {
+          saldo += haber - debe;
+        }
+      }
+    });
+
+    setSaldoCuenta(saldo);
   };
 
   useEffect(() => {

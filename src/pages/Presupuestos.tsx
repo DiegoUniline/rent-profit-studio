@@ -287,7 +287,7 @@ export default function Presupuestos() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [presupuestosRes, empresasRes, movimientosRes] = await Promise.all([
+      const [presupuestosRes, empresasRes] = await Promise.all([
         supabase
           .from("presupuestos")
           .select(`
@@ -304,7 +304,19 @@ export default function Presupuestos() {
           .select("id, razon_social")
           .eq("activa", true)
           .order("razon_social"),
-        supabase
+      ]);
+
+      if (presupuestosRes.error) throw presupuestosRes.error;
+      if (empresasRes.error) throw empresasRes.error;
+
+      // Paginate movements to bypass 1000-row limit
+      const PAGE_SIZE = 1000;
+      let allMovimientos: any[] = [];
+      let from = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data: batch, error: movError } = await supabase
           .from("asiento_movimientos")
           .select(`
             id, 
@@ -315,16 +327,22 @@ export default function Presupuestos() {
             asientos_contables!inner(estado),
             cuentas_contables(codigo)
           `)
-          .not("presupuesto_id", "is", null),
-      ]);
+          .not("presupuesto_id", "is", null)
+          .range(from, from + PAGE_SIZE - 1);
 
-      if (presupuestosRes.error) throw presupuestosRes.error;
-      if (empresasRes.error) throw empresasRes.error;
-      if (movimientosRes.error) throw movimientosRes.error;
+        if (movError) throw movError;
+        if (batch && batch.length > 0) {
+          allMovimientos = allMovimientos.concat(batch);
+          hasMore = batch.length === PAGE_SIZE;
+          from += PAGE_SIZE;
+        } else {
+          hasMore = false;
+        }
+      }
 
       setPresupuestos(presupuestosRes.data || []);
       setEmpresas(empresasRes.data || []);
-      setMovimientos((movimientosRes.data || []) as unknown as MovimientoConAsiento[]);
+      setMovimientos(allMovimientos as unknown as MovimientoConAsiento[]);
       
       // Expand all empresas by default
       const empresaIds = new Set((presupuestosRes.data || []).map(p => p.empresa_id));
