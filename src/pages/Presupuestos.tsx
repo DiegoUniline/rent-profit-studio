@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -41,7 +42,6 @@ import {
   Eye,
 } from "lucide-react";
 import { PresupuestoDialog } from "@/components/dialogs/PresupuestoDialog";
-import { EjercidoViewDialog } from "@/components/dialogs/EjercidoViewDialog";
 import { SortablePresupuestoRow } from "@/components/presupuestos/SortablePresupuestoRow";
 import {
   DndContext,
@@ -189,6 +189,7 @@ const calcularEjercido = (
 
 export default function Presupuestos() {
   const { role } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
@@ -242,8 +243,6 @@ export default function Presupuestos() {
   }, [filterEstado]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPresupuesto, setEditingPresupuesto] = useState<Presupuesto | null>(null);
-  const [ejercidoDialogOpen, setEjercidoDialogOpen] = useState(false);
-  const [viewingPresupuesto, setViewingPresupuesto] = useState<Presupuesto | null>(null);
   const [expandedEmpresas, setExpandedEmpresas] = useState<Set<string>>(new Set());
   
   // Grouping preference with localStorage persistence
@@ -393,8 +392,10 @@ export default function Presupuestos() {
   };
 
   const openEjercidoView = (presupuesto: Presupuesto) => {
-    setViewingPresupuesto(presupuesto);
-    setEjercidoDialogOpen(true);
+    const params = presupuesto.cuentas_contables?.codigo
+      ? `?cuenta=${presupuesto.cuentas_contables.codigo}`
+      : "";
+    navigate(`/presupuestos/${presupuesto.id}/ejercido${params}`);
   };
 
   const toggleEmpresa = (empresaId: string) => {
@@ -1162,13 +1163,6 @@ export default function Presupuestos() {
         onSuccess={fetchData}
       />
 
-      <EjercidoViewDialog
-        open={ejercidoDialogOpen}
-        onOpenChange={setEjercidoDialogOpen}
-        presupuestoId={viewingPresupuesto?.id || null}
-        presupuestoPartida={viewingPresupuesto?.partida || ""}
-        cuentaCodigo={viewingPresupuesto?.cuentas_contables?.codigo}
-      />
     </div>
   );
 }

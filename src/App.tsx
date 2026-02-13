@@ -16,6 +16,7 @@ import Perfil from "./pages/Perfil";
 import CentrosNegocio from "./pages/CentrosNegocio";
 import Terceros from "./pages/Terceros";
 import Presupuestos from "./pages/Presupuestos";
+import EjercidoDetalle from "./pages/EjercidoDetalle";
 import Asientos from "./pages/Asientos";
 import AsientoDetalle from "./pages/AsientoDetalle";
 import Programacion from "./pages/Programacion";
@@ -145,6 +146,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["admin", "contador"]}>
             <Presupuestos />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/presupuestos/:id/ejercido"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "contador"]}>
+            <EjercidoDetalle />
           </ProtectedRoute>
         }
       />
