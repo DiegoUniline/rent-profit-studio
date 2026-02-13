@@ -714,180 +714,150 @@ export default function Presupuestos() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Presupuestos</h1>
-          <p className="text-muted-foreground">
-            Gestiona las partidas presupuestales por empresa
-          </p>
-        </div>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Presupuestos</h1>
         {role === "admin" && (
-          <Button onClick={openNew} className="gap-2">
+          <Button onClick={openNew} size="sm" className="gap-2">
             <Plus className="h-4 w-4" />
-            Nuevo Presupuesto
+            Nuevo
           </Button>
         )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Presupuestado</CardTitle>
-            <Calculator className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              {formatCurrency(totals.totalPresupuestado)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {totals.totalPartidas} partidas activas
-            </p>
-          </CardContent>
+      {/* Summary Cards - Compact */}
+      <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+        <Card className="p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-muted-foreground">Total Presupuestado</span>
+            <Calculator className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+          <div className="text-lg font-bold text-primary">{formatCurrency(totals.totalPresupuestado)}</div>
+          <p className="text-[10px] text-muted-foreground">{totals.totalPartidas} partidas activas</p>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Ejercido</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(totals.totalEjercido)}
-            </div>
-            <div className="flex items-center gap-2">
-              <Progress 
-                value={Math.min(totals.porcentajeGlobal, 100)} 
-                className="h-2 flex-1"
-              />
-              <span className="text-xs text-muted-foreground">
-                {totals.porcentajeGlobal.toFixed(1)}%
-              </span>
-            </div>
-          </CardContent>
+        <Card className="p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-muted-foreground">Total Ejercido</span>
+            <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+          <div className="text-lg font-bold text-green-600">{formatCurrency(totals.totalEjercido)}</div>
+          <div className="flex items-center gap-1">
+            <Progress value={Math.min(totals.porcentajeGlobal, 100)} className="h-1.5 flex-1" />
+            <span className="text-[10px] text-muted-foreground">{totals.porcentajeGlobal.toFixed(1)}%</span>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Por Ejercer</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${totals.totalPorEjercer < 0 ? 'text-destructive' : ''}`}>
-              {formatCurrency(totals.totalPorEjercer)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {totals.totalPorEjercer < 0 ? 'Sobregiro' : 'Disponible'}
-            </p>
-          </CardContent>
+        <Card className="p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-muted-foreground">Por Ejercer</span>
+            <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+          <div className={`text-lg font-bold ${totals.totalPorEjercer < 0 ? 'text-destructive' : ''}`}>
+            {formatCurrency(totals.totalPorEjercer)}
+          </div>
+          <p className="text-[10px] text-muted-foreground">{totals.totalPorEjercer < 0 ? 'Sobregiro' : 'Disponible'}</p>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Empresas</CardTitle>
-            <Building className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totals.empresasCount}</div>
-            <p className="text-xs text-muted-foreground">
-              Con partidas activas
-            </p>
-          </CardContent>
+        <Card className="p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-muted-foreground">Empresas</span>
+            <Building className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+          <div className="text-lg font-bold">{totals.empresasCount}</div>
+          <p className="text-[10px] text-muted-foreground">Con partidas activas</p>
         </Card>
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4">
-            {/* Row 1: Search and Company */}
-            <div className="flex flex-col gap-4 sm:flex-row">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por partida, notas o empresa..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <FilterSelect
-                value={filterCompany}
-                onValueChange={setFilterCompany}
-                options={empresas.map((e) => ({ value: e.id, label: e.razon_social }))}
-                placeholder="Filtrar por empresa"
-                searchPlaceholder="Buscar empresa..."
-                allOption={{ value: "all", label: "Todas las empresas" }}
-                className="w-full sm:w-[250px]"
-              />
-              <Tabs value={filterEstado} onValueChange={(v) => setFilterEstado(v as "activos" | "baja")}>
-                <TabsList>
-                  <TabsTrigger value="activos">Activos</TabsTrigger>
-                  <TabsTrigger value="baja">Baja</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-            
-            {/* Row 2: Multi-filters */}
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-              <MultiFilterSelect
-                values={filterCentros}
-                onValuesChange={setFilterCentros}
-                options={filterOptions.centros}
-                placeholder="Centro de Negocio"
-                searchPlaceholder="Buscar centro..."
-                className="w-full"
-              />
-              <MultiFilterSelect
-                values={filterCuentas}
-                onValuesChange={setFilterCuentas}
-                options={filterOptions.cuentas}
-                placeholder="Cuenta"
-                searchPlaceholder="Buscar cuenta..."
-                className="w-full"
-              />
-              <MultiFilterSelect
-                values={filterPartidas}
-                onValuesChange={setFilterPartidas}
-                options={filterOptions.partidas}
-                placeholder="Partida"
-                searchPlaceholder="Buscar partida..."
-                className="w-full"
+      <Card className="p-3">
+        <div className="flex flex-col gap-2">
+          {/* Row 1: Search and Company */}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por partida, notas o empresa..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-8 text-sm"
               />
             </div>
-            
-            {/* Row 3: Grouping buttons */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Layers className="h-4 w-4" />
-                <span>Agrupar por:</span>
-              </div>
-              <ToggleGroup type="single" value={grouping} onValueChange={handleGroupingChange}>
-                <ToggleGroupItem value="empresa" aria-label="Agrupar por empresa" className="text-xs px-3">
-                  Empresa
-                </ToggleGroupItem>
-                <ToggleGroupItem value="partida" aria-label="Agrupar por partida" className="text-xs px-3">
-                  Partida
-                </ToggleGroupItem>
-                <ToggleGroupItem value="cuenta" aria-label="Agrupar por cuenta" className="text-xs px-3">
-                  Cuenta
-                </ToggleGroupItem>
-                <ToggleGroupItem value="centro" aria-label="Agrupar por centro" className="text-xs px-3">
-                  Centro
-                </ToggleGroupItem>
-                <ToggleGroupItem value="ninguno" aria-label="Sin agrupar" className="text-xs px-3">
-                  Sin agrupar
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
+            <FilterSelect
+              value={filterCompany}
+              onValueChange={setFilterCompany}
+              options={empresas.map((e) => ({ value: e.id, label: e.razon_social }))}
+              placeholder="Filtrar por empresa"
+              searchPlaceholder="Buscar empresa..."
+              allOption={{ value: "all", label: "Todas las empresas" }}
+              className="w-full sm:w-[250px]"
+            />
+            <Tabs value={filterEstado} onValueChange={(v) => setFilterEstado(v as "activos" | "baja")}>
+              <TabsList className="h-8">
+                <TabsTrigger value="activos" className="text-xs h-7">Activos</TabsTrigger>
+                <TabsTrigger value="baja" className="text-xs h-7">Baja</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-        </CardContent>
+          
+          {/* Row 2: Multi-filters */}
+          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <MultiFilterSelect
+              values={filterCentros}
+              onValuesChange={setFilterCentros}
+              options={filterOptions.centros}
+              placeholder="Centro de Negocio"
+              searchPlaceholder="Buscar centro..."
+              className="w-full"
+            />
+            <MultiFilterSelect
+              values={filterCuentas}
+              onValuesChange={setFilterCuentas}
+              options={filterOptions.cuentas}
+              placeholder="Cuenta"
+              searchPlaceholder="Buscar cuenta..."
+              className="w-full"
+            />
+            <MultiFilterSelect
+              values={filterPartidas}
+              onValuesChange={setFilterPartidas}
+              options={filterOptions.partidas}
+              placeholder="Partida"
+              searchPlaceholder="Buscar partida..."
+              className="w-full"
+            />
+          </div>
+          
+          {/* Row 3: Grouping buttons */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Layers className="h-3.5 w-3.5" />
+              <span>Agrupar:</span>
+            </div>
+            <ToggleGroup type="single" value={grouping} onValueChange={handleGroupingChange}>
+              <ToggleGroupItem value="empresa" aria-label="Agrupar por empresa" className="text-xs px-2 h-7">
+                Empresa
+              </ToggleGroupItem>
+              <ToggleGroupItem value="partida" aria-label="Agrupar por partida" className="text-xs px-2 h-7">
+                Partida
+              </ToggleGroupItem>
+              <ToggleGroupItem value="cuenta" aria-label="Agrupar por cuenta" className="text-xs px-2 h-7">
+                Cuenta
+              </ToggleGroupItem>
+              <ToggleGroupItem value="centro" aria-label="Agrupar por centro" className="text-xs px-2 h-7">
+                Centro
+              </ToggleGroupItem>
+              <ToggleGroupItem value="ninguno" aria-label="Sin agrupar" className="text-xs px-2 h-7">
+                Sin agrupar
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+        </div>
       </Card>
 
       {/* Grouped List */}
-      <div className="space-y-4">
+      <div className="space-y-2">
         {filteredPresupuestos.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center">
@@ -1061,49 +1031,49 @@ export default function Presupuestos() {
                   onOpenChange={() => toggleEmpresa(group.id)}
                 >
                   <CollapsibleTrigger asChild>
-                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-2 px-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           {expandedEmpresas.has(group.id) ? (
-                            <ChevronDown className="h-5 w-5" />
+                            <ChevronDown className="h-4 w-4" />
                           ) : (
-                            <ChevronRight className="h-5 w-5" />
+                            <ChevronRight className="h-4 w-4" />
                           )}
                           <div>
-                            <CardTitle className="text-lg">
+                            <CardTitle className="text-sm">
                               {group.label}
                             </CardTitle>
                             {group.sublabel && (
-                              <p className="text-xs text-muted-foreground font-mono">
+                              <p className="text-[10px] text-muted-foreground font-mono">
                                 {group.sublabel}
                               </p>
                             )}
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs text-muted-foreground">
                               {group.presupuestos.length} partida(s)
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-4">
                           <div className="text-right">
-                            <div className="text-sm text-muted-foreground">Presupuestado</div>
-                            <div className="text-lg font-bold text-primary">
+                            <div className="text-[10px] text-muted-foreground">Presupuestado</div>
+                            <div className="text-sm font-bold text-primary">
                               {formatCurrency(group.totalPresupuestado)}
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-sm text-muted-foreground">Ejercido</div>
-                            <div className="text-lg font-bold text-green-600">
+                            <div className="text-[10px] text-muted-foreground">Ejercido</div>
+                            <div className="text-sm font-bold text-green-600">
                               {formatCurrency(group.totalEjercido)}
                             </div>
                           </div>
-                          <div className="text-right min-w-[100px]">
-                            <div className="text-sm text-muted-foreground">Avance</div>
-                            <div className="flex items-center gap-2">
+                          <div className="text-right min-w-[80px]">
+                            <div className="text-[10px] text-muted-foreground">Avance</div>
+                            <div className="flex items-center gap-1">
                               <Progress 
                                 value={Math.min(porcentajeGrupo, 100)} 
-                                className="h-2 w-16"
+                                className="h-1.5 w-12"
                               />
-                              <span className={`text-sm font-medium ${porcentajeGrupo > 100 ? 'text-destructive' : ''}`}>
+                              <span className={`text-xs font-medium ${porcentajeGrupo > 100 ? 'text-destructive' : ''}`}>
                                 {porcentajeGrupo.toFixed(0)}%
                               </span>
                             </div>
@@ -1113,7 +1083,7 @@ export default function Presupuestos() {
                     </CardHeader>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <CardContent className="pt-0">
+                    <CardContent className="pt-0 px-3 pb-3">
                       <div className="rounded-md border overflow-x-auto">
                         <DndContext
                           sensors={sensors}
