@@ -537,6 +537,8 @@ export default function Reportes() {
         <TabsContent value="flujo" className="mt-4">
           <FlujoEfectivoPresupuesto
             presupuestos={presupuestos}
+            movimientos={movimientos}
+            asientos={asientos}
             loading={loadingData}
             empresaNombre={empresaNombre}
             onOrderUpdate={loadPresupuestos}
