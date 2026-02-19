@@ -65,6 +65,7 @@ export default function Reportes() {
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [asientos, setAsientos] = useState<AsientoContable[]>([]);
   const [presupuestos, setPresupuestos] = useState<any[]>([]);
+  const [flujosProgramados, setFlujosProgramados] = useState<any[]>([]);
 
   // Cargar empresas al iniciar
   useEffect(() => {
@@ -80,6 +81,7 @@ export default function Reportes() {
   useEffect(() => {
     loadDatosContables();
     loadPresupuestos();
+    loadFlujosProgramados();
   }, [empresaId, centrosSeleccionados, fechaInicio, fechaFin, empresas]);
 
   const loadEmpresas = async () => {
@@ -273,6 +275,69 @@ export default function Reportes() {
       setPresupuestos(presupuestosTransformados);
     } catch (error: any) {
       console.error("Error loading presupuestos:", error);
+    }
+  };
+
+  const loadFlujosProgramados = async () => {
+    if (empresas.length === 0) return;
+
+    try {
+      const empresaIds = empresaId === "todas"
+        ? empresas.map(e => e.id)
+        : [empresaId];
+
+      // Get presupuesto IDs for the selected empresas
+      let presQuery = supabase
+        .from("presupuestos")
+        .select("id")
+        .eq("activo", true);
+
+      if (empresaId !== "todas") {
+        presQuery = presQuery.eq("empresa_id", empresaId);
+      } else {
+        presQuery = presQuery.in("empresa_id", empresaIds);
+      }
+
+      if (centrosSeleccionados.length > 0) {
+        presQuery = presQuery.in("centro_negocio_id", centrosSeleccionados);
+      }
+
+      const { data: presIds, error: presError } = await presQuery;
+      if (presError) throw presError;
+
+      const ids = (presIds || []).map((p: any) => p.id);
+      if (ids.length === 0) {
+        setFlujosProgramados([]);
+        return;
+      }
+
+      // Paginate flujos_programados
+      let allFlujos: any[] = [];
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data: batch, error } = await supabase
+          .from("flujos_programados")
+          .select("*")
+          .in("presupuesto_id", ids)
+          .order("fecha", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (error) throw error;
+        if (batch && batch.length > 0) {
+          allFlujos = allFlujos.concat(batch);
+          hasMore = batch.length === PAGE_SIZE;
+          from += PAGE_SIZE;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      setFlujosProgramados(allFlujos);
+    } catch (error: any) {
+      console.error("Error loading flujos programados:", error);
     }
   };
 
@@ -537,6 +602,7 @@ export default function Reportes() {
         <TabsContent value="flujo" className="mt-4">
           <FlujoEfectivoPresupuesto
             presupuestos={presupuestos}
+            flujosProgramados={flujosProgramados}
             movimientos={movimientos}
             asientos={asientos}
             loading={loadingData}

@@ -330,6 +330,44 @@ export type Database = {
         }
         Relationships: []
       }
+      flujos_programados: {
+        Row: {
+          created_at: string
+          descripcion: string | null
+          fecha: string
+          id: string
+          monto: number
+          presupuesto_id: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          descripcion?: string | null
+          fecha: string
+          id?: string
+          monto?: number
+          presupuesto_id: string
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          descripcion?: string | null
+          fecha?: string
+          id?: string
+          monto?: number
+          presupuesto_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flujos_programados_presupuesto_id_fkey"
+            columns: ["presupuesto_id"]
+            isOneToOne: false
+            referencedRelation: "presupuestos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       presupuestos: {
         Row: {
           activo: boolean
