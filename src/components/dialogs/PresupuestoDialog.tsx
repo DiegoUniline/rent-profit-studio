@@ -25,9 +25,9 @@ import { z } from "zod";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmpresaDialog } from "./EmpresaDialog";
 import { CuentaDialog } from "./CuentaDialog";
-
 import { CentroNegocioDialog } from "./CentroNegocioDialog";
 import { UnidadMedidaDialog } from "./UnidadMedidaDialog";
+import { Plus, Trash2, Copy } from "lucide-react";
 
 interface Empresa {
   id: string;
@@ -40,7 +40,6 @@ interface CuentaContable {
   nombre: string;
   empresa_id: string;
 }
-
 
 interface CentroNegocio {
   id: string;
@@ -97,9 +96,15 @@ interface PresupuestoForm {
   cantidad: string;
   precio_unitario: string;
   notas: string;
-  fecha_inicio: Date | undefined;
-  fecha_fin: Date | undefined;
-  frecuencia: "semanal" | "mensual" | "bimestral" | "trimestral" | "semestral" | "anual";
+}
+
+interface FlujoRow {
+  id?: string; // existing DB id
+  fecha: Date | undefined;
+  monto: string;
+  tipo: "ingreso" | "egreso";
+  descripcion: string;
+  isNew?: boolean;
 }
 
 const emptyForm: PresupuestoForm = {
@@ -111,9 +116,6 @@ const emptyForm: PresupuestoForm = {
   cantidad: "1",
   precio_unitario: "0",
   notas: "",
-  fecha_inicio: undefined,
-  fecha_fin: undefined,
-  frecuencia: "mensual",
 };
 
 export function PresupuestoDialog({
@@ -126,10 +128,10 @@ export function PresupuestoDialog({
   const { toast } = useToast();
   const [form, setForm] = useState<PresupuestoForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [flujoRows, setFlujoRows] = useState<FlujoRow[]>([]);
   
   // Related data states
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
-  
   const [centros, setCentros] = useState<CentroNegocio[]>([]);
   const [unidades, setUnidades] = useState<UnidadMedida[]>([]);
   const [allEmpresas, setAllEmpresas] = useState<Empresa[]>(empresas);
@@ -137,7 +139,6 @@ export function PresupuestoDialog({
   // Dialog states for inline creation
   const [empresaDialogOpen, setEmpresaDialogOpen] = useState(false);
   const [cuentaDialogOpen, setCuentaDialogOpen] = useState(false);
-  
   const [centroDialogOpen, setCentroDialogOpen] = useState(false);
   const [unidadDialogOpen, setUnidadDialogOpen] = useState(false);
 
@@ -172,15 +173,32 @@ export function PresupuestoDialog({
           cantidad: String(presupuesto.cantidad),
           precio_unitario: String(presupuesto.precio_unitario),
           notas: presupuesto.notas || "",
-          fecha_inicio: presupuesto.fecha_inicio ? new Date(presupuesto.fecha_inicio + "T00:00:00") : undefined,
-          fecha_fin: presupuesto.fecha_fin ? new Date(presupuesto.fecha_fin + "T00:00:00") : undefined,
-          frecuencia: presupuesto.frecuencia || "mensual",
         });
+        loadFlujoRows(presupuesto.id);
       } else {
         setForm(emptyForm);
+        setFlujoRows([]);
       }
     }
   }, [open, presupuesto]);
+
+  const loadFlujoRows = async (presupuestoId: string) => {
+    const { data, error } = await supabase
+      .from("flujos_programados")
+      .select("*")
+      .eq("presupuesto_id", presupuestoId)
+      .order("fecha", { ascending: true });
+    
+    if (data) {
+      setFlujoRows(data.map((f: any) => ({
+        id: f.id,
+        fecha: new Date(f.fecha + "T00:00:00"),
+        monto: String(f.monto),
+        tipo: f.tipo as "ingreso" | "egreso",
+        descripcion: f.descripcion || "",
+      })));
+    }
+  };
 
   const loadEmpresas = async () => {
     const { data } = await supabase
@@ -209,7 +227,6 @@ export function PresupuestoDialog({
 
     if (cuentasRes.data) setCuentas(cuentasRes.data);
     if (centrosRes.data) setCentros(centrosRes.data);
-    if (centrosRes.data) setCentros(centrosRes.data);
   };
 
   const loadUnidades = async () => {
@@ -227,11 +244,45 @@ export function PresupuestoDialog({
     return cantidad * precio;
   }, [form.cantidad, form.precio_unitario]);
 
+  const totalFlujos = useMemo(() => {
+    return flujoRows.reduce((sum, r) => sum + (parseFloat(r.monto) || 0), 0);
+  }, [flujoRows]);
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("es-MX", {
       style: "currency",
       currency: "MXN",
     }).format(value);
+  };
+
+  // Flujo row management
+  const addFlujoRow = () => {
+    setFlujoRows(prev => [...prev, {
+      fecha: undefined,
+      monto: "",
+      tipo: "egreso",
+      descripcion: "",
+      isNew: true,
+    }]);
+  };
+
+  const duplicateFlujoRow = (index: number) => {
+    const source = flujoRows[index];
+    setFlujoRows(prev => [...prev, {
+      fecha: source.fecha,
+      monto: source.monto,
+      tipo: source.tipo,
+      descripcion: source.descripcion,
+      isNew: true,
+    }]);
+  };
+
+  const removeFlujoRow = (index: number) => {
+    setFlujoRows(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateFlujoRow = (index: number, updates: Partial<FlujoRow>) => {
+    setFlujoRows(prev => prev.map((r, i) => i === index ? { ...r, ...updates } : r));
   };
 
   const handleSave = async () => {
@@ -265,10 +316,13 @@ export function PresupuestoDialog({
         cantidad,
         precio_unitario,
         notas: form.notas || null,
-        fecha_inicio: form.fecha_inicio ? format(form.fecha_inicio, "yyyy-MM-dd") : null,
-        fecha_fin: form.fecha_fin ? format(form.fecha_fin, "yyyy-MM-dd") : null,
-        frecuencia: form.frecuencia,
+        // Keep legacy fields null for new entries
+        fecha_inicio: null as string | null,
+        fecha_fin: null as string | null,
+        frecuencia: "mensual" as const,
       };
+
+      let presupuestoId: string;
 
       if (presupuesto) {
         const { error } = await supabase
@@ -276,9 +330,8 @@ export function PresupuestoDialog({
           .update(data)
           .eq("id", presupuesto.id);
         if (error) throw error;
-        toast({ title: "Presupuesto actualizado" });
+        presupuestoId = presupuesto.id;
       } else {
-        // Obtener el máximo orden actual para la empresa
         const { data: maxData } = await supabase
           .from("presupuestos")
           .select("orden")
@@ -288,13 +341,38 @@ export function PresupuestoDialog({
 
         const nuevoOrden = maxData && maxData.length > 0 ? (maxData[0].orden || 0) + 1 : 1;
 
-        const { error } = await supabase
+        const { data: insertData, error } = await supabase
           .from("presupuestos")
-          .insert({ ...data, orden: nuevoOrden });
+          .insert({ ...data, orden: nuevoOrden })
+          .select("id")
+          .single();
         if (error) throw error;
-        toast({ title: "Presupuesto creado" });
+        presupuestoId = insertData.id;
       }
 
+      // Save flujos_programados: delete all existing and re-insert
+      await supabase
+        .from("flujos_programados")
+        .delete()
+        .eq("presupuesto_id", presupuestoId);
+
+      const validFlujos = flujoRows.filter(r => r.fecha && parseFloat(r.monto) > 0);
+      if (validFlujos.length > 0) {
+        const flujosToInsert = validFlujos.map(r => ({
+          presupuesto_id: presupuestoId,
+          fecha: format(r.fecha!, "yyyy-MM-dd"),
+          monto: parseFloat(r.monto),
+          tipo: r.tipo,
+          descripcion: r.descripcion || null,
+        }));
+
+        const { error: flujoError } = await supabase
+          .from("flujos_programados")
+          .insert(flujosToInsert);
+        if (flujoError) throw flujoError;
+      }
+
+      toast({ title: presupuesto ? "Presupuesto actualizado" : "Presupuesto creado" });
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
@@ -317,7 +395,6 @@ export function PresupuestoDialog({
     if (form.empresa_id) loadRelatedData(form.empresa_id);
     setCuentaDialogOpen(false);
   };
-
 
   const handleCentroCreated = () => {
     if (form.empresa_id) loadRelatedData(form.empresa_id);
@@ -343,7 +420,6 @@ export function PresupuestoDialog({
     label: c.nombre,
     sublabel: c.codigo,
   }));
-
 
   const centroOptions = centros.map((c) => ({
     id: c.id,
@@ -412,7 +488,6 @@ export function PresupuestoDialog({
               />
             </div>
 
-
             {/* Centro de Negocios */}
             <div className="space-y-2">
               <Label htmlFor="centro_negocio_id">Centro de Negocios</Label>
@@ -470,59 +545,6 @@ export function PresupuestoDialog({
               </div>
             </div>
 
-            {/* Sección de Fechas y Frecuencia para Flujo de Efectivo */}
-            <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-              <h4 className="font-medium text-sm text-muted-foreground">
-                Configuración para Flujo de Efectivo
-              </h4>
-              
-              <div className="grid grid-cols-3 gap-4">
-                {/* Fecha Inicio */}
-                <div className="space-y-2">
-                  <Label>Fecha Inicio</Label>
-                  <DateInput
-                    value={form.fecha_inicio}
-                    onChange={(date) => setForm({ ...form, fecha_inicio: date })}
-                    placeholder="Seleccionar"
-                  />
-                </div>
-
-                {/* Fecha Fin */}
-                <div className="space-y-2">
-                  <Label>Fecha Fin</Label>
-                  <DateInput
-                    value={form.fecha_fin}
-                    onChange={(date) => setForm({ ...form, fecha_fin: date })}
-                    placeholder="Seleccionar"
-                    minDate={form.fecha_inicio}
-                  />
-                </div>
-
-                {/* Frecuencia */}
-                <div className="space-y-2">
-                  <Label>Frecuencia</Label>
-                  <Select
-                    value={form.frecuencia}
-                    onValueChange={(value: PresupuestoForm["frecuencia"]) =>
-                      setForm({ ...form, frecuencia: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Frecuencia" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="semanal">Semanal</SelectItem>
-                      <SelectItem value="mensual">Mensual</SelectItem>
-                      <SelectItem value="bimestral">Bimestral</SelectItem>
-                      <SelectItem value="trimestral">Trimestral</SelectItem>
-                      <SelectItem value="semestral">Semestral</SelectItem>
-                      <SelectItem value="anual">Anual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
             {/* Presupuesto calculado */}
             <div className="rounded-lg bg-muted p-4">
               <div className="flex justify-between items-center">
@@ -533,6 +555,106 @@ export function PresupuestoDialog({
                   {formatCurrency(presupuestoCalculado)}
                 </span>
               </div>
+            </div>
+
+            {/* Programación de Flujo */}
+            <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm flex items-center gap-2">
+                  📊 Programación de Flujo
+                </h4>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>Total: <strong className="text-foreground">{formatCurrency(totalFlujos)}</strong></span>
+                </div>
+              </div>
+
+              {flujoRows.length > 0 && (
+                <div className="space-y-2">
+                  {flujoRows.map((row, index) => (
+                    <div key={index} className="grid grid-cols-[1fr_120px_100px_1fr_auto_auto] gap-2 items-end">
+                      <div className="space-y-1">
+                        {index === 0 && <Label className="text-xs">Fecha</Label>}
+                        <DateInput
+                          value={row.fecha}
+                          onChange={(date) => updateFlujoRow(index, { fecha: date })}
+                          placeholder="dd/mm/aaaa"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        {index === 0 && <Label className="text-xs">Monto</Label>}
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={row.monto}
+                          onChange={(e) => updateFlujoRow(index, { monto: e.target.value })}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        {index === 0 && <Label className="text-xs">Tipo</Label>}
+                        <Select
+                          value={row.tipo}
+                          onValueChange={(val: "ingreso" | "egreso") => updateFlujoRow(index, { tipo: val })}
+                        >
+                          <SelectTrigger className="h-10">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ingreso">Ingreso</SelectItem>
+                            <SelectItem value="egreso">Egreso</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        {index === 0 && <Label className="text-xs">Descripción</Label>}
+                        <Input
+                          value={row.descripcion}
+                          onChange={(e) => updateFlujoRow(index, { descripcion: e.target.value })}
+                          placeholder="Opcional..."
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 shrink-0"
+                        onClick={() => duplicateFlujoRow(index)}
+                        title="Duplicar fila"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 shrink-0 text-destructive hover:text-destructive"
+                        onClick={() => removeFlujoRow(index)}
+                        title="Eliminar fila"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addFlujoRow}
+                className="w-full gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Agregar fecha
+              </Button>
+
+              {flujoRows.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  Sin programación de flujo. Agrega fechas y montos para generar el flujo de efectivo automáticamente.
+                </p>
+              )}
             </div>
 
             {/* Notas */}
@@ -575,7 +697,6 @@ export function PresupuestoDialog({
         defaultEmpresaId={form.empresa_id}
         onSuccess={handleCuentaCreated}
       />
-
 
       <CentroNegocioDialog
         open={centroDialogOpen}

@@ -14,29 +14,31 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatCurrency, Movimiento, AsientoContable } from "@/lib/accounting-utils";
 import { cn } from "@/lib/utils";
-import { parseLocalDate } from "@/lib/date-utils";
-import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, DollarSign, CalendarDays, ChevronDown, ChevronRight, Lock, ArrowRightLeft } from "lucide-react";
-import { format, startOfMonth, differenceInMonths } from "date-fns";
+import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, DollarSign, ChevronDown, ChevronRight, Lock, ArrowRightLeft } from "lucide-react";
+import { format, startOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+
+interface FlujoProgramado {
+  id: string;
+  presupuesto_id: string;
+  fecha: string;
+  monto: number;
+  tipo: "ingreso" | "egreso";
+  descripcion: string | null;
+}
 
 interface Presupuesto {
   id: string;
   partida: string;
   cantidad: number;
   precio_unitario: number;
-  fecha_inicio: string | null;
-  fecha_fin: string | null;
-  frecuencia: "semanal" | "mensual" | "bimestral" | "trimestral" | "semestral" | "anual" | null;
   orden: number | null;
   cuenta?: {
     codigo: string;
     nombre: string;
-  } | null;
-  tercero?: {
-    razon_social: string;
   } | null;
   centro_negocio?: {
     codigo: string;
@@ -46,6 +48,7 @@ interface Presupuesto {
 
 interface FlujoEfectivoPresupuestoProps {
   presupuestos: Presupuesto[];
+  flujosProgramados: FlujoProgramado[];
   movimientos?: Movimiento[];
   asientos?: AsientoContable[];
   loading?: boolean;
@@ -61,14 +64,10 @@ interface FlujoMensual {
   codigoCuenta: string;
   nombreCuenta: string;
   tipo: TipoFlujo;
-  montoTotal: number;
-  frecuencia: string;
-  mesesOriginal: number[]; // presupuesto original
-  mesesEjercido: number[]; // ejercido real per month
-  mesesAjustado: number[]; // adjusted (ejercido for closed, redistributed for future)
+  meses: number[]; // indexed by global month index
+  mesesEjercido: number[];
+  mesesAjustado: number[]; // ejercido for closed, programmed for future
   orden: number;
-  centroNegocioCodigo: string;
-  centroNegocioNombre: string;
 }
 
 interface GrupoCuenta {
@@ -76,70 +75,17 @@ interface GrupoCuenta {
   nombreCuenta: string;
   flujos: FlujoMensual[];
   totalMeses: number[];
-  totalMesesOriginal: number[];
-}
-
-// Determina si es entrada o salida basado en el código de cuenta
-function determinarTipoFlujo(codigoCuenta: string): TipoFlujo {
-  if (!codigoCuenta) return "salida";
-  const primerDigito = codigoCuenta.charAt(0);
-  if (primerDigito === "1" || primerDigito === "4") return "entrada";
-  return "salida";
-}
-
-// Calcular la frecuencia en meses
-function getFrecuenciaEnMeses(frecuencia: string | null): number {
-  switch (frecuencia) {
-    case "semanal": return 0.25;
-    case "mensual": return 1;
-    case "bimestral": return 2;
-    case "trimestral": return 3;
-    case "semestral": return 6;
-    case "anual": return 12;
-    default: return 1;
-  }
-}
-
-// Nombre de la frecuencia
-function getNombreFrecuencia(frecuencia: string | null): string {
-  switch (frecuencia) {
-    case "semanal": return "Semanal";
-    case "mensual": return "Mensual";
-    case "bimestral": return "Bimestral";
-    case "trimestral": return "Trimestral";
-    case "semestral": return "Semestral";
-    case "anual": return "Anual";
-    default: return "Mensual";
-  }
-}
-
-// Generar años disponibles (current + 3 more = 4 years)
-function getAnosDisponibles(): number[] {
-  const currentYear = new Date().getFullYear();
-  return [currentYear, currentYear + 1, currentYear + 2, currentYear + 3];
 }
 
 const MESES_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-/**
- * Determines if a global month index corresponds to a "closed" month
- * (any month strictly before the current month is closed).
- */
-function isMesCerrado(allMeses: Date[], index: number): boolean {
+function isMesCerrado(date: Date): boolean {
   const now = new Date();
-  const currentMonthStart = startOfMonth(now);
-  return allMeses[index] < currentMonthStart;
+  return date < startOfMonth(now);
 }
 
-/**
- * Calculate ejercido amount for a movement based on cuenta type.
- */
 function getEjercidoFromMovimiento(mov: any, codigoCuenta: string): number {
   const primerDigito = codigoCuenta.charAt(0);
-  // Activos (1): ejercido = haber (sale del activo)
-  // Pasivos/Capital (2,3): ejercido = debe
-  // Ingresos (4): ejercido = haber
-  // Costos/Gastos (5,6): ejercido = debe
   if (primerDigito === "1") return Number(mov.haber);
   if (primerDigito === "2" || primerDigito === "3") return Number(mov.debe);
   if (primerDigito === "4") return Number(mov.haber);
@@ -149,14 +95,13 @@ function getEjercidoFromMovimiento(mov: any, codigoCuenta: string): number {
 
 export function FlujoEfectivoPresupuesto({
   presupuestos,
+  flujosProgramados,
   movimientos = [],
   asientos = [],
   loading,
   empresaNombre,
 }: FlujoEfectivoPresupuestoProps) {
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "entradas" | "salidas">("todos");
-  const anosDisponibles = useMemo(() => getAnosDisponibles(), []);
-  const [anosSeleccionados, setAnosSeleccionados] = useState<number[]>([new Date().getFullYear()]);
   const [expandedCuentas, setExpandedCuentas] = useState<Set<string>>(new Set());
   const [expandedYears, setExpandedYears] = useState<Set<number>>(() => new Set([new Date().getFullYear()]));
 
@@ -176,20 +121,17 @@ export function FlujoEfectivoPresupuesto({
     });
   };
 
-  // All months across all selected years (for global totals)
-  const allMeses = useMemo(() => {
-    if (anosSeleccionados.length === 0) return [];
-    const meses: Date[] = [];
-    const sortedYears = [...anosSeleccionados].sort((a, b) => a - b);
-    sortedYears.forEach(year => {
-      for (let month = 0; month < 12; month++) {
-        meses.push(new Date(year, month, 1));
-      }
+  // Auto-detect years from flujos_programados dates
+  const detectedYears = useMemo(() => {
+    const yearsSet = new Set<number>();
+    flujosProgramados.forEach(f => {
+      const year = parseInt(f.fecha.substring(0, 4));
+      if (!isNaN(year)) yearsSet.add(year);
     });
-    return meses;
-  }, [anosSeleccionados]);
-
-  const numMeses = allMeses.length;
+    // Always include current year
+    yearsSet.add(new Date().getFullYear());
+    return [...yearsSet].sort((a, b) => a - b);
+  }, [flujosProgramados]);
 
   // Build asiento map for date lookup
   const asientoMap = useMemo(() => {
@@ -200,218 +142,172 @@ export function FlujoEfectivoPresupuesto({
 
   // Build ejercido per presupuesto per month
   const ejercidoPorPresupuestoMes = useMemo(() => {
-    // Map: presupuesto_id -> Map<"YYYY-MM" -> amount>
     const result = new Map<string, Map<string, number>>();
-    
     movimientos.forEach(mov => {
       const movAny = mov as any;
       if (!movAny.presupuesto_id) return;
       const asiento = asientoMap.get(mov.asiento_id);
       if (!asiento || asiento.estado !== "aplicado") return;
-      
       const fechaAsiento = new Date(asiento.fecha + "T00:00:00");
       const mesKey = format(fechaAsiento, "yyyy-MM");
-      
-      // Find the presupuesto to get cuenta code
       const presupuesto = presupuestos.find(p => p.id === movAny.presupuesto_id);
       const codigoCuenta = presupuesto?.cuenta?.codigo || "";
       const monto = getEjercidoFromMovimiento(mov, codigoCuenta);
-      
       if (!result.has(movAny.presupuesto_id)) {
         result.set(movAny.presupuesto_id, new Map());
       }
       const mesMap = result.get(movAny.presupuesto_id)!;
       mesMap.set(mesKey, (mesMap.get(mesKey) || 0) + monto);
     });
-    
     return result;
   }, [movimientos, asientoMap, presupuestos]);
 
-  // Process presupuestos into monthly flows with ejercido + redistribution
+  // Group flujos by presupuesto, then distribute into months per year
   const flujosMensuales = useMemo(() => {
-    if (numMeses === 0) return [];
-    const flujos: FlujoMensual[] = [];
-
-    presupuestos.forEach((p) => {
-      if (!p.fecha_inicio || !p.fecha_fin) return;
-      const fechaInicio = parseLocalDate(p.fecha_inicio);
-      const fechaFin = parseLocalDate(p.fecha_fin);
-      const montoTotal = p.cantidad * p.precio_unitario;
-      const codigoCuenta = p.cuenta?.codigo || "";
-      const tipo = determinarTipoFlujo(codigoCuenta);
-      const frecuencia = p.frecuencia || "mensual";
-      const frecuenciaEnMeses = getFrecuenciaEnMeses(frecuencia);
-
-      const mesesEnPeriodo = differenceInMonths(fechaFin, fechaInicio) + 1;
-      let numOcurrencias: number;
-      if (frecuencia === "semanal") {
-        numOcurrencias = mesesEnPeriodo * 4;
-      } else {
-        numOcurrencias = Math.ceil(mesesEnPeriodo / frecuenciaEnMeses);
+    // Group flujos by presupuesto_id
+    const flujosByPresupuesto = new Map<string, FlujoProgramado[]>();
+    flujosProgramados.forEach(f => {
+      if (!flujosByPresupuesto.has(f.presupuesto_id)) {
+        flujosByPresupuesto.set(f.presupuesto_id, []);
       }
-      const montoPorOcurrencia = numOcurrencias > 0 ? montoTotal / numOcurrencias : montoTotal;
+      flujosByPresupuesto.get(f.presupuesto_id)!.push(f);
+    });
 
-      // Step 1: Calculate original budget distribution (unchanged logic)
-      const mesesOriginal: number[] = new Array(numMeses).fill(0);
-      allMeses.forEach((mesActual, index) => {
-        const inicioMes = startOfMonth(mesActual);
-        const mesEstaEnRango =
-          (inicioMes >= startOfMonth(fechaInicio) && inicioMes <= fechaFin) ||
-          (mesActual >= fechaInicio && mesActual <= fechaFin);
-        if (!mesEstaEnRango) return;
+    const allFlujos: FlujoMensual[] = [];
 
-        if (frecuencia === "semanal") {
-          const montoSemanal = montoTotal / numOcurrencias;
-          mesesOriginal[index] = montoSemanal * 4;
-        } else if (frecuencia === "mensual") {
-          mesesOriginal[index] = montoPorOcurrencia;
-        } else {
-          const mesesDesdeInicio = differenceInMonths(inicioMes, startOfMonth(fechaInicio));
-          if (mesesDesdeInicio % frecuenciaEnMeses === 0) {
-            mesesOriginal[index] = montoPorOcurrencia;
+    flujosByPresupuesto.forEach((flujos, presupuestoId) => {
+      const presupuesto = presupuestos.find(p => p.id === presupuestoId);
+      if (!presupuesto) return;
+
+      const codigoCuenta = presupuesto.cuenta?.codigo || "";
+      // Determine tipo from flujos (use first one, or from cuenta)
+      const primerFlujo = flujos[0];
+      const tipo: TipoFlujo = primerFlujo.tipo === "ingreso" ? "entrada" : "salida";
+
+      // Build month arrays for all detected years
+      const numMonths = detectedYears.length * 12;
+      const meses = new Array(numMonths).fill(0);
+      const mesesEjercido = new Array(numMonths).fill(0);
+      const mesesAjustado = new Array(numMonths).fill(0);
+
+      // Distribute flujos into months
+      flujos.forEach(f => {
+        const fecha = new Date(f.fecha + "T00:00:00");
+        const year = fecha.getFullYear();
+        const month = fecha.getMonth();
+        const yearIdx = detectedYears.indexOf(year);
+        if (yearIdx === -1) return;
+        const globalIdx = yearIdx * 12 + month;
+        meses[globalIdx] += f.monto;
+      });
+
+      // Fill ejercido
+      const ejercidoMap = ejercidoPorPresupuestoMes.get(presupuestoId);
+      detectedYears.forEach((year, yearIdx) => {
+        for (let month = 0; month < 12; month++) {
+          const mesKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+          const globalIdx = yearIdx * 12 + month;
+          if (ejercidoMap?.has(mesKey)) {
+            mesesEjercido[globalIdx] = ejercidoMap.get(mesKey)!;
           }
         }
       });
 
-      // Step 2: Get ejercido real per month
-      const ejercidoMap = ejercidoPorPresupuestoMes.get(p.id);
-      const mesesEjercido: number[] = new Array(numMeses).fill(0);
-      allMeses.forEach((mes, index) => {
-        const mesKey = format(mes, "yyyy-MM");
-        if (ejercidoMap?.has(mesKey)) {
-          mesesEjercido[index] = ejercidoMap.get(mesKey)!;
+      // Build adjusted: closed months use ejercido, future use programmed
+      detectedYears.forEach((year, yearIdx) => {
+        for (let month = 0; month < 12; month++) {
+          const globalIdx = yearIdx * 12 + month;
+          const monthDate = new Date(year, month, 1);
+          if (isMesCerrado(monthDate)) {
+            mesesAjustado[globalIdx] = mesesEjercido[globalIdx];
+          } else {
+            mesesAjustado[globalIdx] = meses[globalIdx];
+          }
         }
       });
 
-      // Step 3: Build adjusted array with redistribution
-      const mesesAjustado: number[] = new Array(numMeses).fill(0);
-      
-      // Calculate total ejercido in closed months
-      let ejercidoAcumulado = 0;
-      const closedMonthIndicesInRange: number[] = [];
-      const futureMonthIndicesInRange: number[] = [];
-
-      allMeses.forEach((mes, index) => {
-        const inicioMes = startOfMonth(mes);
-        const mesEstaEnRango =
-          (inicioMes >= startOfMonth(fechaInicio) && inicioMes <= fechaFin) ||
-          (mes >= fechaInicio && mes <= fechaFin);
-        if (!mesEstaEnRango) return;
-
-        if (isMesCerrado(allMeses, index)) {
-          closedMonthIndicesInRange.push(index);
-          ejercidoAcumulado += mesesEjercido[index];
-          // Closed months use ejercido real
-          mesesAjustado[index] = mesesEjercido[index];
-        } else {
-          futureMonthIndicesInRange.push(index);
-        }
-      });
-
-      // Redistribute remaining budget across future months
-      const pendiente = montoTotal - ejercidoAcumulado;
-      const numMesesFuturos = futureMonthIndicesInRange.length;
-
-      if (numMesesFuturos > 0 && pendiente > 0) {
-        const montoPorMesFuturo = pendiente / numMesesFuturos;
-        futureMonthIndicesInRange.forEach(idx => {
-          mesesAjustado[idx] = montoPorMesFuturo;
-        });
-      } else if (numMesesFuturos > 0 && pendiente <= 0) {
-        // Everything already exercised or over-exercised
-        futureMonthIndicesInRange.forEach(idx => {
-          mesesAjustado[idx] = 0;
-        });
-      }
-
-      if (mesesAjustado.some(m => m !== 0) || mesesOriginal.some(m => m !== 0)) {
-        flujos.push({
-          presupuestoId: p.id,
-          partida: p.partida,
+      if (mesesAjustado.some(m => m !== 0) || meses.some(m => m !== 0)) {
+        allFlujos.push({
+          presupuestoId,
+          partida: presupuesto.partida,
           codigoCuenta,
-          nombreCuenta: p.cuenta?.nombre || "Sin cuenta",
+          nombreCuenta: presupuesto.cuenta?.nombre || "Sin cuenta",
           tipo,
-          montoTotal,
-          frecuencia: getNombreFrecuencia(frecuencia),
-          mesesOriginal,
+          meses,
           mesesEjercido,
           mesesAjustado,
-          orden: p.orden || 0,
-          centroNegocioCodigo: p.centro_negocio?.codigo || "",
-          centroNegocioNombre: p.centro_negocio?.nombre || "Sin centro",
+          orden: presupuesto.orden || 0,
         });
       }
     });
 
-    return flujos.sort((a, b) => a.orden - b.orden);
-  }, [presupuestos, allMeses, numMeses, ejercidoPorPresupuestoMes]);
+    return allFlujos.sort((a, b) => a.orden - b.orden);
+  }, [presupuestos, flujosProgramados, detectedYears, ejercidoPorPresupuestoMes]);
 
-  // Global totals using adjusted values
-  const totalesMensuales = useMemo(() => {
-    const entradas: number[] = new Array(numMeses).fill(0);
-    const salidas: number[] = new Array(numMeses).fill(0);
-    flujosMensuales.forEach((flujo) => {
-      flujo.mesesAjustado.forEach((monto, index) => {
-        if (flujo.tipo === "entrada") entradas[index] += monto;
-        else salidas[index] += monto;
-      });
-    });
-    const saldos: number[] = [];
-    let saldoAcumulado = 0;
-    for (let i = 0; i < numMeses; i++) {
-      saldoAcumulado += entradas[i] - salidas[i];
-      saldos.push(saldoAcumulado);
-    }
-    return { entradas, salidas, saldos };
-  }, [flujosMensuales, numMeses]);
-
-  const totalesGenerales = useMemo(() => ({
-    totalEntradas: totalesMensuales.entradas.reduce((a, b) => a + b, 0),
-    totalSalidas: totalesMensuales.salidas.reduce((a, b) => a + b, 0),
-    saldoFinal: totalesMensuales.saldos[numMeses - 1] || 0,
-  }), [totalesMensuales, numMeses]);
-
-  // Per-year data: extract 12-month slices for each selected year
-  const sortedYears = useMemo(() => [...anosSeleccionados].sort((a, b) => a - b), [anosSeleccionados]);
-
+  // Per-year data
   const yearData = useMemo(() => {
-    return sortedYears.map((year, yearIdx) => {
+    return detectedYears.map((year, yearIdx) => {
       const startIdx = yearIdx * 12;
-      const endIdx = startIdx + 12;
 
-      // Slice flows for this year
-      const yearEntradas: number[] = totalesMensuales.entradas.slice(startIdx, endIdx);
-      const yearSalidas: number[] = totalesMensuales.salidas.slice(startIdx, endIdx);
-      const yearSaldos: number[] = totalesMensuales.saldos.slice(startIdx, endIdx);
-
-      // Group flows by cuenta for this year
-      const entradasGrupos: Record<string, { flujos: FlujoMensual[]; meses12: number[][]; meses12Original: number[][] }> = {};
-      const salidasGrupos: Record<string, { flujos: FlujoMensual[]; meses12: number[][]; meses12Original: number[][] }> = {};
+      const entradas = new Array(12).fill(0);
+      const salidas = new Array(12).fill(0);
 
       flujosMensuales.forEach(flujo => {
-        const slice = flujo.mesesAjustado.slice(startIdx, endIdx);
-        const sliceOriginal = flujo.mesesOriginal.slice(startIdx, endIdx);
-        if (slice.every(m => m === 0) && sliceOriginal.every(m => m === 0)) return;
+        for (let i = 0; i < 12; i++) {
+          const globalIdx = startIdx + i;
+          const val = flujo.mesesAjustado[globalIdx] || 0;
+          if (flujo.tipo === "entrada") entradas[i] += val;
+          else salidas[i] += val;
+        }
+      });
+
+      const saldos: number[] = [];
+      // For accumulated balance, carry from previous year
+      const prevYearLastSaldo = yearIdx > 0 ? (() => {
+        // Sum all prior years
+        let acc = 0;
+        for (let py = 0; py < yearIdx; py++) {
+          for (let m = 0; m < 12; m++) {
+            const gi = py * 12 + m;
+            flujosMensuales.forEach(f => {
+              const v = f.mesesAjustado[gi] || 0;
+              if (f.tipo === "entrada") acc += v;
+              else acc -= v;
+            });
+          }
+        }
+        return acc;
+      })() : 0;
+
+      let saldoAcumulado = prevYearLastSaldo;
+      for (let i = 0; i < 12; i++) {
+        saldoAcumulado += entradas[i] - salidas[i];
+        saldos.push(saldoAcumulado);
+      }
+
+      // Group by cuenta
+      const entradasGrupos: Record<string, { flujos: FlujoMensual[]; meses12: number[][] }> = {};
+      const salidasGrupos: Record<string, { flujos: FlujoMensual[]; meses12: number[][] }> = {};
+
+      flujosMensuales.forEach(flujo => {
+        const slice = flujo.mesesAjustado.slice(startIdx, startIdx + 12);
+        const sliceOrig = flujo.meses.slice(startIdx, startIdx + 12);
+        if (slice.every(m => m === 0) && sliceOrig.every(m => m === 0)) return;
 
         const target = flujo.tipo === "entrada" ? entradasGrupos : salidasGrupos;
         const key = flujo.codigoCuenta || "sin-cuenta";
-        if (!target[key]) target[key] = { flujos: [], meses12: [], meses12Original: [] };
+        if (!target[key]) target[key] = { flujos: [], meses12: [] };
         target[key].flujos.push(flujo);
         target[key].meses12.push(slice);
-        target[key].meses12Original.push(sliceOriginal);
       });
 
       const buildGrupos = (grupos: typeof entradasGrupos): GrupoCuenta[] =>
         Object.entries(grupos)
-          .map(([codigoCuenta, { flujos, meses12, meses12Original }]) => ({
+          .map(([codigoCuenta, { flujos, meses12 }]) => ({
             codigoCuenta,
             nombreCuenta: flujos[0]?.nombreCuenta || "Sin cuenta",
             flujos,
             totalMeses: meses12.reduce(
-              (acc, m) => acc.map((v, i) => v + m[i]),
-              new Array(12).fill(0)
-            ),
-            totalMesesOriginal: meses12Original.reduce(
               (acc, m) => acc.map((v, i) => v + m[i]),
               new Array(12).fill(0)
             ),
@@ -421,45 +317,60 @@ export function FlujoEfectivoPresupuesto({
       return {
         year,
         startIdx,
-        entradas: yearEntradas,
-        salidas: yearSalidas,
-        saldos: yearSaldos,
+        entradas,
+        salidas,
+        saldos,
         gruposEntradas: buildGrupos(entradasGrupos),
         gruposSalidas: buildGrupos(salidasGrupos),
-        totalEntradas: yearEntradas.reduce((a, b) => a + b, 0),
-        totalSalidas: yearSalidas.reduce((a, b) => a + b, 0),
+        totalEntradas: entradas.reduce((a, b) => a + b, 0),
+        totalSalidas: salidas.reduce((a, b) => a + b, 0),
       };
     });
-  }, [sortedYears, flujosMensuales, totalesMensuales]);
+  }, [detectedYears, flujosMensuales]);
+
+  // Global totals
+  const totalesGenerales = useMemo(() => {
+    let totalEntradas = 0;
+    let totalSalidas = 0;
+    yearData.forEach(yd => {
+      totalEntradas += yd.totalEntradas;
+      totalSalidas += yd.totalSalidas;
+    });
+    const lastYear = yearData[yearData.length - 1];
+    const saldoFinal = lastYear?.saldos[11] || 0;
+    return { totalEntradas, totalSalidas, saldoFinal };
+  }, [yearData]);
 
   // Export Excel
   const exportarExcel = () => {
-    const detalleData = flujosMensuales.map((f) => {
-      const fila: Record<string, any> = {
-        Partida: f.partida,
-        Cuenta: f.codigoCuenta,
-        Tipo: f.tipo === "entrada" ? "Entrada" : "Salida",
-        Frecuencia: f.frecuencia,
-        "Monto Base": f.montoTotal,
-      };
-      allMeses.forEach((mes, i) => {
-        const mesLabel = format(mes, "MMM yyyy", { locale: es });
-        const cerrado = isMesCerrado(allMeses, i);
-        fila[`${mesLabel} (${cerrado ? "Real" : "Proyectado"})`] = f.mesesAjustado[i];
-        if (cerrado) {
-          fila[`${mesLabel} (Presupuesto Orig.)`] = f.mesesOriginal[i];
-        }
-      });
-      return fila;
+    const resumenData: any[] = [];
+    yearData.forEach(yd => {
+      for (let i = 0; i < 12; i++) {
+        const monthDate = new Date(yd.year, i, 1);
+        resumenData.push({
+          Año: yd.year,
+          Mes: format(monthDate, "MMMM", { locale: es }),
+          Estado: isMesCerrado(monthDate) ? "Cerrado (Real)" : "Proyectado",
+          Entradas: yd.entradas[i],
+          Salidas: yd.salidas[i],
+          "Flujo Neto": yd.entradas[i] - yd.salidas[i],
+          "Saldo Acumulado": yd.saldos[i],
+        });
+      }
     });
-    const resumenData = allMeses.map((mes, i) => ({
-      Mes: format(mes, "MMMM yyyy", { locale: es }),
-      Estado: isMesCerrado(allMeses, i) ? "Cerrado (Real)" : "Proyectado",
-      Entradas: totalesMensuales.entradas[i],
-      Salidas: totalesMensuales.salidas[i],
-      "Flujo Neto": totalesMensuales.entradas[i] - totalesMensuales.salidas[i],
-      "Saldo Acumulado": totalesMensuales.saldos[i],
-    }));
+
+    const detalleData = flujosProgramados.map(f => {
+      const p = presupuestos.find(p => p.id === f.presupuesto_id);
+      return {
+        Partida: p?.partida || "",
+        Cuenta: p?.cuenta?.codigo || "",
+        Fecha: f.fecha,
+        Monto: f.monto,
+        Tipo: f.tipo === "ingreso" ? "Entrada" : "Salida",
+        Descripcion: f.descripcion || "",
+      };
+    });
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumenData), "Resumen");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalleData), "Detalle");
@@ -470,17 +381,17 @@ export function FlujoEfectivoPresupuesto({
   const exportarPDF = () => {
     const doc = new jsPDF({ orientation: "landscape" });
     const pageWidth = doc.internal.pageSize.getWidth();
-    const anosLabel = anosSeleccionados.length > 0 ? anosSeleccionados.sort().join(", ") : "Sin años";
+    const yearsLabel = detectedYears.join(", ");
     doc.setFontSize(16);
-    doc.text(`Flujo de Efectivo - Proyección ${anosLabel}`, pageWidth / 2, 15, { align: "center" });
+    doc.text(`Flujo de Efectivo - ${yearsLabel}`, pageWidth / 2, 15, { align: "center" });
     doc.setFontSize(11);
     doc.text(empresaNombre, pageWidth / 2, 22, { align: "center" });
 
     let startY = 30;
     yearData.forEach(yd => {
-      const resumenData = yd.entradas.map((entrada, i) => {
-        const globalIdx = yd.startIdx + i;
-        const cerrado = isMesCerrado(allMeses, globalIdx);
+      const data = yd.entradas.map((entrada, i) => {
+        const monthDate = new Date(yd.year, i, 1);
+        const cerrado = isMesCerrado(monthDate);
         return [
           `${MESES_LABELS[i]}${cerrado ? " ✓" : ""}`,
           formatCurrency(entrada),
@@ -494,7 +405,7 @@ export function FlujoEfectivoPresupuesto({
       autoTable(doc, {
         startY: startY + 4,
         head: [["Mes", "Entradas", "Salidas", "Flujo Neto", "Saldo Acumulado"]],
-        body: resumenData,
+        body: data,
         styles: { fontSize: 8, cellPadding: 2 },
         headStyles: { fillColor: [59, 130, 246] },
       });
@@ -505,12 +416,12 @@ export function FlujoEfectivoPresupuesto({
       }
     });
 
-    doc.save(`Flujo_Efectivo_${empresaNombre}_${anosLabel}.pdf`);
+    doc.save(`Flujo_Efectivo_${empresaNombre}_${yearsLabel}.pdf`);
   };
 
-  // Render month header with closed/projected indicator
-  const renderMesHeader = (monthIndex: number, globalIndex: number) => {
-    const cerrado = isMesCerrado(allMeses, globalIndex);
+  const renderMesHeader = (monthIndex: number, year: number) => {
+    const monthDate = new Date(year, monthIndex, 1);
+    const cerrado = isMesCerrado(monthDate);
     return (
       <TableHead key={monthIndex} className="min-w-[110px] text-right">
         <div className="flex flex-col items-end gap-0.5">
@@ -529,9 +440,9 @@ export function FlujoEfectivoPresupuesto({
     );
   };
 
-  // Render cell with appropriate styling for closed vs projected
-  const renderMontoCell = (monto: number, globalIndex: number, textClass?: string) => {
-    const cerrado = isMesCerrado(allMeses, globalIndex);
+  const renderMontoCell = (monto: number, year: number, monthIndex: number, textClass?: string) => {
+    const monthDate = new Date(year, monthIndex, 1);
+    const cerrado = isMesCerrado(monthDate);
     return (
       <TableCell
         className={cn(
@@ -546,7 +457,6 @@ export function FlujoEfectivoPresupuesto({
     );
   };
 
-  // Render a cuenta group row for a specific year
   const renderGrupoCuentaYear = (
     grupo: GrupoCuenta,
     tipo: TipoFlujo,
@@ -578,14 +488,12 @@ export function FlujoEfectivoPresupuesto({
               </span>
             </div>
           </TableCell>
-          <TableCell className="text-center text-xs text-muted-foreground">-</TableCell>
-          {grupo.totalMeses.map((monto, i) => renderMontoCell(monto, yearStartIdx + i, textClass))}
+          {grupo.totalMeses.map((monto, i) => renderMontoCell(monto, year, i, textClass))}
         </TableRow>
 
         {isExpanded && grupo.flujos.map((flujo, fIdx) => {
           const sliceAjustado = flujo.mesesAjustado.slice(yearStartIdx, yearStartIdx + 12);
-          const sliceOriginal = flujo.mesesOriginal.slice(yearStartIdx, yearStartIdx + 12);
-          const sliceEjercido = flujo.mesesEjercido.slice(yearStartIdx, yearStartIdx + 12);
+          const sliceOrig = flujo.meses.slice(yearStartIdx, yearStartIdx + 12);
           return (
             <React.Fragment key={`${key}-${flujo.presupuestoId}-${fIdx}`}>
               <TableRow
@@ -596,16 +504,12 @@ export function FlujoEfectivoPresupuesto({
                 )}
               >
                 <TableCell className="sticky left-0 z-10 bg-background pl-12">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">{flujo.partida}</span>
-                  </div>
+                  <span className="text-sm">{flujo.partida}</span>
                 </TableCell>
-                <TableCell className="text-center text-xs text-muted-foreground">{flujo.frecuencia}</TableCell>
                 {sliceAjustado.map((monto, i) => {
-                  const globalIdx = yearStartIdx + i;
-                  const cerrado = isMesCerrado(allMeses, globalIdx);
-                  const original = sliceOriginal[i];
-                  const diff = cerrado && original > 0 ? monto - original : 0;
+                  const monthDate = new Date(year, i, 1);
+                  const cerrado = isMesCerrado(monthDate);
+                  const original = sliceOrig[i];
                   return (
                     <TableCell
                       key={i}
@@ -615,8 +519,8 @@ export function FlujoEfectivoPresupuesto({
                         cerrado && "bg-blue-50/30 dark:bg-blue-950/10"
                       )}
                       title={cerrado
-                        ? `Real: ${formatCurrency(monto)} | Presupuesto: ${formatCurrency(original)}${diff !== 0 ? ` | Dif: ${formatCurrency(diff)}` : ""}`
-                        : `Proyectado ajustado: ${formatCurrency(monto)} | Original: ${formatCurrency(original)}`
+                        ? `Real: ${formatCurrency(monto)} | Programado: ${formatCurrency(original)}`
+                        : `Programado: ${formatCurrency(monto)}`
                       }
                     >
                       {monto !== 0 ? formatCurrency(monto) : "-"}
@@ -650,7 +554,7 @@ export function FlujoEfectivoPresupuesto({
           <CardContent className="pt-4">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-muted-foreground truncate">Total Entradas ({sortedYears.join(", ") || "Sin años"})</p>
+                <p className="text-sm text-muted-foreground truncate">Total Entradas</p>
                 <p className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400 truncate">
                   {formatCurrency(totalesGenerales.totalEntradas)}
                 </p>
@@ -663,7 +567,7 @@ export function FlujoEfectivoPresupuesto({
           <CardContent className="pt-4">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-muted-foreground truncate">Total Salidas ({sortedYears.join(", ") || "Sin años"})</p>
+                <p className="text-sm text-muted-foreground truncate">Total Salidas</p>
                 <p className="text-xl sm:text-2xl font-bold text-red-600 dark:text-red-400 truncate">
                   {formatCurrency(totalesGenerales.totalSalidas)}
                 </p>
@@ -698,7 +602,7 @@ export function FlujoEfectivoPresupuesto({
         </div>
         <div className="flex items-center gap-1.5">
           <ArrowRightLeft className="h-3 w-3 text-amber-600" />
-          <span><strong>Proy.</strong> = Proyectado con redistribución automática</span>
+          <span><strong>Proy.</strong> = Programado</span>
         </div>
       </div>
 
@@ -707,33 +611,13 @@ export function FlujoEfectivoPresupuesto({
         <CardContent className="pt-4 overflow-x-auto">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              {/* Filtro de años */}
-              <div className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm font-medium whitespace-nowrap">Años:</span>
-                <div className="flex gap-1 bg-muted p-1 rounded-lg">
-                  {anosDisponibles.map((ano) => {
-                    const isSelected = anosSeleccionados.includes(ano);
-                    return (
-                      <Button
-                        key={ano}
-                        variant={isSelected ? "default" : "ghost"}
-                        size="sm"
-                        onClick={() => {
-                          if (isSelected) {
-                            if (anosSeleccionados.length > 1) {
-                              setAnosSeleccionados(prev => prev.filter(a => a !== ano));
-                            }
-                          } else {
-                            setAnosSeleccionados(prev => [...prev, ano].sort());
-                          }
-                        }}
-                        className="px-3 h-8"
-                      >
-                        {ano}
-                      </Button>
-                    );
-                  })}
+              {/* Info de años detectados */}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="font-medium">Años detectados:</span>
+                <div className="flex gap-1">
+                  {detectedYears.map(year => (
+                    <Badge key={year} variant="secondary">{year}</Badge>
+                  ))}
                 </div>
               </div>
 
@@ -762,7 +646,7 @@ export function FlujoEfectivoPresupuesto({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setExpandedYears(new Set(sortedYears))}
+                  onClick={() => setExpandedYears(new Set(detectedYears))}
                   className="text-xs"
                 >
                   Expandir todos
@@ -782,11 +666,11 @@ export function FlujoEfectivoPresupuesto({
       </Card>
 
       {/* Year blocks */}
-      {anosSeleccionados.length === 0 ? (
+      {detectedYears.length === 0 ? (
         <Card>
           <CardContent className="py-8">
             <div className="text-center text-muted-foreground">
-              Selecciona al menos un año para ver la proyección
+              No hay flujos programados. Agrega fechas y montos en los presupuestos para generar el flujo de efectivo.
             </div>
           </CardContent>
         </Card>
@@ -832,15 +716,14 @@ export function FlujoEfectivoPresupuesto({
                           <TableHeader>
                             <TableRow className="bg-muted/50">
                               <TableHead className="sticky left-0 z-10 bg-muted/50 min-w-[300px]">Cuenta / Concepto</TableHead>
-                              <TableHead className="min-w-[80px] text-center">Frecuencia</TableHead>
-                              {MESES_LABELS.map((_, i) => renderMesHeader(i, yd.startIdx + i))}
+                              {MESES_LABELS.map((_, i) => renderMesHeader(i, yd.year))}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {yd.gruposEntradas.length === 0 && yd.gruposSalidas.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
-                                  No hay presupuestos con datos para {yd.year}
+                                <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                                  No hay flujos programados para {yd.year}
                                 </TableCell>
                               </TableRow>
                             ) : (
@@ -849,7 +732,7 @@ export function FlujoEfectivoPresupuesto({
                                 {mostrarEntradas && yd.gruposEntradas.length > 0 && (
                                   <>
                                     <TableRow className="bg-green-100/50 dark:bg-green-950/40">
-                                      <TableCell colSpan={14} className="sticky left-0 z-10 bg-green-100/50 dark:bg-green-950/40 font-bold text-green-800 dark:text-green-300">
+                                      <TableCell colSpan={13} className="sticky left-0 z-10 bg-green-100/50 dark:bg-green-950/40 font-bold text-green-800 dark:text-green-300">
                                         <div className="flex items-center gap-2">
                                           <TrendingUp className="h-4 w-4" />
                                           ENTRADAS DE EFECTIVO
@@ -858,11 +741,11 @@ export function FlujoEfectivoPresupuesto({
                                     </TableRow>
                                     {yd.gruposEntradas.map(g => renderGrupoCuentaYear(g, "entrada", yd.year, yd.startIdx))}
                                     <TableRow className="bg-green-50 dark:bg-green-950/30 font-semibold border-t-2 border-green-200 dark:border-green-800">
-                                      <TableCell className="sticky left-0 z-10 bg-green-50 dark:bg-green-950/30 pl-4" colSpan={2}>Total Entradas</TableCell>
+                                      <TableCell className="sticky left-0 z-10 bg-green-50 dark:bg-green-950/30 pl-4">Total Entradas</TableCell>
                                       {yd.entradas.map((monto, i) => (
                                         <TableCell key={i} className={cn(
                                           "text-right font-mono text-green-700 dark:text-green-400",
-                                          isMesCerrado(allMeses, yd.startIdx + i) && "bg-blue-50/30 dark:bg-blue-950/10"
+                                          isMesCerrado(new Date(yd.year, i, 1)) && "bg-blue-50/30 dark:bg-blue-950/10"
                                         )}>
                                           {monto !== 0 ? formatCurrency(monto) : "-"}
                                         </TableCell>
@@ -875,7 +758,7 @@ export function FlujoEfectivoPresupuesto({
                                 {mostrarSalidas && yd.gruposSalidas.length > 0 && (
                                   <>
                                     <TableRow className="bg-red-100/50 dark:bg-red-950/40">
-                                      <TableCell colSpan={14} className="sticky left-0 z-10 bg-red-100/50 dark:bg-red-950/40 font-bold text-red-800 dark:text-red-300">
+                                      <TableCell colSpan={13} className="sticky left-0 z-10 bg-red-100/50 dark:bg-red-950/40 font-bold text-red-800 dark:text-red-300">
                                         <div className="flex items-center gap-2">
                                           <TrendingDown className="h-4 w-4" />
                                           SALIDAS DE EFECTIVO
@@ -884,11 +767,11 @@ export function FlujoEfectivoPresupuesto({
                                     </TableRow>
                                     {yd.gruposSalidas.map(g => renderGrupoCuentaYear(g, "salida", yd.year, yd.startIdx))}
                                     <TableRow className="bg-red-50 dark:bg-red-950/30 font-semibold border-t-2 border-red-200 dark:border-red-800">
-                                      <TableCell className="sticky left-0 z-10 bg-red-50 dark:bg-red-950/30 pl-4" colSpan={2}>Total Salidas</TableCell>
+                                      <TableCell className="sticky left-0 z-10 bg-red-50 dark:bg-red-950/30 pl-4">Total Salidas</TableCell>
                                       {yd.salidas.map((monto, i) => (
                                         <TableCell key={i} className={cn(
                                           "text-right font-mono text-red-700 dark:text-red-400",
-                                          isMesCerrado(allMeses, yd.startIdx + i) && "bg-blue-50/30 dark:bg-blue-950/10"
+                                          isMesCerrado(new Date(yd.year, i, 1)) && "bg-blue-50/30 dark:bg-blue-950/10"
                                         )}>
                                           {monto !== 0 ? formatCurrency(monto) : "-"}
                                         </TableCell>
@@ -901,21 +784,21 @@ export function FlujoEfectivoPresupuesto({
                                 {filtroTipo === "todos" && (
                                   <>
                                     <TableRow className="bg-muted/30">
-                                      <TableCell colSpan={14} className="sticky left-0 z-10 bg-muted/30 font-bold">
+                                      <TableCell colSpan={13} className="sticky left-0 z-10 bg-muted/30 font-bold">
                                         <div className="flex items-center gap-2">
                                           <DollarSign className="h-4 w-4" />FLUJO DE EFECTIVO
                                         </div>
                                       </TableCell>
                                     </TableRow>
                                     <TableRow className="bg-blue-50 dark:bg-blue-950/30 font-semibold">
-                                      <TableCell className="sticky left-0 z-10 bg-blue-50 dark:bg-blue-950/30 pl-6" colSpan={2}>Flujo Neto del Período</TableCell>
+                                      <TableCell className="sticky left-0 z-10 bg-blue-50 dark:bg-blue-950/30 pl-6">Flujo Neto del Período</TableCell>
                                       {yd.entradas.map((entrada, i) => {
                                         const neto = entrada - yd.salidas[i];
                                         return (
                                           <TableCell key={i} className={cn(
                                             "text-right font-mono",
                                             neto >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400",
-                                            isMesCerrado(allMeses, yd.startIdx + i) && "bg-blue-50/50 dark:bg-blue-950/20"
+                                            isMesCerrado(new Date(yd.year, i, 1)) && "bg-blue-50/50 dark:bg-blue-950/20"
                                           )}>
                                             {neto !== 0 ? formatCurrency(neto) : "-"}
                                           </TableCell>
@@ -923,7 +806,7 @@ export function FlujoEfectivoPresupuesto({
                                       })}
                                     </TableRow>
                                     <TableRow className="bg-primary/10 font-bold text-base border-t-2 border-primary/30">
-                                      <TableCell className="sticky left-0 z-10 bg-primary/10 pl-6" colSpan={2}>Saldo Acumulado</TableCell>
+                                      <TableCell className="sticky left-0 z-10 bg-primary/10 pl-6">Saldo Acumulado</TableCell>
                                       {yd.saldos.map((saldo, i) => (
                                         <TableCell key={i} className={cn(
                                           "text-right font-mono",
