@@ -332,33 +332,56 @@ export type Database = {
       }
       flujos_programados: {
         Row: {
+          asiento_movimiento_id: string | null
+          auto_generado: boolean
           created_at: string
           descripcion: string | null
+          empresa_id: string | null
           fecha: string
           id: string
           monto: number
-          presupuesto_id: string
+          presupuesto_id: string | null
           tipo: string
         }
         Insert: {
+          asiento_movimiento_id?: string | null
+          auto_generado?: boolean
           created_at?: string
           descripcion?: string | null
+          empresa_id?: string | null
           fecha: string
           id?: string
           monto?: number
-          presupuesto_id: string
+          presupuesto_id?: string | null
           tipo: string
         }
         Update: {
+          asiento_movimiento_id?: string | null
+          auto_generado?: boolean
           created_at?: string
           descripcion?: string | null
+          empresa_id?: string | null
           fecha?: string
           id?: string
           monto?: number
-          presupuesto_id?: string
+          presupuesto_id?: string | null
           tipo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "flujos_programados_asiento_movimiento_id_fkey"
+            columns: ["asiento_movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "asiento_movimientos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flujos_programados_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "flujos_programados_presupuesto_id_fkey"
             columns: ["presupuesto_id"]

@@ -14,7 +14,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatCurrency, Movimiento, AsientoContable } from "@/lib/accounting-utils";
 import { cn } from "@/lib/utils";
-import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, DollarSign, ChevronDown, ChevronRight, Lock, ArrowRightLeft } from "lucide-react";
+import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, DollarSign, ChevronDown, ChevronRight, Lock, ArrowRightLeft, Zap } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import jsPDF from "jspdf";
@@ -23,11 +23,13 @@ import * as XLSX from "xlsx";
 
 interface FlujoProgramado {
   id: string;
-  presupuesto_id: string;
+  presupuesto_id: string | null;
   fecha: string;
   monto: number;
   tipo: "ingreso" | "egreso";
   descripcion: string | null;
+  auto_generado?: boolean;
+  empresa_id?: string | null;
 }
 
 interface Presupuesto {
@@ -68,6 +70,7 @@ interface FlujoMensual {
   mesesEjercido: number[];
   mesesAjustado: number[]; // ejercido for closed, programmed for future
   orden: number;
+  autoGenerado?: boolean;
 }
 
 interface GrupoCuenta {
@@ -164,33 +167,37 @@ export function FlujoEfectivoPresupuesto({
 
   // Group flujos by presupuesto, then distribute into months per year
   const flujosMensuales = useMemo(() => {
-    // Group flujos by presupuesto_id
+    // Separate budget-linked and auto-generated flujos
     const flujosByPresupuesto = new Map<string, FlujoProgramado[]>();
+    const autoFlujos: FlujoProgramado[] = [];
+
     flujosProgramados.forEach(f => {
-      if (!flujosByPresupuesto.has(f.presupuesto_id)) {
-        flujosByPresupuesto.set(f.presupuesto_id, []);
+      if (f.auto_generado && !f.presupuesto_id) {
+        autoFlujos.push(f);
+      } else if (f.presupuesto_id) {
+        if (!flujosByPresupuesto.has(f.presupuesto_id)) {
+          flujosByPresupuesto.set(f.presupuesto_id, []);
+        }
+        flujosByPresupuesto.get(f.presupuesto_id)!.push(f);
       }
-      flujosByPresupuesto.get(f.presupuesto_id)!.push(f);
     });
 
     const allFlujos: FlujoMensual[] = [];
+    const numMonths = detectedYears.length * 12;
 
+    // Process budget-linked flujos
     flujosByPresupuesto.forEach((flujos, presupuestoId) => {
       const presupuesto = presupuestos.find(p => p.id === presupuestoId);
       if (!presupuesto) return;
 
       const codigoCuenta = presupuesto.cuenta?.codigo || "";
-      // Determine tipo from flujos (use first one, or from cuenta)
       const primerFlujo = flujos[0];
       const tipo: TipoFlujo = primerFlujo.tipo === "ingreso" ? "entrada" : "salida";
 
-      // Build month arrays for all detected years
-      const numMonths = detectedYears.length * 12;
       const meses = new Array(numMonths).fill(0);
       const mesesEjercido = new Array(numMonths).fill(0);
       const mesesAjustado = new Array(numMonths).fill(0);
 
-      // Distribute flujos into months
       flujos.forEach(f => {
         const fecha = new Date(f.fecha + "T00:00:00");
         const year = fecha.getFullYear();
@@ -201,7 +208,6 @@ export function FlujoEfectivoPresupuesto({
         meses[globalIdx] += f.monto;
       });
 
-      // Fill ejercido
       const ejercidoMap = ejercidoPorPresupuestoMes.get(presupuestoId);
       detectedYears.forEach((year, yearIdx) => {
         for (let month = 0; month < 12; month++) {
@@ -213,7 +219,6 @@ export function FlujoEfectivoPresupuesto({
         }
       });
 
-      // Build adjusted: closed months use ejercido, future use programmed
       detectedYears.forEach((year, yearIdx) => {
         for (let month = 0; month < 12; month++) {
           const globalIdx = yearIdx * 12 + month;
@@ -240,6 +245,57 @@ export function FlujoEfectivoPresupuesto({
         });
       }
     });
+
+    // Process auto-generated IVA flujos - group by descripcion pattern
+    if (autoFlujos.length > 0) {
+      // Group by tipo (ingreso/egreso) and month
+      const ivaIngresos = new Array(numMonths).fill(0);
+      const ivaEgresos = new Array(numMonths).fill(0);
+
+      autoFlujos.forEach(f => {
+        const fecha = new Date(f.fecha + "T00:00:00");
+        const year = fecha.getFullYear();
+        const month = fecha.getMonth();
+        const yearIdx = detectedYears.indexOf(year);
+        if (yearIdx === -1) return;
+        const globalIdx = yearIdx * 12 + month;
+        if (f.tipo === "ingreso") {
+          ivaIngresos[globalIdx] += f.monto;
+        } else {
+          ivaEgresos[globalIdx] += f.monto;
+        }
+      });
+
+      if (ivaIngresos.some(m => m !== 0)) {
+        allFlujos.push({
+          presupuestoId: "iva-trasladado-auto",
+          partida: "IVA Trasladado (Auto)",
+          codigoCuenta: "IVA",
+          nombreCuenta: "IVA Trasladado",
+          tipo: "entrada",
+          meses: ivaIngresos,
+          mesesEjercido: ivaIngresos, // auto-generated = already real
+          mesesAjustado: ivaIngresos,
+          orden: 99990,
+          autoGenerado: true,
+        });
+      }
+
+      if (ivaEgresos.some(m => m !== 0)) {
+        allFlujos.push({
+          presupuestoId: "iva-favor-auto",
+          partida: "IVA a Favor (Auto)",
+          codigoCuenta: "IVA",
+          nombreCuenta: "IVA a Favor",
+          tipo: "salida",
+          meses: ivaEgresos,
+          mesesEjercido: ivaEgresos,
+          mesesAjustado: ivaEgresos,
+          orden: 99991,
+          autoGenerado: true,
+        });
+      }
+    }
 
     return allFlujos.sort((a, b) => a.orden - b.orden);
   }, [presupuestos, flujosProgramados, detectedYears, ejercidoPorPresupuestoMes]);
@@ -483,6 +539,11 @@ export function FlujoEfectivoPresupuesto({
               {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
               <span className="font-medium">{grupo.codigoCuenta}</span>
               <span className={cn("text-sm", textClass)}>{grupo.nombreCuenta}</span>
+              {grupo.flujos.some(f => f.autoGenerado) && (
+                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800">
+                  <Zap className="h-2.5 w-2.5 mr-0.5" />Auto IVA
+                </Badge>
+              )}
               <span className="text-xs text-muted-foreground ml-2">
                 ({grupo.flujos.length} {grupo.flujos.length === 1 ? "partida" : "partidas"})
               </span>
@@ -504,7 +565,14 @@ export function FlujoEfectivoPresupuesto({
                 )}
               >
                 <TableCell className="sticky left-0 z-10 bg-background pl-12">
-                  <span className="text-sm">{flujo.partida}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{flujo.partida}</span>
+                    {flujo.autoGenerado && (
+                      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800">
+                        <Zap className="h-2.5 w-2.5 mr-0.5" />Auto
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 {sliceAjustado.map((monto, i) => {
                   const monthDate = new Date(year, i, 1);
@@ -603,6 +671,10 @@ export function FlujoEfectivoPresupuesto({
         <div className="flex items-center gap-1.5">
           <ArrowRightLeft className="h-3 w-3 text-amber-600" />
           <span><strong>Proy.</strong> = Programado</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Zap className="h-3 w-3 text-violet-600" />
+          <span><strong>Auto</strong> = IVA generado desde asientos</span>
         </div>
       </div>
 
