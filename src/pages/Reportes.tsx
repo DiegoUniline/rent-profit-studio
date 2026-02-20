@@ -306,32 +306,63 @@ export default function Reportes() {
       if (presError) throw presError;
 
       const ids = (presIds || []).map((p: any) => p.id);
-      if (ids.length === 0) {
-        setFlujosProgramados([]);
-        return;
-      }
 
-      // Paginate flujos_programados
       let allFlujos: any[] = [];
       const PAGE_SIZE = 1000;
-      let from = 0;
-      let hasMore = true;
 
-      while (hasMore) {
-        const { data: batch, error } = await supabase
-          .from("flujos_programados")
-          .select("*")
-          .in("presupuesto_id", ids)
-          .order("fecha", { ascending: true })
-          .range(from, from + PAGE_SIZE - 1);
+      // 1. Load budget-linked flujos
+      if (ids.length > 0) {
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data: batch, error } = await supabase
+            .from("flujos_programados")
+            .select("*")
+            .in("presupuesto_id", ids)
+            .order("fecha", { ascending: true })
+            .range(from, from + PAGE_SIZE - 1);
 
-        if (error) throw error;
-        if (batch && batch.length > 0) {
-          allFlujos = allFlujos.concat(batch);
-          hasMore = batch.length === PAGE_SIZE;
-          from += PAGE_SIZE;
-        } else {
-          hasMore = false;
+          if (error) throw error;
+          if (batch && batch.length > 0) {
+            allFlujos = allFlujos.concat(batch);
+            hasMore = batch.length === PAGE_SIZE;
+            from += PAGE_SIZE;
+          } else {
+            hasMore = false;
+          }
+        }
+      }
+
+      // 2. Load auto-generated IVA flujos by empresa
+      {
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          let ivaQuery = supabase
+            .from("flujos_programados")
+            .select("*")
+            .eq("auto_generado", true)
+            .order("fecha", { ascending: true })
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (empresaId !== "todas") {
+            ivaQuery = ivaQuery.eq("empresa_id", empresaId);
+          } else {
+            ivaQuery = ivaQuery.in("empresa_id", empresaIds);
+          }
+
+          const { data: batch, error } = await ivaQuery;
+          if (error) throw error;
+          if (batch && batch.length > 0) {
+            // Avoid duplicates (IVA flujos that also have presupuesto_id)
+            const existingIds = new Set(allFlujos.map((f: any) => f.id));
+            const newBatch = batch.filter((f: any) => !existingIds.has(f.id));
+            allFlujos = allFlujos.concat(newBatch);
+            hasMore = batch.length === PAGE_SIZE;
+            from += PAGE_SIZE;
+          } else {
+            hasMore = false;
+          }
         }
       }
 
