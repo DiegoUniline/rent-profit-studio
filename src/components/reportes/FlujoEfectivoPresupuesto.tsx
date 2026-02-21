@@ -224,7 +224,10 @@ export function FlujoEfectivoPresupuesto({
           const globalIdx = yearIdx * 12 + month;
           const monthDate = new Date(year, month, 1);
           if (isMesCerrado(monthDate)) {
-            mesesAjustado[globalIdx] = mesesEjercido[globalIdx];
+            // Use ejercido if available, otherwise fall back to programmed
+            mesesAjustado[globalIdx] = mesesEjercido[globalIdx] !== 0 
+              ? mesesEjercido[globalIdx] 
+              : meses[globalIdx];
           } else {
             mesesAjustado[globalIdx] = meses[globalIdx];
           }
