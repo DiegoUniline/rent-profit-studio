@@ -87,6 +87,12 @@ function isMesCerrado(date: Date): boolean {
   return date < startOfMonth(now);
 }
 
+function isMesActual(date: Date): boolean {
+  const now = new Date();
+  const start = startOfMonth(now);
+  return date.getFullYear() === start.getFullYear() && date.getMonth() === start.getMonth();
+}
+
 function getEjercidoFromMovimiento(mov: any, codigoCuenta: string): number {
   const primerDigito = codigoCuenta.charAt(0);
   if (primerDigito === "1") return Number(mov.haber);
@@ -224,11 +230,15 @@ export function FlujoEfectivoPresupuesto({
           const globalIdx = yearIdx * 12 + month;
           const monthDate = new Date(year, month, 1);
           if (isMesCerrado(monthDate)) {
-            // Use ejercido if available, otherwise fall back to programmed
-            mesesAjustado[globalIdx] = mesesEjercido[globalIdx] !== 0 
-              ? mesesEjercido[globalIdx] 
+            // Closed month: ALWAYS use real (ejercido), even if 0
+            mesesAjustado[globalIdx] = mesesEjercido[globalIdx];
+          } else if (isMesActual(monthDate)) {
+            // Current month: use real if exists, otherwise programmed
+            mesesAjustado[globalIdx] = mesesEjercido[globalIdx] !== 0
+              ? mesesEjercido[globalIdx]
               : meses[globalIdx];
           } else {
+            // Future month: use programmed
             mesesAjustado[globalIdx] = meses[globalIdx];
           }
         }
