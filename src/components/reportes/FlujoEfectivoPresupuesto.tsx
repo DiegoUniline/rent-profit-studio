@@ -93,13 +93,9 @@ function isMesActual(date: Date): boolean {
   return date.getFullYear() === start.getFullYear() && date.getMonth() === start.getMonth();
 }
 
-function getEjercidoFromMovimiento(mov: any, codigoCuenta: string): number {
-  const primerDigito = codigoCuenta.charAt(0);
-  if (primerDigito === "1") return Number(mov.haber);
-  if (primerDigito === "2" || primerDigito === "3") return Number(mov.debe);
-  if (primerDigito === "4") return Number(mov.haber);
-  if (primerDigito === "5" || primerDigito === "6") return Number(mov.debe);
-  return Number(mov.haber);
+function getEjercidoFromMovimiento(mov: any, _codigoCuenta: string): number {
+  // debe and haber are mutually exclusive per row, so sum captures the actual amount
+  return Number(mov.debe) + Number(mov.haber);
 }
 
 export function FlujoEfectivoPresupuesto({
