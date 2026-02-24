@@ -179,25 +179,30 @@ export default function Reportes() {
       let movimientosData: any[] = [];
 
       if (asientosIds.length > 0) {
-        // Paginate to get ALL movements (bypass 1000-row limit)
+        // Batch .in() calls to avoid URL length limits (max ~200 UUIDs per batch)
+        const IN_BATCH_SIZE = 200;
         const PAGE_SIZE = 1000;
-        let from = 0;
-        let hasMore = true;
 
-        while (hasMore) {
-          const { data: batch, error: movError } = await supabase
-            .from("asiento_movimientos")
-            .select("*")
-            .in("asiento_id", asientosIds)
-            .range(from, from + PAGE_SIZE - 1);
+        for (let b = 0; b < asientosIds.length; b += IN_BATCH_SIZE) {
+          const idsBatch = asientosIds.slice(b, b + IN_BATCH_SIZE);
+          let from = 0;
+          let hasMore = true;
 
-          if (movError) throw movError;
-          if (batch && batch.length > 0) {
-            movimientosData = movimientosData.concat(batch);
-            hasMore = batch.length === PAGE_SIZE;
-            from += PAGE_SIZE;
-          } else {
-            hasMore = false;
+          while (hasMore) {
+            const { data: batch, error: movError } = await supabase
+              .from("asiento_movimientos")
+              .select("*")
+              .in("asiento_id", idsBatch)
+              .range(from, from + PAGE_SIZE - 1);
+
+            if (movError) throw movError;
+            if (batch && batch.length > 0) {
+              movimientosData = movimientosData.concat(batch);
+              hasMore = batch.length === PAGE_SIZE;
+              from += PAGE_SIZE;
+            } else {
+              hasMore = false;
+            }
           }
         }
       }
