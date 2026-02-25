@@ -225,14 +225,9 @@ export function FlujoEfectivoPresupuesto({
         for (let month = 0; month < 12; month++) {
           const globalIdx = yearIdx * 12 + month;
           const monthDate = new Date(year, month, 1);
-          if (isMesCerrado(monthDate)) {
-            // Closed month: ALWAYS use real (ejercido), even if 0
+          if (isMesCerrado(monthDate) || isMesActual(monthDate)) {
+            // Closed or current month: ALWAYS use real (ejercido), even if 0
             mesesAjustado[globalIdx] = mesesEjercido[globalIdx];
-          } else if (isMesActual(monthDate)) {
-            // Current month: use real if exists, otherwise programmed
-            mesesAjustado[globalIdx] = mesesEjercido[globalIdx] !== 0
-              ? mesesEjercido[globalIdx]
-              : meses[globalIdx];
           } else {
             // Future month: use programmed
             mesesAjustado[globalIdx] = meses[globalIdx];
@@ -487,13 +482,15 @@ export function FlujoEfectivoPresupuesto({
   const renderMesHeader = (monthIndex: number, year: number) => {
     const monthDate = new Date(year, monthIndex, 1);
     const cerrado = isMesCerrado(monthDate);
+    const actual = isMesActual(monthDate);
+    const esReal = cerrado || actual;
     return (
       <TableHead key={monthIndex} className="min-w-[110px] text-right">
         <div className="flex flex-col items-end gap-0.5">
           <span>{MESES_LABELS[monthIndex]}</span>
-          {cerrado ? (
+          {esReal ? (
             <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
-              <Lock className="h-2.5 w-2.5 mr-0.5" />Real
+              <Lock className="h-2.5 w-2.5 mr-0.5" />{actual ? "Parcial" : "Real"}
             </Badge>
           ) : (
             <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
