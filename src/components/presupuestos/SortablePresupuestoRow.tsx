@@ -3,7 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { Edit, Power, GripVertical, AlertTriangle, Eye } from "lucide-react";
+import { Edit, Power, GripVertical, AlertTriangle, Eye, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Presupuesto {
@@ -31,6 +31,7 @@ interface SortablePresupuestoRowProps {
   onEdit: (p: Presupuesto) => void;
   onToggleActivo: (p: Presupuesto) => void;
   onViewEjercido?: (p: Presupuesto) => void;
+  onCopy?: (p: Presupuesto) => void;
 }
 
 export function SortablePresupuestoRow({
@@ -42,6 +43,7 @@ export function SortablePresupuestoRow({
   onEdit,
   onToggleActivo,
   onViewEjercido,
+  onCopy,
 }: SortablePresupuestoRowProps) {
   const {
     attributes,
@@ -168,6 +170,17 @@ export function SortablePresupuestoRow({
               title="Ver ejercido"
             >
               <Eye className="h-4 w-4" />
+            </Button>
+          )}
+          {onCopy && canEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => onCopy(p)}
+              title="Copiar"
+            >
+              <Copy className="h-4 w-4" />
             </Button>
           )}
           {canEdit && (
