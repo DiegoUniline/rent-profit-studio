@@ -174,7 +174,11 @@ export function PresupuestoDialog({
           precio_unitario: String(presupuesto.precio_unitario),
           notas: presupuesto.notas || "",
         });
-        loadFlujoRows(presupuesto.id);
+        if (presupuesto.id) {
+          loadFlujoRows(presupuesto.id);
+        } else {
+          setFlujoRows([]);
+        }
       } else {
         setForm(emptyForm);
         setFlujoRows([]);
@@ -324,7 +328,7 @@ export function PresupuestoDialog({
 
       let presupuestoId: string;
 
-      if (presupuesto) {
+      if (presupuesto?.id) {
         const { error } = await supabase
           .from("presupuestos")
           .update(data)
@@ -372,7 +376,7 @@ export function PresupuestoDialog({
         if (flujoError) throw flujoError;
       }
 
-      toast({ title: presupuesto ? "Presupuesto actualizado" : "Presupuesto creado" });
+      toast({ title: presupuesto?.id ? "Presupuesto actualizado" : "Presupuesto creado" });
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
@@ -439,7 +443,7 @@ export function PresupuestoDialog({
         <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {presupuesto ? "Editar Presupuesto" : "Nuevo Presupuesto"}
+              {presupuesto?.id ? "Editar Presupuesto" : presupuesto ? "Copiar Presupuesto" : "Nuevo Presupuesto"}
             </DialogTitle>
           </DialogHeader>
 

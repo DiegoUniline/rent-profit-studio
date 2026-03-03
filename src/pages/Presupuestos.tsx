@@ -40,6 +40,7 @@ import {
   GripVertical,
   Layers,
   Eye,
+  Copy,
 } from "lucide-react";
 import { PresupuestoDialog } from "@/components/dialogs/PresupuestoDialog";
 import { SortablePresupuestoRow } from "@/components/presupuestos/SortablePresupuestoRow";
@@ -388,6 +389,18 @@ export default function Presupuestos() {
 
   const openEdit = (presupuesto: Presupuesto) => {
     setEditingPresupuesto(presupuesto);
+    setDialogOpen(true);
+  };
+
+  const openCopy = (presupuesto: Presupuesto) => {
+    // Create a copy without id so PresupuestoDialog treats it as new
+    const copy = {
+      ...presupuesto,
+      id: undefined,
+      partida: `Copia de ${presupuesto.partida}`,
+      activo: true,
+    } as any;
+    setEditingPresupuesto(copy);
     setDialogOpen(true);
   };
 
@@ -990,6 +1003,15 @@ export default function Presupuestos() {
                                       variant="ghost"
                                       size="icon"
                                       className="h-7 w-7"
+                                      onClick={() => openCopy(p)}
+                                      title="Copiar"
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
                                       onClick={() => openEdit(p)}
                                       title="Editar"
                                     >
@@ -1125,6 +1147,7 @@ export default function Presupuestos() {
                                     onEdit={openEdit}
                                     onToggleActivo={handleToggleActivo}
                                     onViewEjercido={openEjercidoView}
+                                    onCopy={openCopy}
                                   />
                                 ))}
                               </SortableContext>
