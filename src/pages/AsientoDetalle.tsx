@@ -454,9 +454,10 @@ export default function AsientoDetalle() {
       toast({ title: isEditing ? "Asiento actualizado" : "Asiento creado" });
       navigate("/asientos");
     } catch (error: any) {
+      console.error("Error guardando asiento:", error);
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Error al guardar",
+        description: error.message || "No se pudo guardar el asiento. Verifique permisos.",
         variant: "destructive",
       });
     } finally {
@@ -554,7 +555,7 @@ export default function AsientoDetalle() {
           <Button variant="outline" onClick={() => navigate("/asientos")}>
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={saving || !totals.balanced} className="gap-2">
+          <Button onClick={handleSave} disabled={saving} className="gap-2">
             <Save className="h-4 w-4" />
             {saving ? "Guardando..." : "Guardar"}
           </Button>
