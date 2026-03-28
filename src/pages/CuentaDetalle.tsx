@@ -243,6 +243,8 @@ export default function CuentaDetalle() {
     });
   }, [movimientos, fechaDesde, fechaHasta, filterCentro, filterTercero]);
 
+  const pagination = useTablePagination(filteredMovimientos);
+
   // Calculate totals
   const { saldo, totalDebe, totalHaber } = useMemo(() => {
     let totalDebe = 0;
