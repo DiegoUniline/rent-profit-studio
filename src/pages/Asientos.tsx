@@ -191,8 +191,14 @@ export default function Asientos() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [asientosRes, empresasRes] = await Promise.all([
-        supabase
+      // Fetch all asientos using pagination to avoid the 1000 row limit
+      let allAsientos: AsientoContable[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
           .from("asientos_contables")
           .select(`
             *,
@@ -201,18 +207,29 @@ export default function Asientos() {
             centros_negocio(id, codigo, nombre)
           `)
           .order("fecha", { ascending: true })
-          .order("numero_asiento", { ascending: true }),
-        supabase
-          .from("empresas")
-          .select("id, razon_social")
-          .eq("activa", true)
-          .order("razon_social"),
-      ]);
+          .order("numero_asiento", { ascending: true })
+          .range(from, from + pageSize - 1);
 
-      if (asientosRes.error) throw asientosRes.error;
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          allAsientos = [...allAsientos, ...data];
+          from += pageSize;
+          hasMore = data.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const empresasRes = await supabase
+        .from("empresas")
+        .select("id, razon_social")
+        .eq("activa", true)
+        .order("razon_social");
+
       if (empresasRes.error) throw empresasRes.error;
 
-      setAsientos(asientosRes.data || []);
+      setAsientos(allAsientos);
       setEmpresas(empresasRes.data || []);
     } catch (error: any) {
       toast({
