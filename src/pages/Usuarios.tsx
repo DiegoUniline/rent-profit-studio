@@ -109,6 +109,8 @@ export default function Usuarios() {
       user.nombre_usuario.toLowerCase().includes(search.toLowerCase())
   );
 
+  const pagination = useTablePagination(filteredUsers);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
