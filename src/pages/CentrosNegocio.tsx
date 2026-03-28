@@ -154,6 +154,8 @@ export default function CentrosNegocio() {
     return matchesSearch && matchesEmpresa && matchesEstado;
   });
 
+  const pagination = useTablePagination(filteredCentros);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
