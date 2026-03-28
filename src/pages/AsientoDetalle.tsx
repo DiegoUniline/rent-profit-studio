@@ -452,8 +452,8 @@ export default function AsientoDetalle() {
       if (movError) throw movError;
 
       toast({ title: isEditing ? "Asiento actualizado" : "Asiento creado" });
-      // Clear filters so the new/updated entry is visible in the list
-      if (!isEditing) {
+      // Clear filters only for brand new entries (not copies) so new entry is visible
+      if (!isEditing && !isCopy) {
         localStorage.removeItem("asientos_filter_search");
         localStorage.removeItem("asientos_filter_company");
         localStorage.removeItem("asientos_filter_tipo");
