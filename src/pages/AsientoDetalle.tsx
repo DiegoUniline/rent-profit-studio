@@ -452,6 +452,15 @@ export default function AsientoDetalle() {
       if (movError) throw movError;
 
       toast({ title: isEditing ? "Asiento actualizado" : "Asiento creado" });
+      // Clear filters so the new/updated entry is visible in the list
+      if (!isEditing) {
+        localStorage.removeItem("asientos_filter_search");
+        localStorage.removeItem("asientos_filter_company");
+        localStorage.removeItem("asientos_filter_tipo");
+        localStorage.removeItem("asientos_filter_estado");
+        localStorage.removeItem("asientos_filter_fecha_desde");
+        localStorage.removeItem("asientos_filter_fecha_hasta");
+      }
       navigate("/asientos");
     } catch (error: any) {
       console.error("Error guardando asiento:", error);
