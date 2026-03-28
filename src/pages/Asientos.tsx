@@ -472,6 +472,23 @@ export default function Asientos() {
                 minDate={filterFechaDesde}
               />
             </div>
+            {(search || filterCompany !== "all" || filterTipo !== "all" || filterEstado !== "all" || filterFechaDesde || filterFechaHasta) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="self-end text-muted-foreground"
+                onClick={() => {
+                  setSearch("");
+                  setFilterCompany("all");
+                  setFilterTipo("all");
+                  setFilterEstado("all");
+                  setFilterFechaDesde(undefined);
+                  setFilterFechaHasta(undefined);
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
