@@ -351,6 +351,8 @@ export default function Asientos() {
     });
   }, [asientos, search, filterCompany, filterTipo, filterEstado, filterFechaDesde, filterFechaHasta]);
 
+  const pagination = useTablePagination(filteredAsientos);
+
   // Calculate totals
   const totals = useMemo(() => {
     const aplicados = filteredAsientos.filter((a) => a.estado === "aplicado");
