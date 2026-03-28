@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import { useTablePagination } from "@/hooks/use-table-pagination";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Plus, Play, Copy, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, Building2, Landmark, X, ChevronDown, ChevronRight, Layers } from "lucide-react";

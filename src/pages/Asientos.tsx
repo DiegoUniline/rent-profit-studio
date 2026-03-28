@@ -1,4 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
+import { useTablePagination } from "@/hooks/use-table-pagination";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
