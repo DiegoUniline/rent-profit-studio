@@ -532,14 +532,14 @@ export default function Asientos() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAsientos.length === 0 ? (
+              {pagination.paginatedItems.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
                     No hay asientos registrados
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredAsientos.map((asiento) => (
+                pagination.paginatedItems.map((asiento) => (
                   <TableRow key={asiento.id}>
                     <TableCell className="font-mono font-medium">
                       #{asiento.numero_asiento}
@@ -637,6 +637,17 @@ export default function Asientos() {
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.totalItems}
+            from={pagination.from}
+            to={pagination.to}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setCurrentPage}
+            onPageSizeChange={pagination.setPageSize}
+            pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
+          />
         </CardContent>
       </Card>
 
