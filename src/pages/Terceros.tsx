@@ -284,7 +284,7 @@ export default function Terceros() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTerceros.map((tercero) => (
+                {pagination.paginatedItems.map((tercero) => (
                   <TableRow key={tercero.id} className={!tercero.activo ? "opacity-50" : ""}>
                     <TableCell>
                       <Badge variant={tipoBadgeVariants[tercero.tipo]}>
@@ -332,6 +332,17 @@ export default function Terceros() {
                 ))}
               </TableBody>
             </Table>
+            <TablePagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.totalItems}
+              from={pagination.from}
+              to={pagination.to}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setCurrentPage}
+              onPageSizeChange={pagination.setPageSize}
+              pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
+            />
           )}
         </CardContent>
       </Card>

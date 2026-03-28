@@ -370,7 +370,7 @@ export default function Empresas() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredEmpresas.map((empresa) => (
+                {pagination.paginatedItems.map((empresa) => (
                   <TableRow key={empresa.id}>
                     <TableCell className="font-medium">{empresa.razon_social}</TableCell>
                     <TableCell>{empresa.rfc}</TableCell>
@@ -400,6 +400,17 @@ export default function Empresas() {
                 ))}
               </TableBody>
             </Table>
+            <TablePagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.totalItems}
+              from={pagination.from}
+              to={pagination.to}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setCurrentPage}
+              onPageSizeChange={pagination.setPageSize}
+              pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
+            />
           )}
         </CardContent>
       </Card>

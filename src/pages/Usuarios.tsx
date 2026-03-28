@@ -164,7 +164,7 @@ export default function Usuarios() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => (
+                {pagination.paginatedItems.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">
                       {user.nombre_completo}
@@ -193,6 +193,17 @@ export default function Usuarios() {
                 ))}
               </TableBody>
             </Table>
+            <TablePagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.totalItems}
+              from={pagination.from}
+              to={pagination.to}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setCurrentPage}
+              onPageSizeChange={pagination.setPageSize}
+              pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
+            />
           )}
         </CardContent>
       </Card>

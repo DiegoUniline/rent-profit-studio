@@ -230,7 +230,7 @@ export default function CentrosNegocio() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCentros.map((centro) => (
+                {pagination.paginatedItems.map((centro) => (
                   <TableRow key={centro.id} className={!centro.activo ? "opacity-50" : ""}>
                     <TableCell className="font-medium">{centro.codigo}</TableCell>
                     <TableCell>{centro.nombre}</TableCell>
@@ -264,6 +264,17 @@ export default function CentrosNegocio() {
                 ))}
               </TableBody>
             </Table>
+            <TablePagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.totalItems}
+              from={pagination.from}
+              to={pagination.to}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setCurrentPage}
+              onPageSizeChange={pagination.setPageSize}
+              pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
+            />
           )}
         </CardContent>
       </Card>
