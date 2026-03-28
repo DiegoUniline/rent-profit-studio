@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { useTablePagination } from "@/hooks/use-table-pagination";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -162,6 +164,8 @@ export default function Empresas() {
     const matchesEstado = filterEstado === "activos" ? e.activa : !e.activa;
     return matchesSearch && matchesEstado;
   });
+
+  const pagination = useTablePagination(filteredEmpresas);
 
   const openNew = () => {
     setEditingEmpresa(null);
@@ -354,48 +358,61 @@ export default function Empresas() {
               <p className="text-muted-foreground">No hay empresas registradas</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Razón Social</TableHead>
-                  <TableHead>RFC</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Ciudad</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredEmpresas.map((empresa) => (
-                  <TableRow key={empresa.id}>
-                    <TableCell className="font-medium">{empresa.razon_social}</TableCell>
-                    <TableCell>{empresa.rfc}</TableCell>
-                    <TableCell>
-                      <Badge variant={empresa.tipo_persona === "moral" ? "default" : "secondary"}>
-                        {empresa.tipo_persona === "moral" ? "Moral" : "Física"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{empresa.ciudad || "-"}</TableCell>
-                    <TableCell>{empresa.estado || "-"}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => openView(empresa)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {canEdit && (
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(empresa)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {canDelete && (
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(empresa)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Razón Social</TableHead>
+                    <TableHead>RFC</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Ciudad</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {pagination.paginatedItems.map((empresa) => (
+                    <TableRow key={empresa.id}>
+                      <TableCell className="font-medium">{empresa.razon_social}</TableCell>
+                      <TableCell>{empresa.rfc}</TableCell>
+                      <TableCell>
+                        <Badge variant={empresa.tipo_persona === "moral" ? "default" : "secondary"}>
+                          {empresa.tipo_persona === "moral" ? "Moral" : "Física"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{empresa.ciudad || "-"}</TableCell>
+                      <TableCell>{empresa.estado || "-"}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => openView(empresa)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {canEdit && (
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(empresa)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(empresa)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <TablePagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                from={pagination.from}
+                to={pagination.to}
+                pageSize={pagination.pageSize}
+                onPageChange={pagination.setCurrentPage}
+                onPageSizeChange={pagination.setPageSize}
+                pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
+              />
+            </>
           )}
         </CardContent>
       </Card>

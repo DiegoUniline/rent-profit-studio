@@ -1,4 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
+import { useTablePagination } from "@/hooks/use-table-pagination";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -241,6 +243,8 @@ export default function CuentaDetalle() {
     });
   }, [movimientos, fechaDesde, fechaHasta, filterCentro, filterTercero]);
 
+  const pagination = useTablePagination(filteredMovimientos);
+
   // Calculate totals
   const { saldo, totalDebe, totalHaber } = useMemo(() => {
     let totalDebe = 0;
@@ -459,7 +463,7 @@ export default function CuentaDetalle() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredMovimientos.map((mov) => (
+                  {pagination.paginatedItems.map((mov) => (
                     <TableRow key={mov.id}>
                       <TableCell className="font-mono text-sm">
                         {mov.asiento?.fecha 
@@ -497,12 +501,7 @@ export default function CuentaDetalle() {
                         {Number(mov.haber) > 0 ? formatCurrency(mov.haber) : "—"}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          asChild
-                          title="Ver póliza"
-                        >
+                        <Button variant="ghost" size="icon" asChild title="Ver póliza">
                           <Link to={`/asientos/${mov.asiento_id}`}>
                             <FileText className="h-4 w-4" />
                           </Link>
@@ -512,6 +511,17 @@ export default function CuentaDetalle() {
                   ))}
                 </TableBody>
               </Table>
+              <TablePagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                from={pagination.from}
+                to={pagination.to}
+                pageSize={pagination.pageSize}
+                onPageChange={pagination.setCurrentPage}
+                onPageSizeChange={pagination.setPageSize}
+                pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
+              />
             </div>
           )}
         </CardContent>

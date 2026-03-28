@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import { useTablePagination } from "@/hooks/use-table-pagination";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Plus, Play, Copy, Pencil, Trash2, TrendingUp, TrendingDown, Wallet, Building2, Landmark, X, ChevronDown, ChevronRight, Layers } from "lucide-react";
@@ -310,6 +312,8 @@ export default function Programacion() {
       return a.fecha_programada.localeCompare(b.fecha_programada);
     });
   }, [programaciones, filterEmpresa, filterTipo, filterEstado, filterCentroNegocio, filterTercero, filterFechaDesde, filterFechaHasta]);
+
+  const pagination = useTablePagination(filteredProgramaciones);
 
   const clearFilters = () => {
     setFilterEmpresa("all");
@@ -781,7 +785,7 @@ export default function Programacion() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredProgramaciones.map((prog) => (
+                      {pagination.paginatedItems.map((prog) => (
                         <TableRow key={prog.id}>
                           <TableCell className="font-medium">
                             {formatDateNumeric(prog.fecha_programada)}
@@ -854,6 +858,17 @@ export default function Programacion() {
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePagination
+                    currentPage={pagination.currentPage}
+                    totalPages={pagination.totalPages}
+                    totalItems={pagination.totalItems}
+                    from={pagination.from}
+                    to={pagination.to}
+                    pageSize={pagination.pageSize}
+                    onPageChange={pagination.setCurrentPage}
+                    onPageSizeChange={pagination.setPageSize}
+                    pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
+                  />
                 </CardContent>
               </Card>
             ) : (

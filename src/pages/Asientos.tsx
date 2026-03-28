@@ -1,4 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
+import { useTablePagination } from "@/hooks/use-table-pagination";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -349,6 +351,8 @@ export default function Asientos() {
     });
   }, [asientos, search, filterCompany, filterTipo, filterEstado, filterFechaDesde, filterFechaHasta]);
 
+  const pagination = useTablePagination(filteredAsientos);
+
   // Calculate totals
   const totals = useMemo(() => {
     const aplicados = filteredAsientos.filter((a) => a.estado === "aplicado");
@@ -528,14 +532,14 @@ export default function Asientos() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAsientos.length === 0 ? (
+              {pagination.paginatedItems.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
                     No hay asientos registrados
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredAsientos.map((asiento) => (
+                pagination.paginatedItems.map((asiento) => (
                   <TableRow key={asiento.id}>
                     <TableCell className="font-mono font-medium">
                       #{asiento.numero_asiento}
@@ -633,6 +637,17 @@ export default function Asientos() {
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.totalItems}
+            from={pagination.from}
+            to={pagination.to}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setCurrentPage}
+            onPageSizeChange={pagination.setPageSize}
+            pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
+          />
         </CardContent>
       </Card>
 
