@@ -165,6 +165,8 @@ export default function Empresas() {
     return matchesSearch && matchesEstado;
   });
 
+  const pagination = useTablePagination(filteredEmpresas);
+
   const openNew = () => {
     setEditingEmpresa(null);
     setForm(emptyForm);
