@@ -152,58 +152,51 @@ export default function Usuarios() {
               <p className="text-muted-foreground">No hay usuarios registrados</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Usuario</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Fecha de Registro</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagination.paginatedItems.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.nombre_completo}
-                    </TableCell>
-                    <TableCell>@{user.nombre_usuario}</TableCell>
-                    <TableCell>{user.telefono || "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant={roleBadgeVariants[user.role]}>
-                        {roleLabels[user.role]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(user.created_at).toLocaleDateString("es-MX")}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditUser(user)}
-                        title="Editar usuario"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Usuario</TableHead>
+                    <TableHead>Teléfono</TableHead>
+                    <TableHead>Rol</TableHead>
+                    <TableHead>Fecha de Registro</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <TablePagination
-              currentPage={pagination.currentPage}
-              totalPages={pagination.totalPages}
-              totalItems={pagination.totalItems}
-              from={pagination.from}
-              to={pagination.to}
-              pageSize={pagination.pageSize}
-              onPageChange={pagination.setCurrentPage}
-              onPageSizeChange={pagination.setPageSize}
-              pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
-            />
+                </TableHeader>
+                <TableBody>
+                  {pagination.paginatedItems.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.nombre_completo}</TableCell>
+                      <TableCell>@{user.nombre_usuario}</TableCell>
+                      <TableCell>{user.telefono || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant={roleBadgeVariants[user.role]}>
+                          {roleLabels[user.role]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{new Date(user.created_at).toLocaleDateString("es-MX")}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)} title="Editar usuario">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <TablePagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                from={pagination.from}
+                to={pagination.to}
+                pageSize={pagination.pageSize}
+                onPageChange={pagination.setCurrentPage}
+                onPageSizeChange={pagination.setPageSize}
+                pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
+              />
+            </>
           )}
         </CardContent>
       </Card>

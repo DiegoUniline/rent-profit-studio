@@ -217,64 +217,58 @@ export default function CentrosNegocio() {
               <p className="text-muted-foreground">No hay centros de negocio</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Empresa</TableHead>
-                  <TableHead>Tipo Actividad</TableHead>
-                  <TableHead>Responsable</TableHead>
-                  <TableHead>Estado</TableHead>
-                  {canEdit && <TableHead className="text-right">Acciones</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagination.paginatedItems.map((centro) => (
-                  <TableRow key={centro.id} className={!centro.activo ? "opacity-50" : ""}>
-                    <TableCell className="font-medium">{centro.codigo}</TableCell>
-                    <TableCell>{centro.nombre}</TableCell>
-                    <TableCell>{centro.empresas?.razon_social || "-"}</TableCell>
-                    <TableCell>{centro.tipo_actividad || "-"}</TableCell>
-                    <TableCell>{centro.responsable || "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant={centro.activo ? "default" : "secondary"}>
-                        {centro.activo ? "Activo" : "Inactivo"}
-                      </Badge>
-                    </TableCell>
-                    {canEdit && (
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEdit(centro)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleActivo(centro)}
-                        >
-                          <Power className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    )}
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Código</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Empresa</TableHead>
+                    <TableHead>Tipo Actividad</TableHead>
+                    <TableHead>Responsable</TableHead>
+                    <TableHead>Estado</TableHead>
+                    {canEdit && <TableHead className="text-right">Acciones</TableHead>}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <TablePagination
-              currentPage={pagination.currentPage}
-              totalPages={pagination.totalPages}
-              totalItems={pagination.totalItems}
-              from={pagination.from}
-              to={pagination.to}
-              pageSize={pagination.pageSize}
-              onPageChange={pagination.setCurrentPage}
-              onPageSizeChange={pagination.setPageSize}
-              pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
-            />
+                </TableHeader>
+                <TableBody>
+                  {pagination.paginatedItems.map((centro) => (
+                    <TableRow key={centro.id} className={!centro.activo ? "opacity-50" : ""}>
+                      <TableCell className="font-medium">{centro.codigo}</TableCell>
+                      <TableCell>{centro.nombre}</TableCell>
+                      <TableCell>{centro.empresas?.razon_social || "-"}</TableCell>
+                      <TableCell>{centro.tipo_actividad || "-"}</TableCell>
+                      <TableCell>{centro.responsable || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant={centro.activo ? "default" : "secondary"}>
+                          {centro.activo ? "Activo" : "Inactivo"}
+                        </Badge>
+                      </TableCell>
+                      {canEdit && (
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(centro)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleToggleActivo(centro)}>
+                            <Power className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <TablePagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                from={pagination.from}
+                to={pagination.to}
+                pageSize={pagination.pageSize}
+                onPageChange={pagination.setCurrentPage}
+                onPageSizeChange={pagination.setPageSize}
+                pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
+              />
+            </>
           )}
         </CardContent>
       </Card>
