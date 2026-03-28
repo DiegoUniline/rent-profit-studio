@@ -313,6 +313,8 @@ export default function Programacion() {
     });
   }, [programaciones, filterEmpresa, filterTipo, filterEstado, filterCentroNegocio, filterTercero, filterFechaDesde, filterFechaHasta]);
 
+  const pagination = useTablePagination(filteredProgramaciones);
+
   const clearFilters = () => {
     setFilterEmpresa("all");
     setFilterTipo("all");
