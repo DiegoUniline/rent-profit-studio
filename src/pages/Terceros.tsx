@@ -194,6 +194,8 @@ export default function Terceros() {
     return matchesSearch && matchesEmpresa && matchesTipo && matchesEstado;
   });
 
+  const pagination = useTablePagination(filteredTerceros);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
