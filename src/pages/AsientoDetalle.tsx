@@ -554,7 +554,7 @@ export default function AsientoDetalle() {
           <Button variant="outline" onClick={() => navigate("/asientos")}>
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={saving || !totals.balanced} className="gap-2">
+          <Button onClick={handleSave} disabled={saving} className="gap-2">
             <Save className="h-4 w-4" />
             {saving ? "Guardando..." : "Guardar"}
           </Button>
