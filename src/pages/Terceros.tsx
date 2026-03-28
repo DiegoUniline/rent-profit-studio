@@ -270,79 +270,69 @@ export default function Terceros() {
               <p className="text-muted-foreground">No hay terceros registrados</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>RFC</TableHead>
-                  <TableHead>Razón Social</TableHead>
-                  <TableHead>Empresa</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagination.paginatedItems.map((tercero) => (
-                  <TableRow key={tercero.id} className={!tercero.activo ? "opacity-50" : ""}>
-                    <TableCell>
-                      <Badge variant={tipoBadgeVariants[tercero.tipo]}>
-                        {tipoLabels[tercero.tipo]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-medium">{tercero.rfc}</TableCell>
-                    <TableCell>{tercero.razon_social}</TableCell>
-                    <TableCell>{tercero.empresas?.razon_social || "-"}</TableCell>
-                    <TableCell>{tercero.telefono || "-"}</TableCell>
-                    <TableCell>{tercero.email || "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant={tercero.activo ? "default" : "secondary"}>
-                        {tercero.activo ? "Activo" : "Inactivo"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openView(tercero)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {canEdit && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEdit(tercero)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleToggleActivo(tercero)}
-                          >
-                            <Power className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>RFC</TableHead>
+                    <TableHead>Razón Social</TableHead>
+                    <TableHead>Empresa</TableHead>
+                    <TableHead>Teléfono</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <TablePagination
-              currentPage={pagination.currentPage}
-              totalPages={pagination.totalPages}
-              totalItems={pagination.totalItems}
-              from={pagination.from}
-              to={pagination.to}
-              pageSize={pagination.pageSize}
-              onPageChange={pagination.setCurrentPage}
-              onPageSizeChange={pagination.setPageSize}
-              pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
-            />
+                </TableHeader>
+                <TableBody>
+                  {pagination.paginatedItems.map((tercero) => (
+                    <TableRow key={tercero.id} className={!tercero.activo ? "opacity-50" : ""}>
+                      <TableCell>
+                        <Badge variant={tipoBadgeVariants[tercero.tipo]}>
+                          {tipoLabels[tercero.tipo]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{tercero.rfc}</TableCell>
+                      <TableCell>{tercero.razon_social}</TableCell>
+                      <TableCell>{tercero.empresas?.razon_social || "-"}</TableCell>
+                      <TableCell>{tercero.telefono || "-"}</TableCell>
+                      <TableCell>{tercero.email || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant={tercero.activo ? "default" : "secondary"}>
+                          {tercero.activo ? "Activo" : "Inactivo"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => openView(tercero)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {canEdit && (
+                          <>
+                            <Button variant="ghost" size="sm" onClick={() => openEdit(tercero)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleToggleActivo(tercero)}>
+                              <Power className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <TablePagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                from={pagination.from}
+                to={pagination.to}
+                pageSize={pagination.pageSize}
+                onPageChange={pagination.setCurrentPage}
+                onPageSizeChange={pagination.setPageSize}
+                pageSizeOptions={pagination.PAGE_SIZE_OPTIONS}
+              />
+            </>
           )}
         </CardContent>
       </Card>
