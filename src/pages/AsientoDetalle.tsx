@@ -454,9 +454,10 @@ export default function AsientoDetalle() {
       toast({ title: isEditing ? "Asiento actualizado" : "Asiento creado" });
       navigate("/asientos");
     } catch (error: any) {
+      console.error("Error guardando asiento:", error);
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Error al guardar",
+        description: error.message || "No se pudo guardar el asiento. Verifique permisos.",
         variant: "destructive",
       });
     } finally {
