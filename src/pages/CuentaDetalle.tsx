@@ -444,6 +444,28 @@ export default function CuentaDetalle() {
             {cuenta.empresas?.razon_social}
           </p>
         </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={generateWhatsAppMessage}
+            disabled={filteredMovimientos.length === 0}
+            title="Compartir por WhatsApp"
+          >
+            <Share2 className="h-4 w-4 mr-2" />
+            WhatsApp
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportToPDF}
+            disabled={filteredMovimientos.length === 0}
+            title="Exportar a PDF"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            PDF
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
