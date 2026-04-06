@@ -130,7 +130,24 @@ export default function Cuentas() {
         .order("codigo"),
       supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social"),
       fetchAllMovimientos(),
-      supabase.from("asientos_contables").select("id, estado").eq("estado", "aplicado"),
+      (async () => {
+        const PAGE_SIZE = 1000;
+        let allData: { id: string; estado: string }[] = [];
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from("asientos_contables")
+            .select("id, estado")
+            .eq("estado", "aplicado")
+            .range(from, from + PAGE_SIZE - 1);
+          if (error) return { data: null, error };
+          allData = allData.concat(data || []);
+          hasMore = (data?.length || 0) === PAGE_SIZE;
+          from += PAGE_SIZE;
+        }
+        return { data: allData, error: null };
+      })(),
     ]);
 
     if (cuentasRes.error) {

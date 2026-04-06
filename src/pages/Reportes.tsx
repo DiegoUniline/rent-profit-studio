@@ -171,8 +171,20 @@ export default function Reportes() {
         asientosQuery = asientosQuery.in("centro_negocio_id", centrosSeleccionados);
       }
 
-      const { data: asientosData, error: asientosError } = await asientosQuery;
-      if (asientosError) throw asientosError;
+      // Paginate asientos to avoid 1000-row limit
+      let asientosData: any[] = [];
+      {
+        const PAGE_SIZE = 1000;
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data, error: asientosError } = await asientosQuery.range(from, from + PAGE_SIZE - 1);
+          if (asientosError) throw asientosError;
+          asientosData = asientosData.concat(data || []);
+          hasMore = (data?.length || 0) === PAGE_SIZE;
+          from += PAGE_SIZE;
+        }
+      }
 
       // Cargar movimientos de esos asientos
       const asientosIds = (asientosData || []).map((a) => a.id);
