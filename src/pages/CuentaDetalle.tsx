@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, BookOpen, Calendar, FileText } from "lucide-react";
+import { ArrowLeft, BookOpen, Calendar, FileText, Share2, Download } from "lucide-react";
 import { formatCurrency } from "@/lib/accounting-utils";
 import { parseLocalDate } from "@/lib/date-utils";
 import { format } from "date-fns";
