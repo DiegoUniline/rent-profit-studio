@@ -271,6 +271,130 @@ export default function CuentaDetalle() {
 
   const hasActiveFilters = fechaDesde || fechaHasta || filterCentro !== "all" || filterTercero !== "all";
 
+  // Generate WhatsApp message from current filtered movements
+  const generateWhatsAppMessage = () => {
+    if (!cuenta) return;
+
+    const lines: string[] = [];
+    lines.push(`📊 *Cuenta: ${cuenta.codigo} - ${cuenta.nombre}*`);
+    lines.push(`🏢 ${cuenta.empresas?.razon_social || ""}`);
+    lines.push(`📋 Naturaleza: ${cuenta.naturaleza === "deudora" ? "Deudora" : "Acreedora"}`);
+    
+    if (fechaDesde || fechaHasta) {
+      const desde = fechaDesde ? format(fechaDesde, "dd/MM/yyyy") : "Inicio";
+      const hasta = fechaHasta ? format(fechaHasta, "dd/MM/yyyy") : "Actual";
+      lines.push(`📅 Período: ${desde} — ${hasta}`);
+    }
+    lines.push("");
+    lines.push("*Movimientos:*");
+    lines.push("─────────────────");
+
+    filteredMovimientos.forEach((mov) => {
+      const fecha = mov.asiento?.fecha
+        ? format(parseLocalDate(mov.asiento.fecha), "dd/MM/yyyy")
+        : "—";
+      const desc = mov.partida || mov.asiento?.observaciones || "Sin descripción";
+      const debe = Number(mov.debe) || 0;
+      const haber = Number(mov.haber) || 0;
+
+      if (debe > 0) {
+        lines.push(`${fecha} | ${desc} | +${formatCurrency(debe)}`);
+      } else if (haber > 0) {
+        lines.push(`${fecha} | ${desc} | -${formatCurrency(haber)}`);
+      }
+    });
+
+    lines.push("─────────────────");
+    lines.push(`*Total Debe:* ${formatCurrency(totalDebe)}`);
+    lines.push(`*Total Haber:* ${formatCurrency(totalHaber)}`);
+    lines.push(`*Saldo:* ${formatCurrency(saldo)}`);
+    lines.push("");
+    lines.push(`_${filteredMovimientos.length} movimientos_`);
+
+    const message = lines.join("\n");
+    const encoded = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encoded}`, "_blank");
+  };
+
+  // Export to PDF
+  const exportToPDF = async () => {
+    if (!cuenta) return;
+
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+
+    const doc = new jsPDF({ orientation: "landscape" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFontSize(14);
+    doc.text(`Detalle de Cuenta: ${cuenta.codigo} - ${cuenta.nombre}`, 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Empresa: ${cuenta.empresas?.razon_social || ""}`, 14, 22);
+    doc.text(`Naturaleza: ${cuenta.naturaleza === "deudora" ? "Deudora" : "Acreedora"}`, 14, 28);
+    
+    if (fechaDesde || fechaHasta) {
+      const desde = fechaDesde ? format(fechaDesde, "dd/MM/yyyy") : "Inicio";
+      const hasta = fechaHasta ? format(fechaHasta, "dd/MM/yyyy") : "Actual";
+      doc.text(`Período: ${desde} — ${hasta}`, 14, 34);
+    }
+
+    const startY = fechaDesde || fechaHasta ? 40 : 34;
+
+    // Table data
+    const tableData = filteredMovimientos.map((mov) => [
+      mov.asiento?.fecha
+        ? format(parseLocalDate(mov.asiento.fecha), "dd/MM/yyyy")
+        : "—",
+      `#${mov.asiento?.numero_asiento || "—"}`,
+      mov.asiento?.tipo === "ingreso" ? "I" : mov.asiento?.tipo === "egreso" ? "E" : "D",
+      mov.partida || "",
+      mov.asiento?.terceros?.razon_social || "",
+      mov.asiento?.centros_negocio
+        ? `${mov.asiento.centros_negocio.codigo} - ${mov.asiento.centros_negocio.nombre}`
+        : "",
+      Number(mov.debe) > 0 ? formatCurrency(mov.debe) : "",
+      Number(mov.haber) > 0 ? formatCurrency(mov.haber) : "",
+    ]);
+
+    autoTable(doc, {
+      startY,
+      head: [["Fecha", "Póliza", "Tipo", "Partida", "Tercero", "Centro Neg.", "Debe", "Haber"]],
+      body: tableData,
+      foot: [[
+        "", "", "", "", "", "TOTALES:",
+        formatCurrency(totalDebe),
+        formatCurrency(totalHaber),
+      ]],
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      footStyles: { fillColor: [236, 240, 241], textColor: [0, 0, 0], fontStyle: "bold" },
+      columnStyles: {
+        6: { halign: "right" },
+        7: { halign: "right" },
+      },
+      didDrawPage: (data) => {
+        // Footer with saldo
+        const finalY = (data.cursor?.y || 0) + 10;
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.text(
+          `Saldo: ${formatCurrency(saldo)}`,
+          pageWidth - 14,
+          Math.min(finalY, doc.internal.pageSize.getHeight() - 10),
+          { align: "right" }
+        );
+      },
+    });
+
+    doc.save(`Cuenta_${cuenta.codigo}_${format(new Date(), "yyyyMMdd")}.pdf`);
+    
+    toast({
+      title: "PDF generado",
+      description: `Se descargó el detalle de ${cuenta.codigo}`,
+    });
+  };
+
   const tipoColors: Record<string, string> = {
     ingreso: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
     egreso: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
