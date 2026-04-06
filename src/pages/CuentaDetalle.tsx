@@ -316,7 +316,7 @@ export default function CuentaDetalle() {
     window.open(`https://wa.me/?text=${encoded}`, "_blank");
   };
 
-  // Export to PDF
+  // Export to PDF - matches screen layout with running balance
   const exportToPDF = async () => {
     if (!cuenta) return;
 
@@ -325,64 +325,92 @@ export default function CuentaDetalle() {
 
     const doc = new jsPDF({ orientation: "landscape" });
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const isDeudora = cuenta.naturaleza === "deudora";
 
     // Header
-    doc.setFontSize(14);
-    doc.text(`Detalle de Cuenta: ${cuenta.codigo} - ${cuenta.nombre}`, 14, 15);
-    doc.setFontSize(10);
-    doc.text(`Empresa: ${cuenta.empresas?.razon_social || ""}`, 14, 22);
-    doc.text(`Naturaleza: ${cuenta.naturaleza === "deudora" ? "Deudora" : "Acreedora"}`, 14, 28);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${cuenta.codigo} - ${cuenta.nombre}`, 14, 15);
     
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Empresa: ${cuenta.empresas?.razon_social || ""}`, 14, 22);
+    doc.text(`Naturaleza: ${isDeudora ? "Deudora" : "Acreedora"}  |  Clasificación: ${cuenta.clasificacion === "titulo" ? "Título" : "Saldo"}`, 14, 28);
+    
+    let infoY = 28;
     if (fechaDesde || fechaHasta) {
       const desde = fechaDesde ? format(fechaDesde, "dd/MM/yyyy") : "Inicio";
       const hasta = fechaHasta ? format(fechaHasta, "dd/MM/yyyy") : "Actual";
-      doc.text(`Período: ${desde} — ${hasta}`, 14, 34);
+      infoY += 6;
+      doc.text(`Período: ${desde} — ${hasta}`, 14, infoY);
     }
+    
+    // Print date on right
+    doc.setFontSize(8);
+    doc.text(`Generado: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, pageWidth - 14, 15, { align: "right" });
+    doc.text(`${filteredMovimientos.length} movimientos`, pageWidth - 14, 21, { align: "right" });
 
-    const startY = fechaDesde || fechaHasta ? 40 : 34;
+    const startY = infoY + 8;
 
-    // Table data
-    const tableData = filteredMovimientos.map((mov) => [
-      mov.asiento?.fecha
-        ? format(parseLocalDate(mov.asiento.fecha), "dd/MM/yyyy")
-        : "—",
-      `#${mov.asiento?.numero_asiento || "—"}`,
-      mov.asiento?.tipo === "ingreso" ? "I" : mov.asiento?.tipo === "egreso" ? "E" : "D",
-      mov.partida || "",
-      mov.asiento?.terceros?.razon_social || "",
-      mov.asiento?.centros_negocio
-        ? `${mov.asiento.centros_negocio.codigo} - ${mov.asiento.centros_negocio.nombre}`
-        : "",
-      Number(mov.debe) > 0 ? formatCurrency(mov.debe) : "",
-      Number(mov.haber) > 0 ? formatCurrency(mov.haber) : "",
-    ]);
+    // Build table data with running balance
+    let runningBalance = 0;
+    const tableData = filteredMovimientos.map((mov) => {
+      const debe = Number(mov.debe) || 0;
+      const haber = Number(mov.haber) || 0;
+      
+      if (isDeudora) {
+        runningBalance += debe - haber;
+      } else {
+        runningBalance += haber - debe;
+      }
+      
+      return [
+        mov.asiento?.fecha
+          ? format(parseLocalDate(mov.asiento.fecha), "dd/MM/yyyy")
+          : "—",
+        `#${mov.asiento?.numero_asiento || "—"}`,
+        mov.asiento?.tipo === "ingreso" ? "Ing" : mov.asiento?.tipo === "egreso" ? "Egr" : "Dia",
+        mov.partida || mov.asiento?.observaciones || "",
+        Number(mov.debe) > 0 ? formatCurrency(mov.debe) : "",
+        Number(mov.haber) > 0 ? formatCurrency(mov.haber) : "",
+        formatCurrency(runningBalance),
+      ];
+    });
 
     autoTable(doc, {
       startY,
-      head: [["Fecha", "Póliza", "Tipo", "Partida", "Tercero", "Centro Neg.", "Debe", "Haber"]],
+      head: [["Fecha", "Póliza", "Tipo", "Partida / Descripción", "Debe", "Haber", "Saldo"]],
       body: tableData,
       foot: [[
-        "", "", "", "", "", "TOTALES:",
+        "", "", "", "TOTALES:",
         formatCurrency(totalDebe),
         formatCurrency(totalHaber),
+        formatCurrency(saldo),
       ]],
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-      footStyles: { fillColor: [236, 240, 241], textColor: [0, 0, 0], fontStyle: "bold" },
+      styles: { fontSize: 7.5, cellPadding: 1.5, overflow: "linebreak" },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: "bold", fontSize: 8 },
+      footStyles: { fillColor: [236, 240, 241], textColor: [0, 0, 0], fontStyle: "bold", fontSize: 8 },
       columnStyles: {
-        6: { halign: "right" },
-        7: { halign: "right" },
+        0: { cellWidth: 22 },
+        1: { cellWidth: 18 },
+        2: { cellWidth: 12 },
+        3: { cellWidth: "auto" },
+        4: { halign: "right", cellWidth: 28 },
+        5: { halign: "right", cellWidth: 28 },
+        6: { halign: "right", cellWidth: 28, fontStyle: "bold" },
       },
+      alternateRowStyles: { fillColor: [248, 249, 250] },
       didDrawPage: (data) => {
-        // Footer with saldo
-        const finalY = (data.cursor?.y || 0) + 10;
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "bold");
+        // Page number footer
+        const pageNum = doc.getNumberOfPages();
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
         doc.text(
-          `Saldo: ${formatCurrency(saldo)}`,
-          pageWidth - 14,
-          Math.min(finalY, doc.internal.pageSize.getHeight() - 10),
-          { align: "right" }
+          `Página ${data.pageNumber}`,
+          pageWidth / 2,
+          pageHeight - 7,
+          { align: "center" }
         );
       },
     });
@@ -391,7 +419,7 @@ export default function CuentaDetalle() {
     
     toast({
       title: "PDF generado",
-      description: `Se descargó el detalle de ${cuenta.codigo}`,
+      description: `Se descargó el reporte de ${cuenta.codigo} con ${filteredMovimientos.length} movimientos`,
     });
   };
 
