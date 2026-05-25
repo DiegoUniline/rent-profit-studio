@@ -249,10 +249,10 @@ export default function Presupuestos() {
   const [expandedEmpresas, setExpandedEmpresas] = useState<Set<string>>(new Set());
   
   // Grouping preference with localStorage persistence
-  type GroupingType = "partida" | "cuenta" | "centro" | "empresa" | "ninguno";
+  type GroupingType = "tipo" | "partida" | "cuenta" | "centro" | "empresa" | "ninguno";
   const [grouping, setGrouping] = useState<GroupingType>(() => {
     const saved = localStorage.getItem("presupuestos_grouping");
-    return (saved as GroupingType) || "empresa";
+    return (saved as GroupingType) || "tipo";
   });
 
   const handleGroupingChange = (value: string) => {
