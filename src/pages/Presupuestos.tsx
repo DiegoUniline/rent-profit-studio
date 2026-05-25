@@ -636,9 +636,14 @@ export default function Presupuestos() {
       }
     });
     
-    // Sort presupuestos within each group by orden
+    // Sort presupuestos within each group: ingresos first, then egresos; by orden within each
     Object.values(groups).forEach(group => {
-      group.presupuestos.sort((a, b) => (a.orden || 0) - (b.orden || 0));
+      group.presupuestos.sort((a: any, b: any) => {
+        const ta = a.tipo === "ingreso" ? 0 : 1;
+        const tb = b.tipo === "ingreso" ? 0 : 1;
+        if (ta !== tb) return ta - tb;
+        return (a.orden || 0) - (b.orden || 0);
+      });
     });
     
     return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label));
