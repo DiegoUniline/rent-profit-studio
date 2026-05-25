@@ -131,6 +131,7 @@ interface Presupuesto {
   ejercido?: number;
   porEjercer?: number;
   porcentaje?: number;
+  tipo?: "ingreso" | "egreso";
 }
 
 // Function to determine if account is "deudora" based on codigo
@@ -195,6 +196,7 @@ export default function Presupuestos() {
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [movimientos, setMovimientos] = useState<MovimientoConAsiento[]>([]);
+  const [tiposByPresupuesto, setTiposByPresupuesto] = useState<Record<string, "ingreso" | "egreso">>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(() => localStorage.getItem("presupuestos_filter_search") || "");
   const [filterCompany, setFilterCompany] = useState<string>(() => localStorage.getItem("presupuestos_filter_company") || "all");
@@ -344,6 +346,26 @@ export default function Presupuestos() {
         }
       }
 
+      // Fetch flujos_programados to derive tipo (ingreso/egreso) per presupuesto
+      const { data: flujosData } = await supabase
+        .from("flujos_programados")
+        .select("presupuesto_id, tipo, monto")
+        .not("presupuesto_id", "is", null);
+
+      const sumByPresupuesto: Record<string, { ingreso: number; egreso: number }> = {};
+      (flujosData || []).forEach((f: any) => {
+        if (!f.presupuesto_id) return;
+        if (!sumByPresupuesto[f.presupuesto_id]) sumByPresupuesto[f.presupuesto_id] = { ingreso: 0, egreso: 0 };
+        const monto = Number(f.monto) || 0;
+        if (f.tipo === "ingreso") sumByPresupuesto[f.presupuesto_id].ingreso += monto;
+        else sumByPresupuesto[f.presupuesto_id].egreso += monto;
+      });
+      const tipos: Record<string, "ingreso" | "egreso"> = {};
+      Object.entries(sumByPresupuesto).forEach(([id, s]) => {
+        tipos[id] = s.ingreso > s.egreso ? "ingreso" : "egreso";
+      });
+      setTiposByPresupuesto(tipos);
+
       setPresupuestos(presupuestosRes.data || []);
       setEmpresas(empresasRes.data || []);
       setMovimientos(allMovimientos as unknown as MovimientoConAsiento[]);
@@ -435,15 +457,23 @@ export default function Presupuestos() {
       const ejercido = calcularEjercido(p.id, p.cuentas_contables?.codigo, movimientos);
       const porEjercer = presupuestado - ejercido;
       const porcentaje = presupuestado > 0 ? (ejercido / presupuestado) * 100 : 0;
-      
+
+      // Determine tipo: prefer flujos_programados; fallback to account code (4xx = ingreso)
+      let tipo: "ingreso" | "egreso" = tiposByPresupuesto[p.id] || "egreso";
+      if (!tiposByPresupuesto[p.id]) {
+        const codigo = p.cuentas_contables?.codigo || "";
+        if (codigo.startsWith("4")) tipo = "ingreso";
+      }
+
       return {
         ...p,
         ejercido,
         porEjercer,
         porcentaje,
+        tipo,
       };
     });
-  }, [presupuestos, movimientos]);
+  }, [presupuestos, movimientos, tiposByPresupuesto]);
 
   // Generate unique options for filters
   const filterOptions = useMemo(() => {
@@ -606,9 +636,14 @@ export default function Presupuestos() {
       }
     });
     
-    // Sort presupuestos within each group by orden
+    // Sort presupuestos within each group: ingresos first, then egresos; by orden within each
     Object.values(groups).forEach(group => {
-      group.presupuestos.sort((a, b) => (a.orden || 0) - (b.orden || 0));
+      group.presupuestos.sort((a: any, b: any) => {
+        const ta = a.tipo === "ingreso" ? 0 : 1;
+        const tb = b.tipo === "ingreso" ? 0 : 1;
+        if (ta !== tb) return ta - tb;
+        return (a.orden || 0) - (b.orden || 0);
+      });
     });
     
     return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label));
@@ -687,23 +722,37 @@ export default function Presupuestos() {
     return filteredPresupuestos.find(p => p.id === activeId) || null;
   }, [activeId, filteredPresupuestos]);
 
-  // Calculate totals
+  // Calculate totals (split by tipo: ingreso/egreso)
   const totals = useMemo(() => {
     const activePresupuestos = filteredPresupuestos.filter(p => p.activo);
-    const totalPresupuestado = activePresupuestos.reduce(
-      (sum, p) => sum + p.cantidad * p.precio_unitario,
-      0
-    );
-    const totalEjercido = activePresupuestos.reduce(
-      (sum, p) => sum + (p.ejercido || 0),
-      0
-    );
+    let presIng = 0, presEgr = 0, ejerIng = 0, ejerEgr = 0;
+    activePresupuestos.forEach((p: any) => {
+      const presupuestado = p.cantidad * p.precio_unitario;
+      const ejercido = p.ejercido || 0;
+      if (p.tipo === "ingreso") {
+        presIng += presupuestado;
+        ejerIng += ejercido;
+      } else {
+        presEgr += presupuestado;
+        ejerEgr += ejercido;
+      }
+    });
+    const totalPresupuestado = presIng + presEgr;
+    const totalEjercido = ejerIng + ejerEgr;
     const totalPorEjercer = totalPresupuestado - totalEjercido;
     const porcentajeGlobal = totalPresupuestado > 0 ? (totalEjercido / totalPresupuestado) * 100 : 0;
     const totalPartidas = activePresupuestos.length;
     const empresasCount = new Set(activePresupuestos.map(p => p.empresa_id)).size;
-    
-    return { totalPresupuestado, totalEjercido, totalPorEjercer, porcentajeGlobal, totalPartidas, empresasCount };
+
+    const porEjercerIng = presIng - ejerIng;
+    const porEjercerEgr = presEgr - ejerEgr;
+
+    return {
+      totalPresupuestado, totalEjercido, totalPorEjercer, porcentajeGlobal, totalPartidas, empresasCount,
+      presIng, presEgr, presDif: presIng - presEgr,
+      ejerIng, ejerEgr, ejerDif: ejerIng - ejerEgr,
+      porEjercerIng, porEjercerEgr, porEjercerDif: porEjercerIng - porEjercerEgr,
+    };
   }, [filteredPresupuestos]);
 
   // Get status color based on percentage
@@ -740,47 +789,96 @@ export default function Presupuestos() {
         )}
       </div>
 
-      {/* Summary Cards - Compact */}
-      <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
-        <Card className="p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-muted-foreground">Total Presupuestado</span>
-            <Calculator className="h-3.5 w-3.5 text-muted-foreground" />
+      {/* Summary Cards - Big with Ingreso / Egreso / Diferencia breakdown */}
+      <div className="grid gap-3 grid-cols-1 lg:grid-cols-3">
+        {/* Total Presupuestado */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Total Presupuesto
+            </span>
+            <Calculator className="h-5 w-5 text-primary" />
           </div>
-          <div className="text-lg font-bold text-primary">{formatCurrency(totals.totalPresupuestado)}</div>
-          <p className="text-[10px] text-muted-foreground">{totals.totalPartidas} partidas activas</p>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Ingreso</span>
+              <span className="text-lg font-bold text-green-600 font-mono">{formatCurrency(totals.presIng)}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Egreso</span>
+              <span className="text-lg font-bold text-destructive font-mono">{formatCurrency(totals.presEgr)}</span>
+            </div>
+            <div className="flex items-baseline justify-between border-t pt-2">
+              <span className="text-sm font-semibold">Diferencia</span>
+              <span className={`text-xl font-bold font-mono ${totals.presDif < 0 ? 'text-destructive' : 'text-primary'}`}>
+                {formatCurrency(totals.presDif)}
+              </span>
+            </div>
+            <p className="text-[10px] text-muted-foreground">{totals.totalPartidas} partidas activas</p>
+          </div>
         </Card>
 
-        <Card className="p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-muted-foreground">Total Ejercido</span>
-            <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+        {/* Total Ejercido */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Total Ejercido
+            </span>
+            <TrendingUp className="h-5 w-5 text-primary" />
           </div>
-          <div className="text-lg font-bold text-green-600">{formatCurrency(totals.totalEjercido)}</div>
-          <div className="flex items-center gap-1">
-            <Progress value={Math.min(totals.porcentajeGlobal, 100)} className="h-1.5 flex-1" />
-            <span className="text-[10px] text-muted-foreground">{totals.porcentajeGlobal.toFixed(1)}%</span>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Ingreso</span>
+              <span className="text-lg font-bold text-green-600 font-mono">{formatCurrency(totals.ejerIng)}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Egreso</span>
+              <span className="text-lg font-bold text-destructive font-mono">{formatCurrency(totals.ejerEgr)}</span>
+            </div>
+            <div className="flex items-baseline justify-between border-t pt-2">
+              <span className="text-sm font-semibold">Diferencia</span>
+              <span className={`text-xl font-bold font-mono ${totals.ejerDif < 0 ? 'text-destructive' : 'text-primary'}`}>
+                {formatCurrency(totals.ejerDif)}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 pt-1">
+              <Progress value={Math.min(totals.porcentajeGlobal, 100)} className="h-1.5 flex-1" />
+              <span className="text-[10px] text-muted-foreground">{totals.porcentajeGlobal.toFixed(1)}%</span>
+            </div>
           </div>
         </Card>
 
-        <Card className="p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-muted-foreground">Por Ejercer</span>
-            <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
+        {/* Total Por Ejercer */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Total Por Ejercer
+            </span>
+            <TrendingDown className="h-5 w-5 text-primary" />
           </div>
-          <div className={`text-lg font-bold ${totals.totalPorEjercer < 0 ? 'text-destructive' : ''}`}>
-            {formatCurrency(totals.totalPorEjercer)}
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Ingreso</span>
+              <span className={`text-lg font-bold font-mono ${totals.porEjercerIng < 0 ? 'text-destructive' : 'text-green-600'}`}>
+                {formatCurrency(totals.porEjercerIng)}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Egreso</span>
+              <span className={`text-lg font-bold font-mono ${totals.porEjercerEgr < 0 ? 'text-destructive' : ''}`}>
+                {formatCurrency(totals.porEjercerEgr)}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between border-t pt-2">
+              <span className="text-sm font-semibold">Diferencia</span>
+              <span className={`text-xl font-bold font-mono ${totals.porEjercerDif < 0 ? 'text-destructive' : 'text-primary'}`}>
+                {formatCurrency(totals.porEjercerDif)}
+              </span>
+            </div>
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Building className="h-3 w-3" /> {totals.empresasCount} empresas activas
+            </p>
           </div>
-          <p className="text-[10px] text-muted-foreground">{totals.totalPorEjercer < 0 ? 'Sobregiro' : 'Disponible'}</p>
-        </Card>
-
-        <Card className="p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-muted-foreground">Empresas</span>
-            <Building className="h-3.5 w-3.5 text-muted-foreground" />
-          </div>
-          <div className="text-lg font-bold">{totals.empresasCount}</div>
-          <p className="text-[10px] text-muted-foreground">Con partidas activas</p>
         </Card>
       </div>
 
