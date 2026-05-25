@@ -347,10 +347,27 @@ export default function Presupuestos() {
       }
 
       // Fetch flujos_programados to derive tipo (ingreso/egreso) per presupuesto
-      const { data: flujosData } = await supabase
-        .from("flujos_programados")
-        .select("presupuesto_id, tipo, monto")
-        .not("presupuesto_id", "is", null);
+      // Paginated to bypass the 1000-row Supabase limit
+      const flujosData: any[] = [];
+      {
+        const PAGE = 1000;
+        let f = 0;
+        let more = true;
+        while (more) {
+          const { data: batch } = await supabase
+            .from("flujos_programados")
+            .select("presupuesto_id, tipo, monto")
+            .not("presupuesto_id", "is", null)
+            .range(f, f + PAGE - 1);
+          if (batch && batch.length > 0) {
+            flujosData.push(...batch);
+            more = batch.length === PAGE;
+            f += PAGE;
+          } else {
+            more = false;
+          }
+        }
+      }
 
       const sumByPresupuesto: Record<string, { ingreso: number; egreso: number }> = {};
       (flujosData || []).forEach((f: any) => {
