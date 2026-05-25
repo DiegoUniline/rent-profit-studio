@@ -645,16 +645,22 @@ export default function Presupuestos() {
       }
     });
     
-    // Sort presupuestos within each group: ingresos first, then egresos; by orden within each
+    // Sort presupuestos within each group: ingresos first, then egresos, then sin tipo; by orden within each
     Object.values(groups).forEach(group => {
       group.presupuestos.sort((a: any, b: any) => {
-        const ta = a.tipo === "ingreso" ? 0 : 1;
-        const tb = b.tipo === "ingreso" ? 0 : 1;
-        if (ta !== tb) return ta - tb;
+        const rank = (t: any) => (t === "ingreso" ? 0 : t === "egreso" ? 1 : 2);
+        const ra = rank(a.tipo);
+        const rb = rank(b.tipo);
+        if (ra !== rb) return ra - rb;
         return (a.orden || 0) - (b.orden || 0);
       });
     });
-    
+
+    // Order groups: for "tipo" grouping, Ingresos > Egresos > Sin clasificar; otherwise alphabetical
+    if (grouping === "tipo") {
+      const order = { "tipo-ingreso": 0, "tipo-egreso": 1, "sin-tipo": 2 } as Record<string, number>;
+      return Object.values(groups).sort((a, b) => (order[a.id] ?? 99) - (order[b.id] ?? 99));
+    }
     return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label));
   }, [filteredPresupuestos, grouping]);
 
