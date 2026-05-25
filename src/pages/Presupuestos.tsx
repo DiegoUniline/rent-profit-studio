@@ -457,15 +457,23 @@ export default function Presupuestos() {
       const ejercido = calcularEjercido(p.id, p.cuentas_contables?.codigo, movimientos);
       const porEjercer = presupuestado - ejercido;
       const porcentaje = presupuestado > 0 ? (ejercido / presupuestado) * 100 : 0;
-      
+
+      // Determine tipo: prefer flujos_programados; fallback to account code (4xx = ingreso)
+      let tipo: "ingreso" | "egreso" = tiposByPresupuesto[p.id] || "egreso";
+      if (!tiposByPresupuesto[p.id]) {
+        const codigo = p.cuentas_contables?.codigo || "";
+        if (codigo.startsWith("4")) tipo = "ingreso";
+      }
+
       return {
         ...p,
         ejercido,
         porEjercer,
         porcentaje,
+        tipo,
       };
     });
-  }, [presupuestos, movimientos]);
+  }, [presupuestos, movimientos, tiposByPresupuesto]);
 
   // Generate unique options for filters
   const filterOptions = useMemo(() => {
