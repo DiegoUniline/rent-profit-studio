@@ -131,6 +131,7 @@ interface Presupuesto {
   ejercido?: number;
   porEjercer?: number;
   porcentaje?: number;
+  tipo?: "ingreso" | "egreso";
 }
 
 // Function to determine if account is "deudora" based on codigo
