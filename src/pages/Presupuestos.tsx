@@ -722,23 +722,37 @@ export default function Presupuestos() {
     return filteredPresupuestos.find(p => p.id === activeId) || null;
   }, [activeId, filteredPresupuestos]);
 
-  // Calculate totals
+  // Calculate totals (split by tipo: ingreso/egreso)
   const totals = useMemo(() => {
     const activePresupuestos = filteredPresupuestos.filter(p => p.activo);
-    const totalPresupuestado = activePresupuestos.reduce(
-      (sum, p) => sum + p.cantidad * p.precio_unitario,
-      0
-    );
-    const totalEjercido = activePresupuestos.reduce(
-      (sum, p) => sum + (p.ejercido || 0),
-      0
-    );
+    let presIng = 0, presEgr = 0, ejerIng = 0, ejerEgr = 0;
+    activePresupuestos.forEach((p: any) => {
+      const presupuestado = p.cantidad * p.precio_unitario;
+      const ejercido = p.ejercido || 0;
+      if (p.tipo === "ingreso") {
+        presIng += presupuestado;
+        ejerIng += ejercido;
+      } else {
+        presEgr += presupuestado;
+        ejerEgr += ejercido;
+      }
+    });
+    const totalPresupuestado = presIng + presEgr;
+    const totalEjercido = ejerIng + ejerEgr;
     const totalPorEjercer = totalPresupuestado - totalEjercido;
     const porcentajeGlobal = totalPresupuestado > 0 ? (totalEjercido / totalPresupuestado) * 100 : 0;
     const totalPartidas = activePresupuestos.length;
     const empresasCount = new Set(activePresupuestos.map(p => p.empresa_id)).size;
-    
-    return { totalPresupuestado, totalEjercido, totalPorEjercer, porcentajeGlobal, totalPartidas, empresasCount };
+
+    const porEjercerIng = presIng - ejerIng;
+    const porEjercerEgr = presEgr - ejerEgr;
+
+    return {
+      totalPresupuestado, totalEjercido, totalPorEjercer, porcentajeGlobal, totalPartidas, empresasCount,
+      presIng, presEgr, presDif: presIng - presEgr,
+      ejerIng, ejerEgr, ejerDif: ejerIng - ejerEgr,
+      porEjercerIng, porEjercerEgr, porEjercerDif: porEjercerIng - porEjercerEgr,
+    };
   }, [filteredPresupuestos]);
 
   // Get status color based on percentage
