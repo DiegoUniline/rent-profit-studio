@@ -346,6 +346,26 @@ export default function Presupuestos() {
         }
       }
 
+      // Fetch flujos_programados to derive tipo (ingreso/egreso) per presupuesto
+      const { data: flujosData } = await supabase
+        .from("flujos_programados")
+        .select("presupuesto_id, tipo, monto")
+        .not("presupuesto_id", "is", null);
+
+      const sumByPresupuesto: Record<string, { ingreso: number; egreso: number }> = {};
+      (flujosData || []).forEach((f: any) => {
+        if (!f.presupuesto_id) return;
+        if (!sumByPresupuesto[f.presupuesto_id]) sumByPresupuesto[f.presupuesto_id] = { ingreso: 0, egreso: 0 };
+        const monto = Number(f.monto) || 0;
+        if (f.tipo === "ingreso") sumByPresupuesto[f.presupuesto_id].ingreso += monto;
+        else sumByPresupuesto[f.presupuesto_id].egreso += monto;
+      });
+      const tipos: Record<string, "ingreso" | "egreso"> = {};
+      Object.entries(sumByPresupuesto).forEach(([id, s]) => {
+        tipos[id] = s.ingreso > s.egreso ? "ingreso" : "egreso";
+      });
+      setTiposByPresupuesto(tipos);
+
       setPresupuestos(presupuestosRes.data || []);
       setEmpresas(empresasRes.data || []);
       setMovimientos(allMovimientos as unknown as MovimientoConAsiento[]);
