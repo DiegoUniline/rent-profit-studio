@@ -964,6 +964,9 @@ export default function Presupuestos() {
               <span>Agrupar:</span>
             </div>
             <ToggleGroup type="single" value={grouping} onValueChange={handleGroupingChange}>
+              <ToggleGroupItem value="tipo" aria-label="Agrupar por tipo" className="text-xs px-2 h-7">
+                Tipo
+              </ToggleGroupItem>
               <ToggleGroupItem value="empresa" aria-label="Agrupar por empresa" className="text-xs px-2 h-7">
                 Empresa
               </ToggleGroupItem>
