@@ -458,12 +458,9 @@ export default function Presupuestos() {
       const porEjercer = presupuestado - ejercido;
       const porcentaje = presupuestado > 0 ? (ejercido / presupuestado) * 100 : 0;
 
-      // Determine tipo: prefer flujos_programados; fallback to account code (4xx = ingreso)
-      let tipo: "ingreso" | "egreso" = tiposByPresupuesto[p.id] || "egreso";
-      if (!tiposByPresupuesto[p.id]) {
-        const codigo = p.cuentas_contables?.codigo || "";
-        if (codigo.startsWith("4")) tipo = "ingreso";
-      }
+      // Determine tipo ONLY from flujos_programados. If no flujo exists, tipo is undefined
+      // and the presupuesto is excluded from ingreso/egreso totals & grouping.
+      const tipo = tiposByPresupuesto[p.id];
 
       return {
         ...p,
