@@ -744,10 +744,11 @@ export default function Presupuestos() {
     activePresupuestos.forEach((p: any) => {
       const presupuestado = p.cantidad * p.precio_unitario;
       const ejercido = p.ejercido || 0;
+      // Only consider presupuestos that have a flujo programado (tipo defined)
       if (p.tipo === "ingreso") {
         presIng += presupuestado;
         ejerIng += ejercido;
-      } else {
+      } else if (p.tipo === "egreso") {
         presEgr += presupuestado;
         ejerEgr += ejercido;
       }
