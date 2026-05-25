@@ -592,6 +592,18 @@ export default function Presupuestos() {
       let groupSublabel: string | undefined;
 
       switch (grouping) {
+        case "tipo":
+          if (!p.tipo) {
+            groupKey = "sin-tipo";
+            groupLabel = "Sin clasificar (sin programación de flujo)";
+          } else if (p.tipo === "ingreso") {
+            groupKey = "tipo-ingreso";
+            groupLabel = "Ingresos";
+          } else {
+            groupKey = "tipo-egreso";
+            groupLabel = "Egresos";
+          }
+          break;
         case "partida":
           groupKey = p.partida;
           groupLabel = p.partida;
