@@ -789,47 +789,96 @@ export default function Presupuestos() {
         )}
       </div>
 
-      {/* Summary Cards - Compact */}
-      <div className="grid gap-2 grid-cols-2 lg:grid-cols-4">
-        <Card className="p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-muted-foreground">Total Presupuestado</span>
-            <Calculator className="h-3.5 w-3.5 text-muted-foreground" />
+      {/* Summary Cards - Big with Ingreso / Egreso / Diferencia breakdown */}
+      <div className="grid gap-3 grid-cols-1 lg:grid-cols-3">
+        {/* Total Presupuestado */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Total Presupuesto
+            </span>
+            <Calculator className="h-5 w-5 text-primary" />
           </div>
-          <div className="text-lg font-bold text-primary">{formatCurrency(totals.totalPresupuestado)}</div>
-          <p className="text-[10px] text-muted-foreground">{totals.totalPartidas} partidas activas</p>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Ingreso</span>
+              <span className="text-lg font-bold text-green-600 font-mono">{formatCurrency(totals.presIng)}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Egreso</span>
+              <span className="text-lg font-bold text-destructive font-mono">{formatCurrency(totals.presEgr)}</span>
+            </div>
+            <div className="flex items-baseline justify-between border-t pt-2">
+              <span className="text-sm font-semibold">Diferencia</span>
+              <span className={`text-xl font-bold font-mono ${totals.presDif < 0 ? 'text-destructive' : 'text-primary'}`}>
+                {formatCurrency(totals.presDif)}
+              </span>
+            </div>
+            <p className="text-[10px] text-muted-foreground">{totals.totalPartidas} partidas activas</p>
+          </div>
         </Card>
 
-        <Card className="p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-muted-foreground">Total Ejercido</span>
-            <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+        {/* Total Ejercido */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Total Ejercido
+            </span>
+            <TrendingUp className="h-5 w-5 text-primary" />
           </div>
-          <div className="text-lg font-bold text-green-600">{formatCurrency(totals.totalEjercido)}</div>
-          <div className="flex items-center gap-1">
-            <Progress value={Math.min(totals.porcentajeGlobal, 100)} className="h-1.5 flex-1" />
-            <span className="text-[10px] text-muted-foreground">{totals.porcentajeGlobal.toFixed(1)}%</span>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Ingreso</span>
+              <span className="text-lg font-bold text-green-600 font-mono">{formatCurrency(totals.ejerIng)}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Egreso</span>
+              <span className="text-lg font-bold text-destructive font-mono">{formatCurrency(totals.ejerEgr)}</span>
+            </div>
+            <div className="flex items-baseline justify-between border-t pt-2">
+              <span className="text-sm font-semibold">Diferencia</span>
+              <span className={`text-xl font-bold font-mono ${totals.ejerDif < 0 ? 'text-destructive' : 'text-primary'}`}>
+                {formatCurrency(totals.ejerDif)}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 pt-1">
+              <Progress value={Math.min(totals.porcentajeGlobal, 100)} className="h-1.5 flex-1" />
+              <span className="text-[10px] text-muted-foreground">{totals.porcentajeGlobal.toFixed(1)}%</span>
+            </div>
           </div>
         </Card>
 
-        <Card className="p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-muted-foreground">Por Ejercer</span>
-            <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
+        {/* Total Por Ejercer */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Total Por Ejercer
+            </span>
+            <TrendingDown className="h-5 w-5 text-primary" />
           </div>
-          <div className={`text-lg font-bold ${totals.totalPorEjercer < 0 ? 'text-destructive' : ''}`}>
-            {formatCurrency(totals.totalPorEjercer)}
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Ingreso</span>
+              <span className={`text-lg font-bold font-mono ${totals.porEjercerIng < 0 ? 'text-destructive' : 'text-green-600'}`}>
+                {formatCurrency(totals.porEjercerIng)}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Egreso</span>
+              <span className={`text-lg font-bold font-mono ${totals.porEjercerEgr < 0 ? 'text-destructive' : ''}`}>
+                {formatCurrency(totals.porEjercerEgr)}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between border-t pt-2">
+              <span className="text-sm font-semibold">Diferencia</span>
+              <span className={`text-xl font-bold font-mono ${totals.porEjercerDif < 0 ? 'text-destructive' : 'text-primary'}`}>
+                {formatCurrency(totals.porEjercerDif)}
+              </span>
+            </div>
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Building className="h-3 w-3" /> {totals.empresasCount} empresas activas
+            </p>
           </div>
-          <p className="text-[10px] text-muted-foreground">{totals.totalPorEjercer < 0 ? 'Sobregiro' : 'Disponible'}</p>
-        </Card>
-
-        <Card className="p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-muted-foreground">Empresas</span>
-            <Building className="h-3.5 w-3.5 text-muted-foreground" />
-          </div>
-          <div className="text-lg font-bold">{totals.empresasCount}</div>
-          <p className="text-[10px] text-muted-foreground">Con partidas activas</p>
         </Card>
       </div>
 
