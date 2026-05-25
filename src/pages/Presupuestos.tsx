@@ -249,10 +249,10 @@ export default function Presupuestos() {
   const [expandedEmpresas, setExpandedEmpresas] = useState<Set<string>>(new Set());
   
   // Grouping preference with localStorage persistence
-  type GroupingType = "partida" | "cuenta" | "centro" | "empresa" | "ninguno";
+  type GroupingType = "tipo" | "partida" | "cuenta" | "centro" | "empresa" | "ninguno";
   const [grouping, setGrouping] = useState<GroupingType>(() => {
     const saved = localStorage.getItem("presupuestos_grouping");
-    return (saved as GroupingType) || "empresa";
+    return (saved as GroupingType) || "tipo";
   });
 
   const handleGroupingChange = (value: string) => {
@@ -458,12 +458,9 @@ export default function Presupuestos() {
       const porEjercer = presupuestado - ejercido;
       const porcentaje = presupuestado > 0 ? (ejercido / presupuestado) * 100 : 0;
 
-      // Determine tipo: prefer flujos_programados; fallback to account code (4xx = ingreso)
-      let tipo: "ingreso" | "egreso" = tiposByPresupuesto[p.id] || "egreso";
-      if (!tiposByPresupuesto[p.id]) {
-        const codigo = p.cuentas_contables?.codigo || "";
-        if (codigo.startsWith("4")) tipo = "ingreso";
-      }
+      // Determine tipo ONLY from flujos_programados. If no flujo exists, tipo is undefined
+      // and the presupuesto is excluded from ingreso/egreso totals & grouping.
+      const tipo = tiposByPresupuesto[p.id];
 
       return {
         ...p,
@@ -595,6 +592,18 @@ export default function Presupuestos() {
       let groupSublabel: string | undefined;
 
       switch (grouping) {
+        case "tipo":
+          if (!p.tipo) {
+            groupKey = "sin-tipo";
+            groupLabel = "Sin clasificar (sin programación de flujo)";
+          } else if (p.tipo === "ingreso") {
+            groupKey = "tipo-ingreso";
+            groupLabel = "Ingresos";
+          } else {
+            groupKey = "tipo-egreso";
+            groupLabel = "Egresos";
+          }
+          break;
         case "partida":
           groupKey = p.partida;
           groupLabel = p.partida;
@@ -636,16 +645,22 @@ export default function Presupuestos() {
       }
     });
     
-    // Sort presupuestos within each group: ingresos first, then egresos; by orden within each
+    // Sort presupuestos within each group: ingresos first, then egresos, then sin tipo; by orden within each
     Object.values(groups).forEach(group => {
       group.presupuestos.sort((a: any, b: any) => {
-        const ta = a.tipo === "ingreso" ? 0 : 1;
-        const tb = b.tipo === "ingreso" ? 0 : 1;
-        if (ta !== tb) return ta - tb;
+        const rank = (t: any) => (t === "ingreso" ? 0 : t === "egreso" ? 1 : 2);
+        const ra = rank(a.tipo);
+        const rb = rank(b.tipo);
+        if (ra !== rb) return ra - rb;
         return (a.orden || 0) - (b.orden || 0);
       });
     });
-    
+
+    // Order groups: for "tipo" grouping, Ingresos > Egresos > Sin clasificar; otherwise alphabetical
+    if (grouping === "tipo") {
+      const order = { "tipo-ingreso": 0, "tipo-egreso": 1, "sin-tipo": 2 } as Record<string, number>;
+      return Object.values(groups).sort((a, b) => (order[a.id] ?? 99) - (order[b.id] ?? 99));
+    }
     return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label));
   }, [filteredPresupuestos, grouping]);
 
@@ -729,10 +744,11 @@ export default function Presupuestos() {
     activePresupuestos.forEach((p: any) => {
       const presupuestado = p.cantidad * p.precio_unitario;
       const ejercido = p.ejercido || 0;
+      // Only consider presupuestos that have a flujo programado (tipo defined)
       if (p.tipo === "ingreso") {
         presIng += presupuestado;
         ejerIng += ejercido;
-      } else {
+      } else if (p.tipo === "egreso") {
         presEgr += presupuestado;
         ejerEgr += ejercido;
       }
@@ -948,6 +964,9 @@ export default function Presupuestos() {
               <span>Agrupar:</span>
             </div>
             <ToggleGroup type="single" value={grouping} onValueChange={handleGroupingChange}>
+              <ToggleGroupItem value="tipo" aria-label="Agrupar por tipo" className="text-xs px-2 h-7">
+                Tipo
+              </ToggleGroupItem>
               <ToggleGroupItem value="empresa" aria-label="Agrupar por empresa" className="text-xs px-2 h-7">
                 Empresa
               </ToggleGroupItem>
