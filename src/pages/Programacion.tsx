@@ -194,23 +194,41 @@ export default function Programacion() {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("programaciones")
-      .select(`
-        *,
-        empresas(razon_social),
-        centros_negocio(codigo, nombre),
-        terceros(razon_social),
-        presupuestos(partida)
-      `)
-      .order("fecha_programada", { ascending: true });
+    const PAGE_SIZE = 1000;
+    let all: Programacion[] = [];
+    let from = 0;
+    let hasMore = true;
 
-    if (error) {
+    try {
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("programaciones")
+          .select(`
+            *,
+            empresas(razon_social),
+            centros_negocio(codigo, nombre),
+            terceros(razon_social),
+            presupuestos(partida)
+          `)
+          .order("fecha_programada", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          all = all.concat(data as Programacion[]);
+          hasMore = data.length === PAGE_SIZE;
+          from += PAGE_SIZE;
+        } else {
+          hasMore = false;
+        }
+      }
+      setProgramaciones(all);
+    } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      setProgramaciones(data || []);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const fetchCatalogs = async () => {
