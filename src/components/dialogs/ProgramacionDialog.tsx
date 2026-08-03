@@ -142,6 +142,25 @@ export function ProgramacionDialog({
       return;
     }
 
+    // Validar que la partida pertenezca al centro de negocio seleccionado
+    if (presupuestoId) {
+      const pres = presupuestos.find((p) => p.id === presupuestoId);
+      if (
+        pres &&
+        pres.centro_negocio_id &&
+        centroNegocioId &&
+        pres.centro_negocio_id !== centroNegocioId
+      ) {
+        toast({
+          title: "Error",
+          description:
+            "La partida presupuestal no pertenece al centro de negocio seleccionado",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const data = {
