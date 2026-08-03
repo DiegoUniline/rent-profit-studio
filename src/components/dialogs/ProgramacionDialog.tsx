@@ -39,6 +39,7 @@ interface Presupuesto {
   id: string;
   partida: string;
   empresa_id: string;
+  centro_negocio_id: string | null;
   cantidad: number;
   precio_unitario: number;
 }
@@ -112,7 +113,7 @@ export function ProgramacionDialog({
       supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social"),
       supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("activo", true).order("codigo"),
       supabase.from("terceros").select("id, razon_social, empresa_id").eq("activo", true).order("razon_social"),
-      supabase.from("presupuestos").select("id, partida, empresa_id, cantidad, precio_unitario").eq("activo", true).order("partida"),
+      supabase.from("presupuestos").select("id, partida, empresa_id, centro_negocio_id, cantidad, precio_unitario").eq("activo", true).order("partida"),
     ]);
     if (empresasRes.data) setEmpresas(empresasRes.data);
     if (centrosRes.data) setCentros(centrosRes.data);
@@ -122,7 +123,14 @@ export function ProgramacionDialog({
 
   const filteredCentros = centros.filter((c) => c.empresa_id === empresaId);
   const filteredTerceros = terceros.filter((t) => t.empresa_id === empresaId);
-  const filteredPresupuestos = presupuestos.filter((p) => p.empresa_id === empresaId);
+  // Solo partidas del centro de negocio seleccionado (o sin centro asignado)
+  const filteredPresupuestos = presupuestos.filter(
+    (p) =>
+      p.empresa_id === empresaId &&
+      (centroNegocioId
+        ? p.centro_negocio_id === centroNegocioId || !p.centro_negocio_id
+        : true)
+  );
 
   const handleSave = async () => {
     if (!empresaId || !monto || parseFloat(monto) <= 0) {
@@ -132,6 +140,25 @@ export function ProgramacionDialog({
         variant: "destructive",
       });
       return;
+    }
+
+    // Validar que la partida pertenezca al centro de negocio seleccionado
+    if (presupuestoId) {
+      const pres = presupuestos.find((p) => p.id === presupuestoId);
+      if (
+        pres &&
+        pres.centro_negocio_id &&
+        centroNegocioId &&
+        pres.centro_negocio_id !== centroNegocioId
+      ) {
+        toast({
+          title: "Error",
+          description:
+            "La partida presupuestal no pertenece al centro de negocio seleccionado",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setLoading(true);
@@ -234,7 +261,14 @@ export function ProgramacionDialog({
                 label: `${c.codigo} - ${c.nombre}`,
               }))}
               value={centroNegocioId}
-              onValueChange={setCentroNegocioId}
+              onValueChange={(val) => {
+                setCentroNegocioId(val);
+                // Limpiar la partida si no pertenece al nuevo centro
+                const pres = presupuestos.find((p) => p.id === presupuestoId);
+                if (pres && pres.centro_negocio_id && pres.centro_negocio_id !== val) {
+                  setPresupuestoId("");
+                }
+              }}
               placeholder="Seleccionar centro..."
               disabled={!empresaId}
             />

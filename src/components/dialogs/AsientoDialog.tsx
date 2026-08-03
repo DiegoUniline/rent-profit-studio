@@ -409,6 +409,25 @@ export function AsientoDialog({
       }
     }
 
+    // Validar que las partidas presupuestales pertenezcan al centro de negocios
+    const partidaInvalida = movimientos.find((m) => {
+      if (!m.presupuesto_id) return false;
+      const p = presupuestos.find((x) => x.id === m.presupuesto_id);
+      if (!p) return true;
+      if (p.empresa_id !== form.empresa_id) return true;
+      if (p.centro_negocio_id && p.centro_negocio_id !== form.centro_negocio_id) return true;
+      return false;
+    });
+    if (partidaInvalida) {
+      toast({
+        title: "Error",
+        description:
+          "Hay partidas presupuestales que no pertenecen al centro de negocios seleccionado. Selecciónelas de nuevo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const asientoData = {
@@ -528,10 +547,14 @@ export function AsientoDialog({
     label: p.partida,
   }));
 
-  // Filter presupuestos by cuenta for each movimiento
+  // Filter presupuestos by cuenta and centro de negocio for each movimiento
   const getPresupuestoOptionsForMovimiento = (cuentaId: string) => {
     const filtered = presupuestos.filter(
-      (p) => !p.cuenta_id || p.cuenta_id === cuentaId
+      (p) =>
+        (!p.cuenta_id || p.cuenta_id === cuentaId) &&
+        (form.centro_negocio_id
+          ? p.centro_negocio_id === form.centro_negocio_id || !p.centro_negocio_id
+          : true)
     );
     return filtered.map((p) => ({
       id: p.id,
@@ -627,7 +650,20 @@ export function AsientoDialog({
                 <Label>Centro de Negocios</Label>
                 <SearchableSelect
                   value={form.centro_negocio_id}
-                  onValueChange={(value) => setForm({ ...form, centro_negocio_id: value })}
+                  onValueChange={(value) => {
+                    setForm({ ...form, centro_negocio_id: value });
+                    // Limpiar partidas presupuestales que no pertenezcan al nuevo centro
+                    setMovimientos((prev) =>
+                      prev.map((m) => {
+                        if (!m.presupuesto_id) return m;
+                        const p = presupuestos.find((x) => x.id === m.presupuesto_id);
+                        if (p && p.centro_negocio_id && p.centro_negocio_id !== value) {
+                          return { ...m, presupuesto_id: "", partida: "" };
+                        }
+                        return m;
+                      })
+                    );
+                  }}
                   options={centroOptions}
                   placeholder={form.empresa_id ? "Seleccionar centro" : "Primero seleccione empresa"}
                   searchPlaceholder="Buscar centro..."
