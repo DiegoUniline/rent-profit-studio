@@ -528,10 +528,14 @@ export function AsientoDialog({
     label: p.partida,
   }));
 
-  // Filter presupuestos by cuenta for each movimiento
+  // Filter presupuestos by cuenta and centro de negocio for each movimiento
   const getPresupuestoOptionsForMovimiento = (cuentaId: string) => {
     const filtered = presupuestos.filter(
-      (p) => !p.cuenta_id || p.cuenta_id === cuentaId
+      (p) =>
+        (!p.cuenta_id || p.cuenta_id === cuentaId) &&
+        (form.centro_negocio_id
+          ? p.centro_negocio_id === form.centro_negocio_id || !p.centro_negocio_id
+          : true)
     );
     return filtered.map((p) => ({
       id: p.id,
