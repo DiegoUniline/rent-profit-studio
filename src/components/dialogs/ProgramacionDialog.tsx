@@ -39,6 +39,7 @@ interface Presupuesto {
   id: string;
   partida: string;
   empresa_id: string;
+  centro_negocio_id: string | null;
   cantidad: number;
   precio_unitario: number;
 }
