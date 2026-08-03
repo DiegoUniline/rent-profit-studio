@@ -113,7 +113,7 @@ export function ProgramacionDialog({
       supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social"),
       supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("activo", true).order("codigo"),
       supabase.from("terceros").select("id, razon_social, empresa_id").eq("activo", true).order("razon_social"),
-      supabase.from("presupuestos").select("id, partida, empresa_id, cantidad, precio_unitario").eq("activo", true).order("partida"),
+      supabase.from("presupuestos").select("id, partida, empresa_id, centro_negocio_id, cantidad, precio_unitario").eq("activo", true).order("partida"),
     ]);
     if (empresasRes.data) setEmpresas(empresasRes.data);
     if (centrosRes.data) setCentros(centrosRes.data);
@@ -123,7 +123,14 @@ export function ProgramacionDialog({
 
   const filteredCentros = centros.filter((c) => c.empresa_id === empresaId);
   const filteredTerceros = terceros.filter((t) => t.empresa_id === empresaId);
-  const filteredPresupuestos = presupuestos.filter((p) => p.empresa_id === empresaId);
+  // Solo partidas del centro de negocio seleccionado (o sin centro asignado)
+  const filteredPresupuestos = presupuestos.filter(
+    (p) =>
+      p.empresa_id === empresaId &&
+      (centroNegocioId
+        ? p.centro_negocio_id === centroNegocioId || !p.centro_negocio_id
+        : true)
+  );
 
   const handleSave = async () => {
     if (!empresaId || !monto || parseFloat(monto) <= 0) {
