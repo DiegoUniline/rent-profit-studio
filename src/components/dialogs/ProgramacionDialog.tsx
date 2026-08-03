@@ -242,7 +242,14 @@ export function ProgramacionDialog({
                 label: `${c.codigo} - ${c.nombre}`,
               }))}
               value={centroNegocioId}
-              onValueChange={setCentroNegocioId}
+              onValueChange={(val) => {
+                setCentroNegocioId(val);
+                // Limpiar la partida si no pertenece al nuevo centro
+                const pres = presupuestos.find((p) => p.id === presupuestoId);
+                if (pres && pres.centro_negocio_id && pres.centro_negocio_id !== val) {
+                  setPresupuestoId("");
+                }
+              }}
               placeholder="Seleccionar centro..."
               disabled={!empresaId}
             />
