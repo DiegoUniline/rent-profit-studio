@@ -409,6 +409,25 @@ export function AsientoDialog({
       }
     }
 
+    // Validar que las partidas presupuestales pertenezcan al centro de negocios
+    const partidaInvalida = movimientos.find((m) => {
+      if (!m.presupuesto_id) return false;
+      const p = presupuestos.find((x) => x.id === m.presupuesto_id);
+      if (!p) return true;
+      if (p.empresa_id !== form.empresa_id) return true;
+      if (p.centro_negocio_id && p.centro_negocio_id !== form.centro_negocio_id) return true;
+      return false;
+    });
+    if (partidaInvalida) {
+      toast({
+        title: "Error",
+        description:
+          "Hay partidas presupuestales que no pertenecen al centro de negocios seleccionado. Selecciónelas de nuevo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const asientoData = {
