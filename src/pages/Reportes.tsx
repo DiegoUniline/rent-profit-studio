@@ -421,14 +421,48 @@ export default function Reportes() {
   // Calcular saldos
   const saldos = useMemo(() => {
     if (!cuentas.length) return [];
-    return calcularSaldosCuentas(
+
+    // Filtro estricto por centro de costos: si el movimiento tiene partida
+    // presupuestal, ésta debe pertenecer a un centro seleccionado.
+    let movs = movimientos;
+    if (centrosSeleccionados.length > 0) {
+      const seleccionados = new Set(centrosSeleccionados);
+      movs = movimientos.filter((m: any) => {
+        if (!m.presupuesto_id) return true;
+        const centro = presupuestoCentroMap.get(m.presupuesto_id);
+        if (centro === undefined || centro === null) return true;
+        return seleccionados.has(centro);
+      });
+    }
+
+    const resultado = calcularSaldosCuentas(
       cuentas,
-      movimientos,
+      movs,
       asientos,
       fechaInicio,
       fechaFin
     );
-  }, [cuentas, movimientos, asientos, fechaInicio, fechaFin]);
+
+    // Consolidar cuentas repetidas (mismo código en distintas empresas)
+    if (empresaId !== "todas") return resultado;
+
+    const consolidado = new Map<string, typeof resultado[number]>();
+    resultado.forEach((s) => {
+      const existente = consolidado.get(s.codigo);
+      if (existente) {
+        existente.saldo_inicial += s.saldo_inicial;
+        existente.debe += s.debe;
+        existente.haber += s.haber;
+        existente.saldo_final += s.saldo_final;
+      } else {
+        consolidado.set(s.codigo, { ...s, cuenta_id: s.codigo });
+      }
+    });
+
+    return Array.from(consolidado.values()).sort((a, b) =>
+      a.codigo.localeCompare(b.codigo)
+    );
+  }, [cuentas, movimientos, asientos, fechaInicio, fechaFin, centrosSeleccionados, presupuestoCentroMap, empresaId]);
 
   const empresaNombre = useMemo(() => {
     if (empresaId === "todas") return "Todas las Empresas";
