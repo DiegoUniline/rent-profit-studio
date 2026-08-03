@@ -631,7 +631,20 @@ export function AsientoDialog({
                 <Label>Centro de Negocios</Label>
                 <SearchableSelect
                   value={form.centro_negocio_id}
-                  onValueChange={(value) => setForm({ ...form, centro_negocio_id: value })}
+                  onValueChange={(value) => {
+                    setForm({ ...form, centro_negocio_id: value });
+                    // Limpiar partidas presupuestales que no pertenezcan al nuevo centro
+                    setMovimientos((prev) =>
+                      prev.map((m) => {
+                        if (!m.presupuesto_id) return m;
+                        const p = presupuestos.find((x) => x.id === m.presupuesto_id);
+                        if (p && p.centro_negocio_id && p.centro_negocio_id !== value) {
+                          return { ...m, presupuesto_id: "", partida: "" };
+                        }
+                        return m;
+                      })
+                    );
+                  }}
                   options={centroOptions}
                   placeholder={form.empresa_id ? "Seleccionar centro" : "Primero seleccione empresa"}
                   searchPlaceholder="Buscar centro..."
