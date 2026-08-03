@@ -221,6 +221,33 @@ export default function Reportes() {
         }
       }
 
+      // Mapa de partidas presupuestales -> centro de negocio (paginado)
+      const centroMap = new Map<string, string | null>();
+      {
+        const PAGE_SIZE = 1000;
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          let presQuery = supabase
+            .from("presupuestos")
+            .select("id, centro_negocio_id")
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (empresaId !== "todas") {
+            presQuery = presQuery.eq("empresa_id", empresaId);
+          } else {
+            presQuery = presQuery.in("empresa_id", empresaIds);
+          }
+
+          const { data: batch, error } = await presQuery;
+          if (error) throw error;
+          (batch || []).forEach((p: any) => centroMap.set(p.id, p.centro_negocio_id));
+          hasMore = (batch?.length || 0) === PAGE_SIZE;
+          from += PAGE_SIZE;
+        }
+      }
+
+      setPresupuestoCentroMap(centroMap);
       setCuentas(cuentasData as CuentaContable[]);
       setAsientos(asientosData as AsientoContable[]);
       setMovimientos(movimientosData as Movimiento[]);
