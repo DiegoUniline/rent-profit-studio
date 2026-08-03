@@ -66,6 +66,8 @@ export default function Reportes() {
   const [asientos, setAsientos] = useState<AsientoContable[]>([]);
   const [presupuestos, setPresupuestos] = useState<any[]>([]);
   const [flujosProgramados, setFlujosProgramados] = useState<any[]>([]);
+  // Mapa presupuesto_id -> centro_negocio_id (para filtrar movimientos por centro)
+  const [presupuestoCentroMap, setPresupuestoCentroMap] = useState<Map<string, string | null>>(new Map());
 
   // Cargar empresas al iniciar
   useEffect(() => {
