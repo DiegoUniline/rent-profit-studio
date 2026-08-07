@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { CalendarRange } from "lucide-react";
 
 export interface FilaGantt {
   id: string;
@@ -63,7 +64,10 @@ export function ProjectGantt({ filas }: Props) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Cronograma</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+          <CalendarRange className="h-4 w-4 text-primary" />
+          Cronograma
+        </CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground py-6 text-center">
           Ninguna partida tiene fecha inicio y fecha fin definidas todavía.
@@ -87,7 +91,10 @@ export function ProjectGantt({ filas }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Cronograma</CardTitle>
+        <CardTitle className="text-base flex items-center gap-2">
+          <CalendarRange className="h-4 w-4 text-primary" />
+          Cronograma
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <ScrollArea className="w-full whitespace-nowrap">

@@ -215,16 +215,33 @@ export default function Proyectos() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => navigate(`/proyectos/${f.proyecto.id}`)}
                     >
-                      <TableCell className="font-medium">{f.proyecto.nombre}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/60 text-primary-foreground">
+                            <FolderKanban className="h-4 w-4" />
+                          </div>
+                          {f.proyecto.nombre}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
                         {f.proyecto.centros_negocio?.codigo} {f.proyecto.centros_negocio?.nombre}
                       </TableCell>
-                      <TableCell>{f.inicio || "-"}</TableCell>
-                      <TableCell>{f.fin || "-"}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(f.presupuesto)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(f.ejercido)}</TableCell>
+                      <TableCell className="text-muted-foreground">{f.inicio || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{f.fin || "-"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(f.presupuesto)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(f.ejercido)}</TableCell>
                       <TableCell className="text-right">
-                        <Badge variant={f.avance > 100 ? "destructive" : "secondary"}>{f.avance.toFixed(0)}%</Badge>
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="h-1.5 w-14 rounded-full bg-secondary overflow-hidden hidden sm:block">
+                            <div
+                              className={`h-full rounded-full ${f.avance > 100 ? "bg-destructive" : "bg-primary"}`}
+                              style={{ width: `${Math.min(100, f.avance)}%` }}
+                            />
+                          </div>
+                          <Badge variant={f.avance > 100 ? "destructive" : "secondary"} className="tabular-nums">
+                            {f.avance.toFixed(0)}%
+                          </Badge>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

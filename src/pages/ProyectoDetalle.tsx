@@ -23,11 +23,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Progress } from "@/components/ui/progress";
 import {
   FlujoEfectivoPresupuesto,
   SeguimientoPartida,
 } from "@/components/reportes/FlujoEfectivoPresupuesto";
 import { ProyectoPartidaSeguimientoDialog, PartidaSeguimiento } from "@/components/dialogs/ProyectoPartidaSeguimientoDialog";
+import { ProyectoEditDialog } from "@/components/dialogs/ProyectoEditDialog";
 import { ProjectSummaryTable, FilaResumenPartida } from "@/components/proyectos/ProjectSummaryTable";
 import { ProjectGantt } from "@/components/proyectos/ProjectGantt";
 import { formatCurrency, Movimiento, AsientoContable } from "@/lib/accounting-utils";
@@ -38,7 +40,19 @@ import {
   calcularDisponible,
   programacionPendienteDeAjustar,
 } from "@/lib/project-utils";
-import { ArrowLeft, Users, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Users,
+  X,
+  FolderKanban,
+  Briefcase,
+  Pencil,
+  Landmark,
+  CalendarClock,
+  CheckCircle2,
+  Wallet,
+  Percent,
+} from "lucide-react";
 
 interface PartidaRow {
   id: string;
@@ -89,6 +103,7 @@ export default function ProyectoDetalle() {
   const [filtroResponsable, setFiltroResponsable] = useState<string>("todos");
   const [dialogPartida, setDialogPartida] = useState<PartidaSeguimiento | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const [accesos, setAccesos] = useState<AccesoUsuario[]>([]);
   const [usuariosDisponibles, setUsuariosDisponibles] = useState<{ id: string; label: string }[]>([]);
@@ -392,50 +407,84 @@ export default function ProyectoDetalle() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/proyectos")}>
+      <div className="flex items-start gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/proyectos")} className="mt-1.5 shrink-0">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">{proyecto.nombre}</h1>
-          <p className="text-muted-foreground">
-            {proyecto.centros_negocio?.codigo} · {proyecto.empresas?.razon_social}
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-sm">
+          <FolderKanban className="h-6 w-6" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-gradient text-2xl sm:text-3xl font-bold truncate">{proyecto.nombre}</h1>
+            {!proyecto.activo && <Badge variant="secondary">Inactivo</Badge>}
+            {canEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                title="Editar Project"
+                onClick={() => setEditDialogOpen(true)}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+          <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+            <Briefcase className="h-3.5 w-3.5" />
+            {proyecto.centros_negocio?.codigo} · {proyecto.centros_negocio?.nombre} · {proyecto.empresas?.razon_social}
           </p>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">Presupuesto total</p>
-            <p className="text-lg font-bold">{formatCurrency(kpis.presupuesto)}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Presupuesto total</p>
+              <Landmark className="h-4 w-4 text-muted-foreground/60" />
+            </div>
+            <p className="text-lg font-bold tabular-nums">{formatCurrency(kpis.presupuesto)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">Proyectado acumulado</p>
-            <p className="text-lg font-bold text-amber-600 dark:text-amber-400">{formatCurrency(kpis.proyectadoAcumulado)}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Proyectado acumulado</p>
+              <CalendarClock className="h-4 w-4 text-amber-500/70" />
+            </div>
+            <p className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(kpis.proyectadoAcumulado)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">Ejercido acumulado</p>
-            <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(kpis.ejercido)}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Ejercido acumulado</p>
+              <CheckCircle2 className="h-4 w-4 text-blue-500/70" />
+            </div>
+            <p className="text-lg font-bold tabular-nums text-blue-600 dark:text-blue-400">{formatCurrency(kpis.ejercido)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">Disponible</p>
-            <p className={`text-lg font-bold ${kpis.disponible >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Disponible</p>
+              <Wallet className={`h-4 w-4 ${kpis.disponible >= 0 ? "text-green-500/70" : "text-red-500/70"}`} />
+            </div>
+            <p className={`text-lg font-bold tabular-nums ${kpis.disponible >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
               {formatCurrency(kpis.disponible)}
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="overflow-hidden border-primary/30 bg-primary/[0.03]">
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">Avance financiero</p>
-            <p className="text-lg font-bold">{kpis.avance.toFixed(1)}%</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Avance financiero</p>
+              <Percent className="h-4 w-4 text-primary/70" />
+            </div>
+            <p className="text-lg font-bold tabular-nums">{kpis.avance.toFixed(1)}%</p>
+            <Progress value={Math.min(100, kpis.avance)} className="h-1.5 mt-2" />
           </CardContent>
         </Card>
       </div>
@@ -481,7 +530,10 @@ export default function ProyectoDetalle() {
           {/* Resumen Presupuesto / Proyectado / Ejercido / Disponible / Avance por cuenta y partida */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Presupuesto vs. Ejercido por partida</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Landmark className="h-4 w-4 text-primary" />
+                Presupuesto vs. Ejercido por partida
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <ProjectSummaryTable
@@ -510,7 +562,10 @@ export default function ProyectoDetalle() {
       {canEdit && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Partidas del centro de negocio</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-primary" />
+              Partidas del centro de negocio
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
@@ -583,6 +638,13 @@ export default function ProyectoDetalle() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         partida={dialogPartida}
+        onSuccess={fetchAll}
+      />
+
+      <ProyectoEditDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        proyecto={proyecto ? { id: proyecto.id, nombre: proyecto.nombre, activo: proyecto.activo } : null}
         onSuccess={fetchAll}
       />
     </div>
