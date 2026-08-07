@@ -22,13 +22,14 @@ import AsientoDetalle from "./pages/AsientoDetalle";
 import Programacion from "./pages/Programacion";
 import Reportes from "./pages/Reportes";
 import Proyectos from "./pages/Proyectos";
+import { PROYECTOS_ALLOWED_EMAILS } from "@/lib/feature-access";
 import ProyectoDetalle from "./pages/ProyectoDetalle";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
+function ProtectedRoute({ children, allowedRoles, allowedEmails }: { children: React.ReactNode; allowedRoles?: string[]; allowedEmails?: string[] }) {
   const { user, role, loading } = useAuth();
 
   if (loading) {
@@ -47,8 +48,13 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
     return <Navigate to="/" replace />;
   }
 
+  if (allowedEmails && !allowedEmails.includes((user.email ?? "").toLowerCase())) {
+    return <Navigate to="/" replace />;
+  }
+
   return <AppLayout>{children}</AppLayout>;
 }
+
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -194,7 +200,7 @@ function AppRoutes() {
       <Route
         path="/proyectos"
         element={
-          <ProtectedRoute allowedRoles={["admin", "contador", "usuario"]}>
+          <ProtectedRoute allowedRoles={["admin", "contador", "usuario"]} allowedEmails={PROYECTOS_ALLOWED_EMAILS}>
             <Proyectos />
           </ProtectedRoute>
         }
@@ -202,11 +208,12 @@ function AppRoutes() {
       <Route
         path="/proyectos/:id"
         element={
-          <ProtectedRoute allowedRoles={["admin", "contador", "usuario"]}>
+          <ProtectedRoute allowedRoles={["admin", "contador", "usuario"]} allowedEmails={PROYECTOS_ALLOWED_EMAILS}>
             <ProyectoDetalle />
           </ProtectedRoute>
         }
       />
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
