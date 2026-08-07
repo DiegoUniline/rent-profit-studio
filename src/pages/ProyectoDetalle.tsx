@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   FlujoEfectivoPresupuesto,
   SeguimientoPartida,
@@ -53,6 +54,10 @@ import {
   CheckCircle2,
   Wallet,
   Percent,
+  LayoutDashboard,
+  CalendarDays,
+  ListChecks,
+  Settings2,
 } from "lucide-react";
 
 interface PartidaRow {
@@ -105,6 +110,17 @@ export default function ProyectoDetalle() {
   const [dialogPartida, setDialogPartida] = useState<PartidaSeguimiento | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [tab, setTab] = useState<"resumen" | "flujo" | "tareas" | "configuracion">(
+    () => (localStorage.getItem("proyecto_detalle_tab") as any) || "resumen"
+  );
+
+  useEffect(() => {
+    localStorage.setItem("proyecto_detalle_tab", tab);
+  }, [tab]);
+
+  useEffect(() => {
+    if (tab === "configuracion" && !canEdit) setTab("resumen");
+  }, [tab, canEdit]);
 
   const [accesos, setAccesos] = useState<AccesoUsuario[]>([]);
   const [usuariosDisponibles, setUsuariosDisponibles] = useState<{ id: string; label: string }[]>([]);
@@ -490,153 +506,190 @@ export default function ProyectoDetalle() {
         </Card>
       </div>
 
-      {/* Indicadores + filtro responsable */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Badge variant="outline">{indicadores.total} partidas</Badge>
-        <Badge variant="outline" className={indicadores.sinResponsable > 0 ? "text-amber-600 border-amber-300" : ""}>
-          {indicadores.sinResponsable} sin responsable
-        </Badge>
-        <Badge variant="outline" className={indicadores.vencidas > 0 ? "text-red-600 border-red-300" : ""}>
-          {indicadores.vencidas} vencidas
-        </Badge>
-        <div className="ml-auto w-full sm:w-64">
-          <Select value={filtroResponsable} onValueChange={setFiltroResponsable}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por responsable" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="sin_responsable">Sin responsable</SelectItem>
-              {responsablesDisponibles.map(([idr, nombre]) => (
-                <SelectItem key={idr} value={idr}>
-                  {nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="resumen" className="gap-1.5">
+            <LayoutDashboard className="h-3.5 w-3.5" />
+            Resumen
+          </TabsTrigger>
+          <TabsTrigger value="flujo" className="gap-1.5">
+            <CalendarDays className="h-3.5 w-3.5" />
+            Flujo mensual
+          </TabsTrigger>
+          <TabsTrigger value="tareas" className="gap-1.5">
+            <ListChecks className="h-3.5 w-3.5" />
+            Tareas
+          </TabsTrigger>
+          {canEdit && (
+            <TabsTrigger value="configuracion" className="gap-1.5">
+              <Settings2 className="h-3.5 w-3.5" />
+              Configuración
+            </TabsTrigger>
+          )}
+        </TabsList>
 
-      {/* Tareas del Project: independientes de las partidas presupuestales */}
-      <ProyectoTareas proyectoId={proyecto.id} empresaId={proyecto.empresa_id} canEdit={canEdit} />
-
-      {partidasFiltradas.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Ninguna partida de este centro está marcada como Project todavía. Actívalas abajo en "Partidas del centro".
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Cronograma (Gantt) */}
-          <ProjectGantt filas={filasResumen} />
-
-          {/* Resumen Presupuesto / Proyectado / Ejercido / Disponible / Avance por cuenta y partida */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Landmark className="h-4 w-4 text-primary" />
-                Presupuesto vs. Ejercido por partida
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ProjectSummaryTable
-                filas={filasResumen}
-                onEdit={canEdit ? openSeguimiento : undefined}
-                readOnly={readOnly}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Árbol Cuenta -> Partida con calendario mensual (reutiliza el Reporte de Flujo) */}
-          <FlujoEfectivoPresupuesto
-            presupuestos={presupuestosParaTree}
-            flujosProgramados={flujos}
-            movimientos={movimientos}
-            asientos={asientos}
-            empresaNombre={proyecto.nombre}
-            seguimientoPorPartida={seguimientoPorPartida}
-            onEditSeguimiento={canEdit ? openSeguimiento : undefined}
-            readOnlySeguimiento={readOnly}
-          />
-        </>
-      )}
-
-      {/* Gestión de partidas incluidas (solo admin/contador) */}
-      {canEdit && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Briefcase className="h-4 w-4 text-primary" />
-              Partidas del centro de negocio
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">Project</TableHead>
-                  <TableHead>Cuenta</TableHead>
-                  <TableHead>Partida</TableHead>
-                  <TableHead className="text-right">Presupuesto</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {partidas.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <Checkbox checked={p.es_project} onCheckedChange={() => toggleEsProject(p)} />
-                    </TableCell>
-                    <TableCell>{p.cuenta ? `${p.cuenta.codigo} ${p.cuenta.nombre}` : "-"}</TableCell>
-                    <TableCell>{p.partida}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(p.cantidad * p.precio_unitario)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Gestión de accesos (solo admin) */}
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Accesos de solo lectura
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <SearchableSelect
-                  value={nuevoAccesoId}
-                  onValueChange={setNuevoAccesoId}
-                  options={usuariosDisponibles}
-                  placeholder="Seleccionar usuario"
-                  searchPlaceholder="Buscar usuario..."
-                  emptyMessage="No hay usuarios disponibles"
-                />
-              </div>
-              <Button onClick={agregarAcceso} disabled={!nuevoAccesoId}>
-                Agregar
-              </Button>
+        {/* Resumen: indicadores, Cronograma y Presupuesto vs. Ejercido */}
+        <TabsContent value="resumen" className="space-y-6 mt-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge variant="outline">{indicadores.total} partidas</Badge>
+            <Badge variant="outline" className={indicadores.sinResponsable > 0 ? "text-amber-600 border-amber-300" : ""}>
+              {indicadores.sinResponsable} sin responsable
+            </Badge>
+            <Badge variant="outline" className={indicadores.vencidas > 0 ? "text-red-600 border-red-300" : ""}>
+              {indicadores.vencidas} vencidas
+            </Badge>
+            <div className="ml-auto w-full sm:w-64">
+              <Select value={filtroResponsable} onValueChange={setFiltroResponsable}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por responsable" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="sin_responsable">Sin responsable</SelectItem>
+                  {responsablesDisponibles.map(([idr, nombre]) => (
+                    <SelectItem key={idr} value={idr}>
+                      {nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {accesos.map((a) => (
-                <Badge key={a.id} variant="secondary" className="gap-1.5">
-                  {a.nombre}
-                  <button onClick={() => quitarAcceso(a.id)} title="Quitar acceso">
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              {accesos.length === 0 && <p className="text-sm text-muted-foreground">Sin usuarios asignados.</p>}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+
+          {partidasFiltradas.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Ninguna partida de este centro está marcada como Project todavía.
+                {canEdit && ' Actívalas en la pestaña "Configuración".'}
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <ProjectGantt filas={filasResumen} />
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Landmark className="h-4 w-4 text-primary" />
+                    Presupuesto vs. Ejercido por partida
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ProjectSummaryTable
+                    filas={filasResumen}
+                    onEdit={canEdit ? openSeguimiento : undefined}
+                    readOnly={readOnly}
+                  />
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+
+        {/* Flujo mensual: árbol Cuenta -> Partida (reutiliza el Reporte de Flujo) */}
+        <TabsContent value="flujo" className="mt-4">
+          {partidasFiltradas.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Ninguna partida de este centro está marcada como Project todavía.
+              </CardContent>
+            </Card>
+          ) : (
+            <FlujoEfectivoPresupuesto
+              presupuestos={presupuestosParaTree}
+              flujosProgramados={flujos}
+              movimientos={movimientos}
+              asientos={asientos}
+              empresaNombre={proyecto.nombre}
+              seguimientoPorPartida={seguimientoPorPartida}
+              onEditSeguimiento={canEdit ? openSeguimiento : undefined}
+              readOnlySeguimiento={readOnly}
+            />
+          )}
+        </TabsContent>
+
+        {/* Tareas del Project: independientes de las partidas presupuestales */}
+        <TabsContent value="tareas" className="mt-4">
+          <ProyectoTareas proyectoId={proyecto.id} empresaId={proyecto.empresa_id} canEdit={canEdit} />
+        </TabsContent>
+
+        {/* Configuración: partidas incluidas y accesos (solo admin/contador) */}
+        {canEdit && (
+          <TabsContent value="configuracion" className="space-y-6 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Briefcase className="h-4 w-4 text-primary" />
+                  Partidas del centro de negocio
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">Project</TableHead>
+                      <TableHead>Cuenta</TableHead>
+                      <TableHead>Partida</TableHead>
+                      <TableHead className="text-right">Presupuesto</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {partidas.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell>
+                          <Checkbox checked={p.es_project} onCheckedChange={() => toggleEsProject(p)} />
+                        </TableCell>
+                        <TableCell>{p.cuenta ? `${p.cuenta.codigo} ${p.cuenta.nombre}` : "-"}</TableCell>
+                        <TableCell>{p.partida}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(p.cantidad * p.precio_unitario)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            {isAdmin && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Accesos de solo lectura
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <SearchableSelect
+                        value={nuevoAccesoId}
+                        onValueChange={setNuevoAccesoId}
+                        options={usuariosDisponibles}
+                        placeholder="Seleccionar usuario"
+                        searchPlaceholder="Buscar usuario..."
+                        emptyMessage="No hay usuarios disponibles"
+                      />
+                    </div>
+                    <Button onClick={agregarAcceso} disabled={!nuevoAccesoId}>
+                      Agregar
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {accesos.map((a) => (
+                      <Badge key={a.id} variant="secondary" className="gap-1.5">
+                        {a.nombre}
+                        <button onClick={() => quitarAcceso(a.id)} title="Quitar acceso">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                    {accesos.length === 0 && <p className="text-sm text-muted-foreground">Sin usuarios asignados.</p>}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        )}
+      </Tabs>
 
       <ProyectoPartidaSeguimientoDialog
         open={dialogOpen}
