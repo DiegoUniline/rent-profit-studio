@@ -4,6 +4,7 @@ import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 export interface FilaGantt {
   id: string;
@@ -89,7 +90,7 @@ export function ProjectGantt({ filas }: Props) {
         <CardTitle className="text-base">Cronograma</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <ScrollArea className="w-full whitespace-nowrap">
           <div className="min-w-[720px]">
             {/* Header de meses */}
             <div className="grid grid-cols-[220px_1fr] mb-2">
@@ -151,7 +152,8 @@ export function ProjectGantt({ filas }: Props) {
               })}
             </div>
           </div>
-        </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
         <div className="flex items-center gap-4 text-xs text-muted-foreground pt-3">
           <div className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded bg-primary inline-block" />En curso

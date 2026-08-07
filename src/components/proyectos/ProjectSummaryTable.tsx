@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/accounting-utils";
@@ -53,6 +54,8 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
   const totalGeneral = agregarFinanciero(filas.map((f) => ({ presupuesto: f.presupuesto, proyectado: f.proyectado, ejercido: f.ejercido })));
 
   return (
+    <ScrollArea className="w-full whitespace-nowrap">
+    <div className="min-w-max">
     <Table>
       <TableHeader>
         <TableRow>
@@ -165,5 +168,8 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
         </TableRow>
       </TableBody>
     </Table>
+    </div>
+    <ScrollBar orientation="horizontal" />
+    </ScrollArea>
   );
 }

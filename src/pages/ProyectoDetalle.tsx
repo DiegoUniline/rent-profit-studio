@@ -483,7 +483,7 @@ export default function ProyectoDetalle() {
             <CardHeader>
               <CardTitle className="text-base">Presupuesto vs. Ejercido por partida</CardTitle>
             </CardHeader>
-            <CardContent className="overflow-x-auto">
+            <CardContent>
               <ProjectSummaryTable
                 filas={filasResumen}
                 onEdit={canEdit ? openSeguimiento : undefined}
