@@ -1,8 +1,21 @@
-import { useMemo } from "react";
-import { addMonths, startOfMonth, format, differenceInCalendarDays, isSameMonth } from "date-fns";
+import { useMemo, useState } from "react";
+import {
+  addMonths,
+  addWeeks,
+  addYears,
+  startOfMonth,
+  startOfWeek,
+  startOfYear,
+  isSameMonth,
+  isSameWeek,
+  isSameYear,
+  format,
+  differenceInCalendarDays,
+} from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { CalendarRange } from "lucide-react";
@@ -22,20 +35,88 @@ interface Props {
   filas: FilaGantt[];
 }
 
+type Granularidad = "semana" | "mes" | "anio";
+
 const LABEL_COL = "260px";
+
+const GRANULARIDADES: { value: Granularidad; label: string }[] = [
+  { value: "semana", label: "Semana" },
+  { value: "mes", label: "Mes" },
+  { value: "anio", label: "Año" },
+];
+
+const CONFIG: Record<
+  Granularidad,
+  {
+    startOf: (d: Date) => Date;
+    step: (d: Date, n: number) => Date;
+    isCurrent: (d: Date, hoy: Date) => boolean;
+    label: (d: Date) => string;
+    pad: number;
+    minWidth: number;
+  }
+> = {
+  semana: {
+    startOf: (d) => startOfWeek(d, { weekStartsOn: 1 }),
+    step: (d, n) => addWeeks(d, n),
+    isCurrent: (d, hoy) => isSameWeek(d, hoy, { weekStartsOn: 1 }),
+    label: (d) => format(d, "dd MMM", { locale: es }),
+    pad: 2,
+    minWidth: 64,
+  },
+  mes: {
+    startOf: startOfMonth,
+    step: (d, n) => addMonths(d, n),
+    isCurrent: (d, hoy) => isSameMonth(d, hoy),
+    label: (d) => format(d, "MMM yy", { locale: es }),
+    pad: 1,
+    minWidth: 56,
+  },
+  anio: {
+    startOf: startOfYear,
+    step: (d, n) => addYears(d, n),
+    isCurrent: (d, hoy) => isSameYear(d, hoy),
+    label: (d) => format(d, "yyyy", { locale: es }),
+    pad: 1,
+    minWidth: 72,
+  },
+};
 
 function parseLocal(dateStr: string): Date {
   return new Date(dateStr + "T00:00:00");
 }
 
-function CronogramaCard({ children }: { children: React.ReactNode }) {
+function CronogramaCard({
+  children,
+  granularidad,
+  onGranularidadChange,
+}: {
+  children: React.ReactNode;
+  granularidad: Granularidad;
+  onGranularidadChange: (g: Granularidad) => void;
+}) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <CalendarRange className="h-4 w-4 text-primary" />
-          Cronograma
-        </CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CalendarRange className="h-4 w-4 text-primary" />
+            Cronograma
+          </CardTitle>
+          <div className="flex gap-1 bg-muted p-1 rounded-lg">
+            {GRANULARIDADES.map((g) => (
+              <Button
+                key={g.value}
+                variant={granularidad === g.value ? "default" : "ghost"}
+                size="sm"
+                className="h-7 px-3 text-xs"
+                onClick={() => onGranularidadChange(g.value)}
+              >
+                {g.label}
+              </Button>
+            ))}
+          </div>
+        </div>
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
@@ -43,6 +124,17 @@ function CronogramaCard({ children }: { children: React.ReactNode }) {
 }
 
 export function ProjectGantt({ filas }: Props) {
+  const [granularidad, setGranularidad] = useState<Granularidad>(
+    () => (localStorage.getItem("project_gantt_granularidad") as Granularidad) || "mes"
+  );
+
+  const handleGranularidadChange = (g: Granularidad) => {
+    setGranularidad(g);
+    localStorage.setItem("project_gantt_granularidad", g);
+  };
+
+  const cfg = CONFIG[granularidad];
+
   const conFechas = useMemo(
     () => filas.filter((f) => f.fechaInicio && f.fechaFin).sort((a, b) => (a.fechaInicio! < b.fechaInicio! ? -1 : 1)),
     [filas]
@@ -68,28 +160,28 @@ export function ProjectGantt({ filas }: Props) {
       if (inicio < min) min = inicio;
       if (fin > max) max = fin;
     });
-    // Padding de un mes a cada lado para que las barras no queden pegadas al borde.
-    const inicio = startOfMonth(addMonths(min, -1));
-    const fin = startOfMonth(addMonths(max, 1));
+    // Padding a cada lado para que las barras no queden pegadas al borde.
+    const inicio = cfg.startOf(cfg.step(min, -cfg.pad));
+    const fin = cfg.startOf(cfg.step(max, cfg.pad));
     return { inicio, fin };
-  }, [conFechas]);
+  }, [conFechas, granularidad]);
 
-  const meses = useMemo(() => {
+  const periodos = useMemo(() => {
     if (!rango) return [];
     const result: Date[] = [];
     let cursor = rango.inicio;
     let guard = 0;
-    while (cursor <= rango.fin && guard < 60) {
+    while (cursor <= rango.fin && guard < 400) {
       result.push(cursor);
-      cursor = addMonths(cursor, 1);
+      cursor = cfg.step(cursor, 1);
       guard++;
     }
     return result;
-  }, [rango]);
+  }, [rango, granularidad]);
 
   if (!rango || conFechas.length === 0) {
     return (
-      <CronogramaCard>
+      <CronogramaCard granularidad={granularidad} onGranularidadChange={handleGranularidadChange}>
         <div className="text-sm text-muted-foreground py-6 text-center">
           Ninguna partida tiene fecha inicio y fecha fin definidas todavía.
         </div>
@@ -100,6 +192,7 @@ export function ProjectGantt({ filas }: Props) {
   const totalDias = differenceInCalendarDays(rango.fin, rango.inicio) || 1;
   const hoy = new Date();
   const hoyPct = Math.min(100, Math.max(0, (differenceInCalendarDays(hoy, rango.inicio) / totalDias) * 100));
+  const anchoMinimo = periodos.length * cfg.minWidth;
 
   const posicion = (f: FilaGantt) => {
     const inicio = parseLocal(f.fechaInicio!);
@@ -110,24 +203,24 @@ export function ProjectGantt({ filas }: Props) {
   };
 
   return (
-    <CronogramaCard>
+    <CronogramaCard granularidad={granularidad} onGranularidadChange={handleGranularidadChange}>
       <ScrollArea className="w-full whitespace-nowrap">
-        <div className="min-w-[760px]">
-          {/* Header de meses */}
+        <div style={{ minWidth: `${Math.max(760, anchoMinimo + 260)}px` }}>
+          {/* Header de periodos */}
           <div className="grid mb-1" style={{ gridTemplateColumns: `${LABEL_COL} 1fr` }}>
             <div />
             <div className="relative flex rounded-t-md overflow-hidden border border-b-0 border-border/60">
-              {meses.map((m, i) => {
-                const esMesActual = isSameMonth(m, hoy);
+              {periodos.map((p, i) => {
+                const esActual = cfg.isCurrent(p, hoy);
                 return (
                   <div
                     key={i}
                     className={cn(
                       "flex-1 py-1.5 text-[11px] font-medium text-center capitalize border-l first:border-l-0 border-border/50",
-                      esMesActual ? "bg-primary/10 text-primary" : "bg-muted/40 text-muted-foreground"
+                      esActual ? "bg-primary/10 text-primary" : "bg-muted/40 text-muted-foreground"
                     )}
                   >
-                    {format(m, "MMM yy", { locale: es })}
+                    {cfg.label(p)}
                   </div>
                 );
               })}
@@ -153,11 +246,11 @@ export function ProjectGantt({ filas }: Props) {
                     {items[0].cuentaNombre ? ` · ${items[0].cuentaNombre}` : ""}
                   </div>
                   <div className="relative h-full min-h-[26px]">
-                    {meses.map((_, i) => (
+                    {periodos.map((_, i) => (
                       <div
                         key={i}
                         className="absolute top-0 bottom-0 border-l border-border/40"
-                        style={{ left: `${(i / meses.length) * 100}%` }}
+                        style={{ left: `${(i / periodos.length) * 100}%` }}
                       />
                     ))}
                   </div>
@@ -185,11 +278,11 @@ export function ProjectGantt({ filas }: Props) {
                         {f.partida}
                       </div>
                       <div className="relative h-8">
-                        {meses.map((_, i) => (
+                        {periodos.map((_, i) => (
                           <div
                             key={i}
                             className="absolute top-0 bottom-0 border-l border-border/40"
-                            style={{ left: `${(i / meses.length) * 100}%` }}
+                            style={{ left: `${(i / periodos.length) * 100}%` }}
                           />
                         ))}
                         <TooltipProvider>
