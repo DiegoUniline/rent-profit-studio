@@ -32,6 +32,7 @@ import { ProyectoPartidaSeguimientoDialog, PartidaSeguimiento } from "@/componen
 import { ProyectoEditDialog } from "@/components/dialogs/ProyectoEditDialog";
 import { ProjectSummaryTable, FilaResumenPartida } from "@/components/proyectos/ProjectSummaryTable";
 import { ProjectGantt } from "@/components/proyectos/ProjectGantt";
+import { ProyectoTareas } from "@/components/proyectos/ProyectoTareas";
 import { formatCurrency, Movimiento, AsientoContable } from "@/lib/accounting-utils";
 import {
   calcularEjercidoPorPartida,
@@ -515,6 +516,9 @@ export default function ProyectoDetalle() {
           </Select>
         </div>
       </div>
+
+      {/* Tareas del Project: independientes de las partidas presupuestales */}
+      <ProyectoTareas proyectoId={proyecto.id} empresaId={proyecto.empresa_id} canEdit={canEdit} />
 
       {partidasFiltradas.length === 0 ? (
         <Card>

@@ -629,6 +629,79 @@ export type Database = {
           },
         ]
       }
+      proyecto_tareas: {
+        Row: {
+          color: string | null
+          created_at: string
+          created_by: string | null
+          empresa_id: string
+          estado: Database["public"]["Enums"]["tarea_estado"]
+          fecha_vencimiento: string | null
+          id: string
+          notas: string | null
+          orden: number
+          proyecto_id: string
+          responsable_tercero_id: string | null
+          titulo: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          empresa_id: string
+          estado?: Database["public"]["Enums"]["tarea_estado"]
+          fecha_vencimiento?: string | null
+          id?: string
+          notas?: string | null
+          orden?: number
+          proyecto_id: string
+          responsable_tercero_id?: string | null
+          titulo: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          empresa_id?: string
+          estado?: Database["public"]["Enums"]["tarea_estado"]
+          fecha_vencimiento?: string | null
+          id?: string
+          notas?: string | null
+          orden?: number
+          proyecto_id?: string
+          responsable_tercero_id?: string | null
+          titulo?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_tareas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_tareas_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_tareas_responsable_tercero_id_fkey"
+            columns: ["responsable_tercero_id"]
+            isOneToOne: false
+            referencedRelation: "terceros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proyecto_usuarios: {
         Row: {
           created_at: string
@@ -880,6 +953,7 @@ export type Database = {
         | "semestral"
         | "anual"
       naturaleza_cuenta: "deudora" | "acreedora"
+      tarea_estado: "pendiente" | "en_progreso" | "bloqueada" | "hecho"
       tipo_asiento: "ingreso" | "egreso" | "diario"
       tipo_persona: "fisica" | "moral"
       tipo_programacion: "ingreso" | "egreso"
@@ -1023,6 +1097,7 @@ export const Constants = {
         "anual",
       ],
       naturaleza_cuenta: ["deudora", "acreedora"],
+      tarea_estado: ["pendiente", "en_progreso", "bloqueada", "hecho"],
       tipo_asiento: ["ingreso", "egreso", "diario"],
       tipo_persona: ["fisica", "moral"],
       tipo_programacion: ["ingreso", "egreso"],
