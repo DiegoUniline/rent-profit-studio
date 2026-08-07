@@ -404,11 +404,13 @@ export type Database = {
           frecuencia:
             | Database["public"]["Enums"]["frecuencia_presupuesto"]
             | null
+          es_project: boolean
           id: string
           notas: string | null
           orden: number | null
           partida: string
           precio_unitario: number
+          responsable_tercero_id: string | null
           tercero_id: string | null
           unidad_medida_id: string | null
           updated_at: string
@@ -425,11 +427,13 @@ export type Database = {
           frecuencia?:
             | Database["public"]["Enums"]["frecuencia_presupuesto"]
             | null
+          es_project?: boolean
           id?: string
           notas?: string | null
           orden?: number | null
           partida: string
           precio_unitario?: number
+          responsable_tercero_id?: string | null
           tercero_id?: string | null
           unidad_medida_id?: string | null
           updated_at?: string
@@ -446,11 +450,13 @@ export type Database = {
           frecuencia?:
             | Database["public"]["Enums"]["frecuencia_presupuesto"]
             | null
+          es_project?: boolean
           id?: string
           notas?: string | null
           orden?: number | null
           partida?: string
           precio_unitario?: number
+          responsable_tercero_id?: string | null
           tercero_id?: string | null
           unidad_medida_id?: string | null
           updated_at?: string
@@ -478,6 +484,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "presupuestos_responsable_tercero_id_fkey"
+            columns: ["responsable_tercero_id"]
+            isOneToOne: false
+            referencedRelation: "terceros"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "presupuestos_tercero_id_fkey"
             columns: ["tercero_id"]
             isOneToOne: false
@@ -489,6 +502,99 @@ export type Database = {
             columns: ["unidad_medida_id"]
             isOneToOne: false
             referencedRelation: "unidades_medida"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyecto_usuarios: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          empresa_id: string
+          id: string
+          proyecto_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          empresa_id: string
+          id?: string
+          proyecto_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          empresa_id?: string
+          id?: string
+          proyecto_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_usuarios_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_usuarios_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyectos: {
+        Row: {
+          activo: boolean
+          centro_negocio_id: string
+          created_at: string
+          created_by: string | null
+          empresa_id: string
+          id: string
+          nombre: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activo?: boolean
+          centro_negocio_id: string
+          created_at?: string
+          created_by?: string | null
+          empresa_id: string
+          id?: string
+          nombre: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activo?: boolean
+          centro_negocio_id?: string
+          created_at?: string
+          created_by?: string | null
+          empresa_id?: string
+          id?: string
+          nombre?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyectos_centro_negocio_id_fkey"
+            columns: ["centro_negocio_id"]
+            isOneToOne: true
+            referencedRelation: "centros_negocio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyectos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
         ]

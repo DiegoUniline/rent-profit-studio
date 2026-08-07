@@ -300,7 +300,7 @@ export default function Presupuestos() {
             *,
             empresas(id, razon_social),
             cuentas_contables(id, codigo, nombre),
-            terceros(id, razon_social, rfc),
+            terceros!presupuestos_tercero_id_fkey(id, razon_social, rfc),
             centros_negocio(id, codigo, nombre),
             unidades_medida(id, codigo, nombre)
           `)

@@ -27,6 +27,7 @@ import {
   Calendar,
   BarChart3,
   Settings,
+  FolderKanban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -59,6 +60,7 @@ const menuGroups = [
     label: "Análisis",
     items: [
       { title: "Reportes", icon: BarChart3, href: "/reportes", roles: ["admin", "contador"] },
+      { title: "Proyectos", icon: FolderKanban, href: "/proyectos", roles: ["admin", "contador", "usuario"] },
     ],
   },
   {

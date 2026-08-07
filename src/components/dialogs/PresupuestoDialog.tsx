@@ -320,10 +320,8 @@ export function PresupuestoDialog({
         cantidad,
         precio_unitario,
         notas: form.notas || null,
-        // Keep legacy fields null for new entries
-        fecha_inicio: null as string | null,
-        fecha_fin: null as string | null,
-        frecuencia: "mensual" as const,
+        // fecha_inicio/fecha_fin/frecuencia no se tocan aquí: los administra
+        // el módulo Project (seguimiento por partida). No pisar esos valores.
       };
 
       let presupuestoId: string;

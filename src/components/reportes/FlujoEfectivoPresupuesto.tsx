@@ -14,7 +14,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatCurrency, Movimiento, AsientoContable } from "@/lib/accounting-utils";
 import { cn } from "@/lib/utils";
-import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, DollarSign, ChevronDown, ChevronRight, Lock, ArrowRightLeft, Zap } from "lucide-react";
+import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, DollarSign, ChevronDown, ChevronRight, Lock, ArrowRightLeft, Zap, User, CalendarRange, Pencil, AlertTriangle } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import jsPDF from "jspdf";
@@ -48,6 +48,15 @@ interface Presupuesto {
   } | null;
 }
 
+export interface SeguimientoPartida {
+  responsable: string | null;
+  fechaInicio: string | null;
+  fechaFin: string | null;
+  avance: number;
+  pendienteAjustar: boolean;
+  vencida: boolean;
+}
+
 interface FlujoEfectivoPresupuestoProps {
   presupuestos: Presupuesto[];
   flujosProgramados: FlujoProgramado[];
@@ -56,6 +65,12 @@ interface FlujoEfectivoPresupuestoProps {
   loading?: boolean;
   empresaNombre: string;
   onOrderUpdate?: () => void;
+  /** Módulo Project: datos de seguimiento por partida (responsable/fechas/avance). */
+  seguimientoPorPartida?: Map<string, SeguimientoPartida>;
+  /** Módulo Project: callback para abrir el editor de seguimiento de una partida. */
+  onEditSeguimiento?: (presupuestoId: string) => void;
+  /** Módulo Project: solo lectura, oculta el botón de editar seguimiento. */
+  readOnlySeguimiento?: boolean;
 }
 
 type TipoFlujo = "entrada" | "salida";
@@ -105,6 +120,9 @@ export function FlujoEfectivoPresupuesto({
   asientos = [],
   loading,
   empresaNombre,
+  seguimientoPorPartida,
+  onEditSeguimiento,
+  readOnlySeguimiento,
 }: FlujoEfectivoPresupuestoProps) {
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "entradas" | "salidas">("todos");
   const [expandedCuentas, setExpandedCuentas] = useState<Set<string>>(new Set());
@@ -569,13 +587,59 @@ export function FlujoEfectivoPresupuesto({
                 )}
               >
                 <TableCell className="sticky left-0 z-10 bg-background pl-12">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm">{flujo.partida}</span>
                     {flujo.autoGenerado && (
                       <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800">
                         <Zap className="h-2.5 w-2.5 mr-0.5" />Auto
                       </Badge>
                     )}
+                    {seguimientoPorPartida && (() => {
+                      const seg = seguimientoPorPartida.get(flujo.presupuestoId);
+                      if (!seg) return null;
+                      return (
+                        <>
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 gap-1">
+                            <User className="h-2.5 w-2.5" />
+                            {seg.responsable || "Sin responsable"}
+                          </Badge>
+                          {(seg.fechaInicio || seg.fechaFin) && (
+                            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 gap-1">
+                              <CalendarRange className="h-2.5 w-2.5" />
+                              {seg.fechaInicio || "—"} a {seg.fechaFin || "—"}
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
+                            Avance {seg.avance.toFixed(0)}%
+                          </Badge>
+                          {seg.pendienteAjustar && (
+                            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 gap-1 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
+                              <AlertTriangle className="h-2.5 w-2.5" />Pendiente de ajustar
+                            </Badge>
+                          )}
+                          {seg.vencida && (
+                            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800">
+                              Vencida
+                            </Badge>
+                          )}
+                          {!readOnlySeguimiento && onEditSeguimiento && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              title="Editar seguimiento"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEditSeguimiento(flujo.presupuestoId);
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </TableCell>
                 {sliceAjustado.map((monto, i) => {

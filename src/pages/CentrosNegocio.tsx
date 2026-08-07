@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTablePagination } from "@/hooks/use-table-pagination";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FilterSelect } from "@/components/ui/filter-select";
-import { Briefcase, Plus, Edit, Power, Search } from "lucide-react";
+import { Briefcase, Plus, Edit, Power, Search, FolderKanban } from "lucide-react";
 import { CentroNegocioDialog } from "@/components/dialogs/CentroNegocioDialog";
 
 interface Empresa {
@@ -39,8 +40,10 @@ interface CentroNegocio {
 }
 
 export default function CentrosNegocio() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [generandoProject, setGenerandoProject] = useState<string | null>(null);
   const [centros, setCentros] = useState<CentroNegocio[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
@@ -144,6 +147,48 @@ export default function CentrosNegocio() {
     setDialogOpen(true);
   };
 
+  const handleGenerarProject = async (centro: CentroNegocio) => {
+    setGenerandoProject(centro.id);
+    try {
+      const { data: existente, error: fetchError } = await supabase
+        .from("proyectos")
+        .select("id")
+        .eq("centro_negocio_id", centro.id)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      if (existente) {
+        navigate(`/proyectos/${existente.id}`);
+        return;
+      }
+
+      const { data: creado, error: insertError } = await supabase
+        .from("proyectos")
+        .insert({
+          empresa_id: centro.empresa_id,
+          centro_negocio_id: centro.id,
+          nombre: centro.nombre,
+          created_by: user?.id,
+        })
+        .select("id")
+        .single();
+
+      if (insertError) throw insertError;
+
+      toast({ title: "Project generado", description: `${centro.nombre} ya está disponible en Análisis → Proyectos` });
+      navigate(`/proyectos/${creado.id}`);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo generar el Project",
+        variant: "destructive",
+      });
+    } finally {
+      setGenerandoProject(null);
+    }
+  };
+
   const filteredCentros = centros.filter((centro) => {
     const matchesSearch =
       centro.codigo.toLowerCase().includes(search.toLowerCase()) ||
@@ -245,6 +290,15 @@ export default function CentrosNegocio() {
                       </TableCell>
                       {canEdit && (
                         <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Generar Project"
+                            disabled={generandoProject === centro.id}
+                            onClick={() => handleGenerarProject(centro)}
+                          >
+                            <FolderKanban className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="sm" onClick={() => openEdit(centro)}>
                             <Edit className="h-4 w-4" />
                           </Button>

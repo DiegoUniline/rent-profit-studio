@@ -21,6 +21,8 @@ import Asientos from "./pages/Asientos";
 import AsientoDetalle from "./pages/AsientoDetalle";
 import Programacion from "./pages/Programacion";
 import Reportes from "./pages/Reportes";
+import Proyectos from "./pages/Proyectos";
+import ProyectoDetalle from "./pages/ProyectoDetalle";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -186,6 +188,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["admin", "contador"]}>
             <Reportes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/proyectos"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "contador", "usuario"]}>
+            <Proyectos />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/proyectos/:id"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "contador", "usuario"]}>
+            <ProyectoDetalle />
           </ProtectedRoute>
         }
       />
