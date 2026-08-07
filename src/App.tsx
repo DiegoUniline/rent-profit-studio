@@ -199,7 +199,7 @@ function AppRoutes() {
       <Route
         path="/proyectos"
         element={
-          <ProtectedRoute allowedRoles={["admin", "contador", "usuario"]}>
+          <ProtectedRoute allowedRoles={["admin", "contador", "usuario"]} allowedEmails={PROYECTOS_ALLOWED_EMAILS}>
             <Proyectos />
           </ProtectedRoute>
         }
@@ -207,11 +207,12 @@ function AppRoutes() {
       <Route
         path="/proyectos/:id"
         element={
-          <ProtectedRoute allowedRoles={["admin", "contador", "usuario"]}>
+          <ProtectedRoute allowedRoles={["admin", "contador", "usuario"]} allowedEmails={PROYECTOS_ALLOWED_EMAILS}>
             <ProyectoDetalle />
           </ProtectedRoute>
         }
       />
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

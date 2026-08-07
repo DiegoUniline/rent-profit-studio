@@ -74,15 +74,21 @@ const menuGroups = [
 
 export function AppSidebar() {
   const location = useLocation();
-  const { role, signOut } = useAuth();
+  const { role, signOut, user } = useAuth();
 
   // Filter groups and items based on role
   const filteredGroups = menuGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => role && item.roles.includes(role)),
+      items: group.items.filter(
+        (item) =>
+          role &&
+          item.roles.includes(role) &&
+          (item.href !== "/proyectos" || canAccessProyectos(user?.email))
+      ),
     }))
     .filter((group) => group.items.length > 0);
+
 
   return (
     <Sidebar className="border-r">
