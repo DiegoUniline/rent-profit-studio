@@ -22,6 +22,7 @@ import AsientoDetalle from "./pages/AsientoDetalle";
 import Programacion from "./pages/Programacion";
 import Reportes from "./pages/Reportes";
 import Proyectos from "./pages/Proyectos";
+import { PROYECTOS_ALLOWED_EMAILS } from "@/lib/feature-access";
 import ProyectoDetalle from "./pages/ProyectoDetalle";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";

@@ -30,6 +30,7 @@ import {
   FolderKanban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { canAccessProyectos } from "@/lib/feature-access";
 
 // Menu grouped logically
 const menuGroups = [
