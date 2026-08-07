@@ -128,7 +128,7 @@ export default function ProyectoDetalle() {
         .select(`
           id, partida, cantidad, precio_unitario, fecha_inicio, fecha_fin, es_project, responsable_tercero_id,
           cuenta:cuenta_id (codigo, nombre),
-          responsable:responsable_tercero_id (razon_social)
+          responsable:terceros!presupuestos_responsable_tercero_id_fkey (razon_social)
         `)
         .eq("centro_negocio_id", proyectoData.centro_negocio_id)
         .eq("activo", true)

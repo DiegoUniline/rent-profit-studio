@@ -283,7 +283,7 @@ export default function Reportes() {
           orden,
           centro_negocio_id,
           cuentas_contables:cuenta_id (codigo, nombre),
-          terceros:tercero_id (razon_social),
+          terceros:terceros!presupuestos_tercero_id_fkey (razon_social),
           centros_negocio:centro_negocio_id (codigo, nombre)
         `)
         .eq("activo", true)

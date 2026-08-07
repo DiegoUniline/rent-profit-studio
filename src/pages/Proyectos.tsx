@@ -88,7 +88,7 @@ export default function Proyectos() {
 
       const { data: partidasData, error: partidasError } = await supabase
         .from("presupuestos")
-        .select("id, centro_negocio_id, cantidad, precio_unitario, fecha_inicio, fecha_fin, responsable:responsable_tercero_id(razon_social)")
+        .select("id, centro_negocio_id, cantidad, precio_unitario, fecha_inicio, fecha_fin, responsable:terceros!presupuestos_responsable_tercero_id_fkey(razon_social)")
         .eq("es_project", true)
         .eq("activo", true)
         .in("centro_negocio_id", centroIds);
