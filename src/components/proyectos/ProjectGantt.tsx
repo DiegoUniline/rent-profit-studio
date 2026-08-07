@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { addMonths, startOfMonth, format, differenceInCalendarDays } from "date-fns";
+import { addMonths, startOfMonth, format, differenceInCalendarDays, isSameMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ export interface FilaGantt {
   id: string;
   partida: string;
   cuentaCodigo: string;
+  cuentaNombre?: string;
   fechaInicio: string | null;
   fechaFin: string | null;
   avance: number;
@@ -21,8 +22,24 @@ interface Props {
   filas: FilaGantt[];
 }
 
+const LABEL_COL = "260px";
+
 function parseLocal(dateStr: string): Date {
   return new Date(dateStr + "T00:00:00");
+}
+
+function CronogramaCard({ children }: { children: React.ReactNode }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <CalendarRange className="h-4 w-4 text-primary" />
+          Cronograma
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
 }
 
 export function ProjectGantt({ filas }: Props) {
@@ -30,6 +47,16 @@ export function ProjectGantt({ filas }: Props) {
     () => filas.filter((f) => f.fechaInicio && f.fechaFin).sort((a, b) => (a.fechaInicio! < b.fechaInicio! ? -1 : 1)),
     [filas]
   );
+
+  const grupos = useMemo(() => {
+    const map = new Map<string, FilaGantt[]>();
+    conFechas.forEach((f) => {
+      const key = f.cuentaCodigo || "sin-cuenta";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(f);
+    });
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [conFechas]);
 
   const rango = useMemo(() => {
     if (conFechas.length === 0) return null;
@@ -62,17 +89,11 @@ export function ProjectGantt({ filas }: Props) {
 
   if (!rango || conFechas.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-          <CalendarRange className="h-4 w-4 text-primary" />
-          Cronograma
-        </CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground py-6 text-center">
+      <CronogramaCard>
+        <div className="text-sm text-muted-foreground py-6 text-center">
           Ninguna partida tiene fecha inicio y fecha fin definidas todavía.
-        </CardContent>
-      </Card>
+        </div>
+      </CronogramaCard>
     );
   }
 
@@ -84,98 +105,134 @@ export function ProjectGantt({ filas }: Props) {
     const inicio = parseLocal(f.fechaInicio!);
     const fin = parseLocal(f.fechaFin!);
     const left = (differenceInCalendarDays(inicio, rango.inicio) / totalDias) * 100;
-    const width = Math.max(1, (differenceInCalendarDays(fin, inicio) / totalDias) * 100);
+    const width = Math.max(1.5, (differenceInCalendarDays(fin, inicio) / totalDias) * 100);
     return { left: `${left}%`, width: `${width}%` };
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <CalendarRange className="h-4 w-4 text-primary" />
-          Cronograma
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ScrollArea className="w-full whitespace-nowrap">
-          <div className="min-w-[720px]">
-            {/* Header de meses */}
-            <div className="grid grid-cols-[220px_1fr] mb-2">
-              <div />
-              <div className="relative flex border-b pb-1">
-                {meses.map((m, i) => (
+    <CronogramaCard>
+      <ScrollArea className="w-full whitespace-nowrap">
+        <div className="min-w-[760px]">
+          {/* Header de meses */}
+          <div className="grid mb-1" style={{ gridTemplateColumns: `${LABEL_COL} 1fr` }}>
+            <div />
+            <div className="relative flex rounded-t-md overflow-hidden border border-b-0 border-border/60">
+              {meses.map((m, i) => {
+                const esMesActual = isSameMonth(m, hoy);
+                return (
                   <div
                     key={i}
-                    className="flex-1 text-xs text-muted-foreground text-center capitalize border-l first:border-l-0"
+                    className={cn(
+                      "flex-1 py-1.5 text-[11px] font-medium text-center capitalize border-l first:border-l-0 border-border/50",
+                      esMesActual ? "bg-primary/10 text-primary" : "bg-muted/40 text-muted-foreground"
+                    )}
                   >
                     {format(m, "MMM yy", { locale: es })}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Filas */}
-            <div className="space-y-1.5">
-              {conFechas.map((f) => {
-                const pos = posicion(f);
-                const barColor = f.vencida
-                  ? "bg-red-400 dark:bg-red-600"
-                  : f.avance >= 100
-                  ? "bg-green-500 dark:bg-green-600"
-                  : "bg-primary";
-                return (
-                  <div key={f.id} className="grid grid-cols-[220px_1fr] items-center gap-2">
-                    <div className="text-xs truncate pr-2" title={f.partida}>
-                      <span className="text-muted-foreground">{f.cuentaCodigo}</span> {f.partida}
-                    </div>
-                    <div className="relative h-5 bg-muted/40 rounded">
-                      {meses.map((_, i) => (
-                        <div
-                          key={i}
-                          className="absolute top-0 bottom-0 border-l border-border/50"
-                          style={{ left: `${(i / meses.length) * 100}%` }}
-                        />
-                      ))}
-                      <div
-                        className="absolute top-0 bottom-0 w-px bg-foreground/40 z-10"
-                        style={{ left: `${hoyPct}%` }}
-                      />
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div
-                              className={cn("absolute top-0.5 bottom-0.5 rounded", barColor)}
-                              style={pos}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {f.fechaInicio} a {f.fechaFin} · Avance {f.avance.toFixed(0)}%
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
                   </div>
                 );
               })}
             </div>
           </div>
-          <ScrollBar orientation="horizontal" />
-        </ScrollArea>
-        <div className="flex items-center gap-4 text-xs text-muted-foreground pt-3">
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded bg-primary inline-block" />En curso
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded bg-green-500 inline-block" />Completada (100%+)
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded bg-red-400 inline-block" />Vencida
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-px bg-foreground/40 inline-block" />Hoy
+
+          <div className="relative rounded-md border border-border/60 overflow-hidden">
+            {/* Línea de "hoy", superpuesta a todas las filas */}
+            <div
+              className="pointer-events-none absolute top-0 bottom-0 z-10 border-l-2 border-dashed border-foreground/40"
+              style={{ left: `calc(${LABEL_COL} + (100% - ${LABEL_COL}) * ${hoyPct / 100})` }}
+            />
+
+            {grupos.map(([codigo, items], gIdx) => (
+              <div key={codigo}>
+                {/* Encabezado de cuenta */}
+                <div
+                  className="grid items-center bg-muted/50 border-b border-border/50"
+                  style={{ gridTemplateColumns: `${LABEL_COL} 1fr` }}
+                >
+                  <div className="px-2.5 py-1.5 text-[11px] font-semibold text-foreground/80 truncate">
+                    {codigo !== "sin-cuenta" ? codigo : "Sin cuenta"}
+                    {items[0].cuentaNombre ? ` · ${items[0].cuentaNombre}` : ""}
+                  </div>
+                  <div className="relative h-full min-h-[26px]">
+                    {meses.map((_, i) => (
+                      <div
+                        key={i}
+                        className="absolute top-0 bottom-0 border-l border-border/40"
+                        style={{ left: `${(i / meses.length) * 100}%` }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Filas de partidas */}
+                {items.map((f, rIdx) => {
+                  const pos = posicion(f);
+                  const barClass = f.vencida
+                    ? "bg-gradient-to-r from-red-500 to-red-400 dark:from-red-500 dark:to-red-400"
+                    : f.avance >= 100
+                    ? "bg-gradient-to-r from-green-600 to-green-500 dark:from-green-500 dark:to-green-400"
+                    : "bg-gradient-to-r from-primary to-primary/80";
+                  return (
+                    <div
+                      key={f.id}
+                      className={cn(
+                        "grid items-center",
+                        rIdx % 2 === 1 && "bg-muted/20",
+                        (gIdx < grupos.length - 1 || rIdx < items.length - 1) && "border-b border-border/30"
+                      )}
+                      style={{ gridTemplateColumns: `${LABEL_COL} 1fr` }}
+                    >
+                      <div className="px-2.5 py-2 text-xs truncate" title={f.partida}>
+                        {f.partida}
+                      </div>
+                      <div className="relative h-8">
+                        {meses.map((_, i) => (
+                          <div
+                            key={i}
+                            className="absolute top-0 bottom-0 border-l border-border/40"
+                            style={{ left: `${(i / meses.length) * 100}%` }}
+                          />
+                        ))}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div
+                                className={cn(
+                                  "absolute top-1.5 bottom-1.5 rounded-full shadow-sm ring-1 ring-black/5 cursor-default",
+                                  barClass
+                                )}
+                                style={pos}
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {f.fechaInicio} a {f.fechaFin} · Avance {f.avance.toFixed(0)}%
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
-      </CardContent>
-    </Card>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground pt-3">
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-primary inline-block" />En curso
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-green-500 inline-block" />Completada (100%+)
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-red-400 inline-block" />Vencida
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-2.5 w-px border-l-2 border-dashed border-foreground/50 inline-block" />Hoy
+        </div>
+      </div>
+    </CronogramaCard>
   );
 }
