@@ -28,6 +28,8 @@ import {
   SeguimientoPartida,
 } from "@/components/reportes/FlujoEfectivoPresupuesto";
 import { ProyectoPartidaSeguimientoDialog, PartidaSeguimiento } from "@/components/dialogs/ProyectoPartidaSeguimientoDialog";
+import { ProjectSummaryTable, FilaResumenPartida } from "@/components/proyectos/ProjectSummaryTable";
+import { ProjectGantt } from "@/components/proyectos/ProjectGantt";
 import { formatCurrency, Movimiento, AsientoContable } from "@/lib/accounting-utils";
 import {
   calcularEjercidoPorPartida,
@@ -322,6 +324,30 @@ export default function ProyectoDetalle() {
     return map;
   }, [partidasFiltradas, ejercidoMap, proyectadoMap]);
 
+  const filasResumen: FilaResumenPartida[] = useMemo(() => {
+    return partidasFiltradas.map((p) => {
+      const presupuesto = p.cantidad * p.precio_unitario;
+      const ejercido = ejercidoMap.get(p.id) || 0;
+      const proyectado = proyectadoAcumuladoMap.get(p.id) || 0;
+      const totalProgramado = proyectadoMap.get(p.id) || 0;
+      return {
+        id: p.id,
+        partida: p.partida,
+        cuentaCodigo: p.cuenta?.codigo || "",
+        cuentaNombre: p.cuenta?.nombre || "Sin cuenta",
+        responsable: p.responsable?.razon_social || null,
+        fechaInicio: p.fecha_inicio,
+        fechaFin: p.fecha_fin,
+        presupuesto,
+        proyectado,
+        ejercido,
+        avance: calcularAvance(ejercido, presupuesto),
+        pendienteAjustar: programacionPendienteDeAjustar(totalProgramado, presupuesto),
+        vencida: !!p.fecha_fin && new Date(p.fecha_fin + "T00:00:00") < new Date(),
+      };
+    });
+  }, [partidasFiltradas, ejercidoMap, proyectadoMap, proyectadoAcumuladoMap]);
+
   const presupuestosParaTree = useMemo(
     () =>
       partidasFiltradas.map((p) => ({
@@ -441,7 +467,6 @@ export default function ProyectoDetalle() {
         </div>
       </div>
 
-      {/* Árbol Cuenta -> Partida (reutiliza el Reporte de Flujo) */}
       {partidasFiltradas.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
@@ -449,16 +474,36 @@ export default function ProyectoDetalle() {
           </CardContent>
         </Card>
       ) : (
-        <FlujoEfectivoPresupuesto
-          presupuestos={presupuestosParaTree}
-          flujosProgramados={flujos}
-          movimientos={movimientos}
-          asientos={asientos}
-          empresaNombre={proyecto.nombre}
-          seguimientoPorPartida={seguimientoPorPartida}
-          onEditSeguimiento={canEdit ? openSeguimiento : undefined}
-          readOnlySeguimiento={readOnly}
-        />
+        <>
+          {/* Cronograma (Gantt) */}
+          <ProjectGantt filas={filasResumen} />
+
+          {/* Resumen Presupuesto / Proyectado / Ejercido / Disponible / Avance por cuenta y partida */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Presupuesto vs. Ejercido por partida</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <ProjectSummaryTable
+                filas={filasResumen}
+                onEdit={canEdit ? openSeguimiento : undefined}
+                readOnly={readOnly}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Árbol Cuenta -> Partida con calendario mensual (reutiliza el Reporte de Flujo) */}
+          <FlujoEfectivoPresupuesto
+            presupuestos={presupuestosParaTree}
+            flujosProgramados={flujos}
+            movimientos={movimientos}
+            asientos={asientos}
+            empresaNombre={proyecto.nombre}
+            seguimientoPorPartida={seguimientoPorPartida}
+            onEditSeguimiento={canEdit ? openSeguimiento : undefined}
+            readOnlySeguimiento={readOnly}
+          />
+        </>
       )}
 
       {/* Gestión de partidas incluidas (solo admin/contador) */}
