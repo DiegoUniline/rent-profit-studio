@@ -28,7 +28,7 @@ import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
+function ProtectedRoute({ children, allowedRoles, allowedEmails }: { children: React.ReactNode; allowedRoles?: string[]; allowedEmails?: string[] }) {
   const { user, role, loading } = useAuth();
 
   if (loading) {
@@ -47,8 +47,13 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
     return <Navigate to="/" replace />;
   }
 
+  if (allowedEmails && !allowedEmails.includes((user.email ?? "").toLowerCase())) {
+    return <Navigate to="/" replace />;
+  }
+
   return <AppLayout>{children}</AppLayout>;
 }
+
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
