@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { formatDateNumeric } from "@/lib/date-utils";
 import { useNavigate } from "react-router-dom";
 import { useTablePagination } from "@/hooks/use-table-pagination";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -226,8 +227,8 @@ export default function Proyectos() {
                       <TableCell className="text-muted-foreground">
                         {f.proyecto.centros_negocio?.codigo} {f.proyecto.centros_negocio?.nombre}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{f.inicio || "-"}</TableCell>
-                      <TableCell className="text-muted-foreground">{f.fin || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{f.inicio ? formatDateNumeric(f.inicio) : "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{f.fin ? formatDateNumeric(f.fin) : "-"}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatCurrency(f.presupuesto)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatCurrency(f.ejercido)}</TableCell>
                       <TableCell className="text-right">

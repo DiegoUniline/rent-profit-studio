@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { formatDateObj } from "@/lib/date-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -62,8 +63,8 @@ export function EstadoResultados({ saldos, loading, fechaInicio, fechaFin }: Est
   }
 
   const formatPeriodo = () => {
-    const inicio = fechaInicio.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
-    const fin = fechaFin.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+    const inicio = formatDateObj(fechaInicio);
+    const fin = formatDateObj(fechaFin);
     return `Del ${inicio} al ${fin}`;
   };
 

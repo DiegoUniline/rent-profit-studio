@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { formatDateObj } from "@/lib/date-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -104,7 +105,7 @@ export function BalanceGeneral({ saldos, loading, fechaCorte }: BalanceGeneralPr
         <CardHeader className="text-center border-b">
           <CardTitle className="text-xl">Balance General</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Al {fechaCorte.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}
+            Al {formatDateObj(fechaCorte)}
           </p>
         </CardHeader>
         <CardContent className="pt-6">
