@@ -19,39 +19,32 @@ export function parseLocalDate(dateStr: string): Date {
 }
 
 /**
- * Formats a date string from the database for display in Spanish (Mexico) locale.
- * Uses short month format: "1 ene 2026"
+ * Formats a Date object as dd/MM/yyyy.
  */
-export function formatDateShort(dateStr: string): string {
-  const date = parseLocalDate(dateStr);
-  return date.toLocaleDateString("es-MX", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+export function formatDateObj(date: Date): string {
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 /**
- * Formats a date string from the database for display in Spanish (Mexico) locale.
- * Uses long format with weekday: "miércoles, 1 de enero de 2026"
+ * Formats a date string from the database in dd/MM/yyyy format.
+ */
+export function formatDateShort(dateStr: string): string {
+  return formatDateObj(parseLocalDate(dateStr));
+}
+
+/**
+ * Formats a date string from the database in dd/MM/yyyy format.
  */
 export function formatDateLong(dateStr: string): string {
-  const date = parseLocalDate(dateStr);
-  return date.toLocaleDateString("es-MX", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  return formatDateObj(parseLocalDate(dateStr));
 }
 
 /**
  * Formats a date string from the database in dd/MM/yyyy format.
  */
 export function formatDateNumeric(dateStr: string): string {
-  const date = parseLocalDate(dateStr);
-  const day = date.getDate().toString().padStart(2, "0");
-  const month = (date.getMonth() + 1).toString().padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+  return formatDateObj(parseLocalDate(dateStr));
 }

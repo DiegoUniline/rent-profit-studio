@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatDateObj } from "@/lib/date-utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -404,7 +405,7 @@ export default function Dashboard() {
                               {roleLabels[usuario.role]}
                             </Badge>
                           </TableCell>
-                          <TableCell>{new Date(usuario.created_at).toLocaleDateString("es-MX")}</TableCell>
+                          <TableCell>{formatDateObj(new Date(usuario.created_at))}</TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm" onClick={() => { setEditingUsuario(usuario); setUsuarioDialogOpen(true); }}>
                               <Edit className="h-4 w-4" />

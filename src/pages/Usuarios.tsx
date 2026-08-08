@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { formatDateObj } from "@/lib/date-utils";
 import { useTablePagination } from "@/hooks/use-table-pagination";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { supabase } from "@/integrations/supabase/client";
@@ -175,7 +176,7 @@ export default function Usuarios() {
                           {roleLabels[user.role]}
                         </Badge>
                       </TableCell>
-                      <TableCell>{new Date(user.created_at).toLocaleDateString("es-MX")}</TableCell>
+                      <TableCell>{formatDateObj(new Date(user.created_at))}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)} title="Editar usuario">
                           <Edit className="h-4 w-4" />
