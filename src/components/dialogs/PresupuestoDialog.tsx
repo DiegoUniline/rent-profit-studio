@@ -129,7 +129,8 @@ export function PresupuestoDialog({
   const [form, setForm] = useState<PresupuestoForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [flujoRows, setFlujoRows] = useState<FlujoRow[]>([]);
-  
+  const [programacionProyectoActiva, setProgramacionProyectoActiva] = useState(false);
+
   // Related data states
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [centros, setCentros] = useState<CentroNegocio[]>([]);
@@ -203,6 +204,36 @@ export function PresupuestoDialog({
       })));
     }
   };
+
+  // Anti-duplicación: si el centro de negocio es un Project con programación
+  // financiera propia, esta partida ya no se programa aquí (flujos_programados).
+  useEffect(() => {
+    if (!open || !form.centro_negocio_id) {
+      setProgramacionProyectoActiva(false);
+      return;
+    }
+    let activo = true;
+    (async () => {
+      const { data: proyecto } = await supabase
+        .from("proyectos")
+        .select("id")
+        .eq("centro_negocio_id", form.centro_negocio_id)
+        .maybeSingle();
+      if (!proyecto) {
+        if (activo) setProgramacionProyectoActiva(false);
+        return;
+      }
+      const { data: programacion } = await supabase
+        .from("proyecto_programacion_financiera")
+        .select("id")
+        .eq("proyecto_id", proyecto.id)
+        .maybeSingle();
+      if (activo) setProgramacionProyectoActiva(!!programacion);
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [open, form.centro_negocio_id]);
 
   const loadEmpresas = async () => {
     const { data } = await supabase
@@ -352,26 +383,30 @@ export function PresupuestoDialog({
         presupuestoId = insertData.id;
       }
 
-      // Save flujos_programados: delete all existing and re-insert
-      await supabase
-        .from("flujos_programados")
-        .delete()
-        .eq("presupuesto_id", presupuestoId);
-
-      const validFlujos = flujoRows.filter(r => r.fecha && parseFloat(r.monto) > 0);
-      if (validFlujos.length > 0) {
-        const flujosToInsert = validFlujos.map(r => ({
-          presupuesto_id: presupuestoId,
-          fecha: format(r.fecha!, "yyyy-MM-dd"),
-          monto: parseFloat(r.monto),
-          tipo: r.tipo,
-          descripcion: r.descripcion || null,
-        }));
-
-        const { error: flujoError } = await supabase
+      // Save flujos_programados: delete all existing and re-insert.
+      // Si el proyecto ya tiene programación financiera propia, esta partida
+      // no se programa aquí (evita duplicar el flujo) — no se toca la tabla.
+      if (!programacionProyectoActiva) {
+        await supabase
           .from("flujos_programados")
-          .insert(flujosToInsert);
-        if (flujoError) throw flujoError;
+          .delete()
+          .eq("presupuesto_id", presupuestoId);
+
+        const validFlujos = flujoRows.filter(r => r.fecha && parseFloat(r.monto) > 0);
+        if (validFlujos.length > 0) {
+          const flujosToInsert = validFlujos.map(r => ({
+            presupuesto_id: presupuestoId,
+            fecha: format(r.fecha!, "yyyy-MM-dd"),
+            monto: parseFloat(r.monto),
+            tipo: r.tipo,
+            descripcion: r.descripcion || null,
+          }));
+
+          const { error: flujoError } = await supabase
+            .from("flujos_programados")
+            .insert(flujosToInsert);
+          if (flujoError) throw flujoError;
+        }
       }
 
       toast({ title: presupuesto?.id ? "Presupuesto actualizado" : "Presupuesto creado" });
@@ -560,6 +595,14 @@ export function PresupuestoDialog({
             </div>
 
             {/* Programación de Flujo */}
+            {programacionProyectoActiva ? (
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <p className="text-sm text-muted-foreground">
+                  📊 Esta partida se programa desde la <strong>Programación financiera</strong> del proyecto
+                  (pestaña "Programación financiera" en el detalle del Project), para evitar duplicar el flujo.
+                </p>
+              </div>
+            ) : (
             <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium text-sm flex items-center gap-2">
@@ -658,6 +701,7 @@ export function PresupuestoDialog({
                 </p>
               )}
             </div>
+            )}
 
             {/* Notas */}
             <div className="space-y-2">

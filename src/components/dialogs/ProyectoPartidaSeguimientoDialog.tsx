@@ -52,6 +52,7 @@ export interface PartidaSeguimiento {
   responsable_tercero_id: string | null;
   fecha_inicio: string | null;
   fecha_fin: string | null;
+  avance_manual?: number | null;
 }
 
 interface PeriodoRow {
@@ -63,6 +64,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   partida: PartidaSeguimiento | null;
+  proyectoId?: string;
   onSuccess: () => void;
 }
 
@@ -79,7 +81,7 @@ function mesesEntre(inicio: Date, fin: Date): string[] {
   return result;
 }
 
-export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, onSuccess }: Props) {
+export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, proyectoId, onSuccess }: Props) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [terceros, setTerceros] = useState<Tercero[]>([]);
@@ -88,7 +90,28 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
   const [fechaFin, setFechaFin] = useState<Date | undefined>();
   const [tipo, setTipo] = useState<"ingreso" | "egreso">("egreso");
   const [periodos, setPeriodos] = useState<PeriodoRow[]>([]);
+  const [avanceManual, setAvanceManual] = useState("");
   const [confirmRangoOpen, setConfirmRangoOpen] = useState(false);
+  const [programacionProyectoActiva, setProgramacionProyectoActiva] = useState(false);
+
+  useEffect(() => {
+    if (!open || !proyectoId) {
+      setProgramacionProyectoActiva(false);
+      return;
+    }
+    let activo = true;
+    supabase
+      .from("proyecto_programacion_financiera")
+      .select("id")
+      .eq("proyecto_id", proyectoId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (activo) setProgramacionProyectoActiva(!!data);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [open, proyectoId]);
 
   const presupuestoMonto = useMemo(() => {
     if (!partida) return 0;
@@ -101,6 +124,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
       setResponsableId(partida.responsable_tercero_id || "");
       setFechaInicio(partida.fecha_inicio ? new Date(partida.fecha_inicio + "T00:00:00") : undefined);
       setFechaFin(partida.fecha_fin ? new Date(partida.fecha_fin + "T00:00:00") : undefined);
+      setAvanceManual(partida.avance_manual != null ? String(partida.avance_manual) : "");
       loadFlujos(partida.id);
     }
     if (!open) {
@@ -175,7 +199,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
   const doSave = async (rangoConfirmado: boolean) => {
     if (!partida) return;
 
-    if (!cuadra) {
+    if (!programacionProyectoActiva && !cuadra) {
       toast({
         title: "La programación no cuadra con el presupuesto",
         description:
@@ -193,7 +217,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
     }
 
     // Detect range change vs. what's currently programmed, before persisting.
-    if (!rangoConfirmado && fechaInicio && fechaFin && totalProgramado > 0) {
+    if (!programacionProyectoActiva && !rangoConfirmado && fechaInicio && fechaFin && totalProgramado > 0) {
       const keysVigentes = new Set(mesesEntre(fechaInicio, fechaFin));
       const fueraDeRango = periodos.some((p) => (parseFloat(p.monto) || 0) > 0 && !keysVigentes.has(p.periodo));
       if (fueraDeRango) {
@@ -210,26 +234,31 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
           responsable_tercero_id: responsableId || null,
           fecha_inicio: fechaInicio ? format(fechaInicio, "yyyy-MM-dd") : null,
           fecha_fin: fechaFin ? format(fechaFin, "yyyy-MM-dd") : null,
+          avance_manual: avanceManual.trim() === "" ? null : Math.min(100, Math.max(0, parseFloat(avanceManual) || 0)),
         })
         .eq("id", partida.id);
       if (updateError) throw updateError;
 
-      await supabase.from("flujos_programados").delete().eq("presupuesto_id", partida.id);
+      // Si el proyecto ya tiene programación financiera propia, esta partida
+      // no se programa aquí (evita duplicar el flujo).
+      if (!programacionProyectoActiva) {
+        await supabase.from("flujos_programados").delete().eq("presupuesto_id", partida.id);
 
-      const filas = periodos
-        .filter((p) => (parseFloat(p.monto) || 0) > 0)
-        .map((p) => ({
-          presupuesto_id: partida.id,
-          empresa_id: partida.empresa_id,
-          fecha: p.periodo,
-          monto: parseFloat(p.monto),
-          tipo,
-          auto_generado: false,
-        }));
+        const filas = periodos
+          .filter((p) => (parseFloat(p.monto) || 0) > 0)
+          .map((p) => ({
+            presupuesto_id: partida.id,
+            empresa_id: partida.empresa_id,
+            fecha: p.periodo,
+            monto: parseFloat(p.monto),
+            tipo,
+            auto_generado: false,
+          }));
 
-      if (filas.length > 0) {
-        const { error: insertError } = await supabase.from("flujos_programados").insert(filas);
-        if (insertError) throw insertError;
+        if (filas.length > 0) {
+          const { error: insertError } = await supabase.from("flujos_programados").insert(filas);
+          if (insertError) throw insertError;
+        }
       }
 
       toast({ title: "Seguimiento actualizado" });
@@ -305,6 +334,28 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
             </div>
 
             <div className="space-y-2">
+              <Label>Avance del cronograma (%)</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={avanceManual}
+                onChange={(e) => setAvanceManual(e.target.value)}
+                placeholder="Vacío = calcular automáticamente por lo ejercido"
+              />
+            </div>
+
+            {programacionProyectoActiva ? (
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <p className="text-sm text-muted-foreground">
+                  📊 Esta partida se programa desde la <strong>Programación financiera</strong> del proyecto,
+                  para evitar duplicar el flujo.
+                </p>
+              </div>
+            ) : (
+            <>
+            <div className="space-y-2">
               <Label>Tipo de flujo</Label>
               <Select value={tipo} onValueChange={(v: "ingreso" | "egreso") => setTipo(v)}>
                 <SelectTrigger>
@@ -367,13 +418,15 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
                 </p>
               )}
             </div>
+            </>
+            )}
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button onClick={() => doSave(false)} disabled={saving || !cuadra}>
+            <Button onClick={() => doSave(false)} disabled={saving || (!programacionProyectoActiva && !cuadra)}>
               {saving ? "Guardando..." : "Guardar"}
             </Button>
           </DialogFooter>

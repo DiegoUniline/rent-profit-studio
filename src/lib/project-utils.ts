@@ -2,7 +2,10 @@
 // Reutiliza los tipos y la fórmula de ejercido ya usados en el Reporte de Flujo
 // (FlujoEfectivoPresupuesto.tsx) para no crear una segunda fuente de verdad.
 
+import { addWeeks, addMonths, addYears } from "date-fns";
 import type { Movimiento, AsientoContable } from "@/lib/accounting-utils";
+
+export type FrecuenciaProgramacion = "semanal" | "mensual" | "trimestral" | "semestral" | "anual";
 
 export interface FlujoProgramadoLite {
   presupuesto_id: string | null;
@@ -85,6 +88,45 @@ export function programacionPendienteDeAjustar(
 ): boolean {
   // Tolerancia de centavo por acumulación de redondeos.
   return Math.abs(totalProgramado - presupuestoPartida) > 0.01;
+}
+
+/**
+ * Reparte un saldo en N periodos sin perder ni agregar centavos: cada periodo
+ * recibe el monto base redondeado a 2 decimales, y el último absorbe el
+ * residuo de redondeo (mismo criterio ya usado para partidas individuales en
+ * ProyectoPartidaSeguimientoDialog.distribuirAutomaticamente).
+ */
+export function distribuirSaldoEntrePeriodos(saldo: number, numPeriodos: number): number[] {
+  if (numPeriodos <= 0) return [];
+  const base = Math.floor((saldo / numPeriodos) * 100) / 100;
+  const restante = Math.round((saldo - base * numPeriodos) * 100) / 100;
+  return Array.from({ length: numPeriodos }, (_, i) => (i === numPeriodos - 1 ? base + restante : base));
+}
+
+/** Avanza una fecha una unidad de la frecuencia dada. */
+function avanzarFrecuencia(fecha: Date, frecuencia: FrecuenciaProgramacion, n: number): Date {
+  switch (frecuencia) {
+    case "semanal":
+      return addWeeks(fecha, n);
+    case "mensual":
+      return addMonths(fecha, n);
+    case "trimestral":
+      return addMonths(fecha, n * 3);
+    case "semestral":
+      return addMonths(fecha, n * 6);
+    case "anual":
+      return addYears(fecha, n);
+  }
+}
+
+/** Calcula las N fechas de pago a partir de una fecha inicial y una frecuencia. */
+export function calcularFechasPorFrecuencia(
+  fechaInicio: Date,
+  frecuencia: FrecuenciaProgramacion,
+  numPeriodos: number
+): Date[] {
+  if (numPeriodos <= 0) return [];
+  return Array.from({ length: numPeriodos }, (_, i) => avanzarFrecuencia(fechaInicio, frecuencia, i));
 }
 
 export interface AgregadoFinanciero {

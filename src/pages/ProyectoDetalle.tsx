@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,10 +31,14 @@ import {
   SeguimientoPartida,
 } from "@/components/reportes/FlujoEfectivoPresupuesto";
 import { ProyectoPartidaSeguimientoDialog, PartidaSeguimiento } from "@/components/dialogs/ProyectoPartidaSeguimientoDialog";
+import { CronogramaPartidaDialog, CronogramaPartida } from "@/components/dialogs/CronogramaPartidaDialog";
 import { ProyectoEditDialog } from "@/components/dialogs/ProyectoEditDialog";
 import { ProjectSummaryTable, FilaResumenPartida } from "@/components/proyectos/ProjectSummaryTable";
 import { ProjectGantt } from "@/components/proyectos/ProjectGantt";
 import { ProyectoTareas } from "@/components/proyectos/ProyectoTareas";
+import { ProgramacionFinancieraProyecto } from "@/components/proyectos/ProgramacionFinancieraProyecto";
+import { useProyectoAcceso } from "@/lib/project-permissions";
+import { exportarCronogramaPDF, compartirCronogramaWhatsApp, compartirCronogramaCorreo } from "@/lib/cronograma-pdf";
 import { formatCurrency, Movimiento, AsientoContable } from "@/lib/accounting-utils";
 import {
   calcularEjercidoPorPartida,
@@ -58,6 +63,8 @@ import {
   CalendarDays,
   ListChecks,
   Settings2,
+  Wand2,
+  History,
 } from "lucide-react";
 
 interface PartidaRow {
@@ -67,6 +74,7 @@ interface PartidaRow {
   precio_unitario: number;
   fecha_inicio: string | null;
   fecha_fin: string | null;
+  avance_manual: number | null;
   es_project: boolean;
   responsable_tercero_id: string | null;
   cuenta: { codigo: string; nombre: string } | null;
@@ -87,6 +95,18 @@ interface AccesoUsuario {
   id: string;
   user_id: string;
   nombre: string;
+  editar_cronograma: boolean;
+  ver_programacion_financiera: boolean;
+  editar_programacion_financiera: boolean;
+}
+
+interface AuditoriaRow {
+  id: string;
+  accion: string;
+  valor_anterior: string | null;
+  valor_nuevo: string | null;
+  created_at: string;
+  user_id: string;
 }
 
 export default function ProyectoDetalle() {
@@ -99,18 +119,27 @@ export default function ProyectoDetalle() {
   const isAdmin = role === "admin";
   const readOnly = role === "usuario";
 
+  const acceso = useProyectoAcceso(id);
+  const canEditCronograma = canEdit || acceso.canEditCronograma;
+  const canViewProgramacionFinanciera = canEdit || acceso.canViewProgramacionFinanciera;
+  const canEditProgramacionFinanciera = canEdit || acceso.canEditProgramacionFinanciera;
+
   const [loading, setLoading] = useState(true);
   const [proyecto, setProyecto] = useState<ProyectoInfo | null>(null);
   const [partidas, setPartidas] = useState<PartidaRow[]>([]);
   const [flujos, setFlujos] = useState<any[]>([]);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [asientos, setAsientos] = useState<AsientoContable[]>([]);
+  const [pagosProyecto, setPagosProyecto] = useState<{ fecha: string; monto: number }[] | null>(null);
+  const [auditoria, setAuditoria] = useState<AuditoriaRow[]>([]);
 
   const [filtroResponsable, setFiltroResponsable] = useState<string>("todos");
   const [dialogPartida, setDialogPartida] = useState<PartidaSeguimiento | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [cronogramaDialogPartida, setCronogramaDialogPartida] = useState<CronogramaPartida | null>(null);
+  const [cronogramaDialogOpen, setCronogramaDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [tab, setTab] = useState<"resumen" | "flujo" | "tareas" | "configuracion">(
+  const [tab, setTab] = useState<"resumen" | "flujo" | "programacion_financiera" | "tareas" | "configuracion">(
     () => (localStorage.getItem("proyecto_detalle_tab") as any) || "resumen"
   );
 
@@ -120,7 +149,8 @@ export default function ProyectoDetalle() {
 
   useEffect(() => {
     if (tab === "configuracion" && !canEdit) setTab("resumen");
-  }, [tab, canEdit]);
+    if (tab === "programacion_financiera" && !canViewProgramacionFinanciera) setTab("resumen");
+  }, [tab, canEdit, canViewProgramacionFinanciera]);
 
   const [accesos, setAccesos] = useState<AccesoUsuario[]>([]);
   const [usuariosDisponibles, setUsuariosDisponibles] = useState<{ id: string; label: string }[]>([]);
@@ -160,7 +190,7 @@ export default function ProyectoDetalle() {
       const { data: partidasData, error: partidasError } = await supabase
         .from("presupuestos")
         .select(`
-          id, partida, cantidad, precio_unitario, fecha_inicio, fecha_fin, es_project, responsable_tercero_id,
+          id, partida, cantidad, precio_unitario, fecha_inicio, fecha_fin, avance_manual, es_project, responsable_tercero_id,
           cuenta:cuenta_id (codigo, nombre),
           responsable:terceros!presupuestos_responsable_tercero_id_fkey (razon_social)
         `)
@@ -169,6 +199,23 @@ export default function ProyectoDetalle() {
         .order("partida");
       if (partidasError) throw partidasError;
       setPartidas((partidasData || []) as any);
+
+      // Programación financiera propia del proyecto: si existe, es la única fuente
+      // activa de programación (evita duplicar el flujo de las partidas).
+      const { data: programacionData } = await supabase
+        .from("proyecto_programacion_financiera")
+        .select("id")
+        .eq("proyecto_id", id)
+        .maybeSingle();
+      if (programacionData) {
+        const { data: pagosData } = await supabase
+          .from("proyecto_programacion_pagos")
+          .select("fecha, monto")
+          .eq("programacion_id", programacionData.id);
+        setPagosProyecto((pagosData || []).map((p) => ({ fecha: p.fecha, monto: Number(p.monto) })));
+      } else {
+        setPagosProyecto(null);
+      }
 
       const idsProject = (partidasData || []).filter((p: any) => p.es_project).map((p: any) => p.id);
 
@@ -209,6 +256,7 @@ export default function ProyectoDetalle() {
       }
 
       if (isAdmin) await fetchAccesos();
+      if (canEdit) await fetchAuditoria();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -216,11 +264,22 @@ export default function ProyectoDetalle() {
     }
   };
 
+  const fetchAuditoria = async () => {
+    if (!id) return;
+    const { data } = await supabase
+      .from("proyecto_auditoria")
+      .select("id, accion, valor_anterior, valor_nuevo, created_at, user_id")
+      .eq("proyecto_id", id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setAuditoria(data || []);
+  };
+
   const fetchAccesos = async () => {
     if (!id) return;
     const { data: accesoRows } = await supabase
       .from("proyecto_usuarios")
-      .select("id, user_id")
+      .select("id, user_id, editar_cronograma, ver_programacion_financiera, editar_programacion_financiera")
       .eq("proyecto_id", id);
 
     const userIds = (accesoRows || []).map((a) => a.user_id);
@@ -232,7 +291,16 @@ export default function ProyectoDetalle() {
         .in("user_id", userIds);
       (profiles || []).forEach((p) => profilesMap.set(p.user_id, p.nombre_completo));
     }
-    setAccesos((accesoRows || []).map((a) => ({ id: a.id, user_id: a.user_id, nombre: profilesMap.get(a.user_id) || "Usuario" })));
+    setAccesos(
+      (accesoRows || []).map((a) => ({
+        id: a.id,
+        user_id: a.user_id,
+        nombre: profilesMap.get(a.user_id) || "Usuario",
+        editar_cronograma: a.editar_cronograma,
+        ver_programacion_financiera: a.ver_programacion_financiera,
+        editar_programacion_financiera: a.editar_programacion_financiera,
+      }))
+    );
 
     const { data: rolesUsuario } = await supabase.from("user_roles").select("user_id").eq("role", "usuario");
     const idsUsuario = (rolesUsuario || []).map((r) => r.user_id);
@@ -289,6 +357,21 @@ export default function ProyectoDetalle() {
     fetchAccesos();
   };
 
+  const togglePermisoAcceso = async (
+    acceso: AccesoUsuario,
+    campo: "editar_cronograma" | "ver_programacion_financiera" | "editar_programacion_financiera"
+  ) => {
+    const { error } = await supabase
+      .from("proyecto_usuarios")
+      .update({ [campo]: !acceso[campo] })
+      .eq("id", acceso.id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    fetchAccesos();
+  };
+
   const partidasProject = useMemo(() => partidas.filter((p) => p.es_project), [partidas]);
 
   const responsablesDisponibles = useMemo(() => {
@@ -308,8 +391,26 @@ export default function ProyectoDetalle() {
   }, [partidasProject, filtroResponsable]);
 
   const ejercidoMap = useMemo(() => calcularEjercidoPorPartida(movimientos as any, asientos), [movimientos, asientos]);
-  const proyectadoMap = useMemo(() => calcularProyectadoPorPartida(flujos), [flujos]);
-  const proyectadoAcumuladoMap = useMemo(() => calcularProyectadoPorPartida(flujos, new Date()), [flujos]);
+
+  // Si el proyecto tiene programación financiera propia, es la única fuente activa:
+  // se reparte cada pago entre las partidas según su peso en el presupuesto total,
+  // en vez de usar los flujos_programados reales de cada partida (evita duplicar).
+  const flujosEfectivos = useMemo(() => {
+    if (!pagosProyecto) return flujos;
+    const presupuestoTotal = partidasProject.reduce((s, p) => s + p.cantidad * p.precio_unitario, 0);
+    if (presupuestoTotal <= 0) return [];
+    const sintetico: any[] = [];
+    partidasProject.forEach((p) => {
+      const peso = (p.cantidad * p.precio_unitario) / presupuestoTotal;
+      pagosProyecto.forEach((pago) => {
+        sintetico.push({ presupuesto_id: p.id, fecha: pago.fecha, monto: pago.monto * peso, tipo: "egreso" });
+      });
+    });
+    return sintetico;
+  }, [pagosProyecto, flujos, partidasProject]);
+
+  const proyectadoMap = useMemo(() => calcularProyectadoPorPartida(flujosEfectivos), [flujosEfectivos]);
+  const proyectadoAcumuladoMap = useMemo(() => calcularProyectadoPorPartida(flujosEfectivos, new Date()), [flujosEfectivos]);
 
   const kpis = useMemo(() => {
     let presupuesto = 0;
@@ -348,7 +449,7 @@ export default function ProyectoDetalle() {
         responsable: p.responsable?.razon_social || null,
         fechaInicio: p.fecha_inicio,
         fechaFin: p.fecha_fin,
-        avance: calcularAvance(ejercido, presupuestoMonto),
+        avance: p.avance_manual ?? calcularAvance(ejercido, presupuestoMonto),
         pendienteAjustar: programacionPendienteDeAjustar(totalProgramado, presupuestoMonto),
         vencida: !!p.fecha_fin && new Date(p.fecha_fin + "T00:00:00") < new Date(),
       });
@@ -373,7 +474,7 @@ export default function ProyectoDetalle() {
         presupuesto,
         proyectado,
         ejercido,
-        avance: calcularAvance(ejercido, presupuesto),
+        avance: p.avance_manual ?? calcularAvance(ejercido, presupuesto),
         pendienteAjustar: programacionPendienteDeAjustar(totalProgramado, presupuesto),
         vencida: !!p.fecha_fin && new Date(p.fecha_fin + "T00:00:00") < new Date(),
       };
@@ -397,6 +498,23 @@ export default function ProyectoDetalle() {
   const openSeguimiento = (presupuestoId: string) => {
     const p = partidas.find((x) => x.id === presupuestoId);
     if (!p) return;
+
+    // admin/contador: diálogo completo (fechas, responsable, avance, flujo). Usuarios
+    // con permiso editar_cronograma únicamente: diálogo reducido vía RPC.
+    if (!canEdit) {
+      setCronogramaDialogPartida({
+        id: p.id,
+        partida: p.partida,
+        cuenta_codigo: p.cuenta?.codigo,
+        cuenta_nombre: p.cuenta?.nombre,
+        fecha_inicio: p.fecha_inicio,
+        fecha_fin: p.fecha_fin,
+        avance_manual: p.avance_manual,
+      });
+      setCronogramaDialogOpen(true);
+      return;
+    }
+
     setDialogPartida({
       id: p.id,
       empresa_id: proyecto!.empresa_id,
@@ -408,8 +526,43 @@ export default function ProyectoDetalle() {
       responsable_tercero_id: p.responsable_tercero_id,
       fecha_inicio: p.fecha_inicio,
       fecha_fin: p.fecha_fin,
+      avance_manual: p.avance_manual,
     });
     setDialogOpen(true);
+  };
+
+  const [shareToken, setShareToken] = useState<string | null>(null);
+
+  const obtenerOCrearShareToken = async (): Promise<string | null> => {
+    if (!id) return null;
+    const { data: existente } = await supabase
+      .from("proyecto_cronograma_shares")
+      .select("token")
+      .eq("proyecto_id", id)
+      .eq("activo", true)
+      .maybeSingle();
+    if (existente) return existente.token;
+
+    const token = crypto.randomUUID().replace(/-/g, "");
+    const { error } = await supabase.from("proyecto_cronograma_shares").insert({
+      proyecto_id: id,
+      token,
+      created_by: user?.id,
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return null;
+    }
+    return token;
+  };
+
+  const handleCopiarLink = async () => {
+    const token = shareToken || (await obtenerOCrearShareToken());
+    if (!token) return;
+    setShareToken(token);
+    const url = `${window.location.origin}/cronograma/${token}`;
+    await navigator.clipboard.writeText(url);
+    toast({ title: "Link copiado", description: "Cualquier persona con este link puede ver el cronograma (sin datos financieros)." });
   };
 
   if (loading) {
@@ -516,6 +669,12 @@ export default function ProyectoDetalle() {
             <CalendarDays className="h-3.5 w-3.5" />
             Flujo mensual
           </TabsTrigger>
+          {canViewProgramacionFinanciera && (
+            <TabsTrigger value="programacion_financiera" className="gap-1.5">
+              <Wand2 className="h-3.5 w-3.5" />
+              Programación financiera
+            </TabsTrigger>
+          )}
           <TabsTrigger value="tareas" className="gap-1.5">
             <ListChecks className="h-3.5 w-3.5" />
             Tareas
@@ -565,7 +724,15 @@ export default function ProyectoDetalle() {
             </Card>
           ) : (
             <>
-              <ProjectGantt filas={filasResumen} />
+              <ProjectGantt
+                filas={filasResumen}
+                acciones={{
+                  onExportarPDF: () => exportarCronogramaPDF(proyecto.nombre, null, filasResumen),
+                  onCompartirWhatsApp: () => compartirCronogramaWhatsApp(proyecto.nombre, filasResumen),
+                  onCompartirCorreo: () => compartirCronogramaCorreo(proyecto.nombre, filasResumen),
+                  onCopiarLink: canEditCronograma ? handleCopiarLink : undefined,
+                }}
+              />
 
               <Card>
                 <CardHeader>
@@ -577,8 +744,8 @@ export default function ProyectoDetalle() {
                 <CardContent>
                   <ProjectSummaryTable
                     filas={filasResumen}
-                    onEdit={canEdit ? openSeguimiento : undefined}
-                    readOnly={readOnly}
+                    onEdit={canEditCronograma ? openSeguimiento : undefined}
+                    readOnly={!canEditCronograma}
                   />
                 </CardContent>
               </Card>
@@ -597,16 +764,29 @@ export default function ProyectoDetalle() {
           ) : (
             <FlujoEfectivoPresupuesto
               presupuestos={presupuestosParaTree}
-              flujosProgramados={flujos}
+              flujosProgramados={flujosEfectivos}
               movimientos={movimientos}
               asientos={asientos}
               empresaNombre={proyecto.nombre}
               seguimientoPorPartida={seguimientoPorPartida}
-              onEditSeguimiento={canEdit ? openSeguimiento : undefined}
-              readOnlySeguimiento={readOnly}
+              onEditSeguimiento={canEditCronograma ? openSeguimiento : undefined}
+              readOnlySeguimiento={!canEditCronograma}
             />
           )}
         </TabsContent>
+
+        {/* Programación financiera propia del proyecto */}
+        {canViewProgramacionFinanciera && (
+          <TabsContent value="programacion_financiera" className="mt-4">
+            <ProgramacionFinancieraProyecto
+              proyectoId={proyecto.id}
+              empresaId={proyecto.empresa_id}
+              presupuestoTotal={kpis.presupuesto}
+              canView={canViewProgramacionFinanciera}
+              canEdit={canEditProgramacionFinanciera}
+            />
+          </TabsContent>
+        )}
 
         {/* Tareas del Project: independientes de las partidas presupuestales */}
         <TabsContent value="tareas" className="mt-4">
@@ -673,20 +853,80 @@ export default function ProyectoDetalle() {
                       Agregar
                     </Button>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {accesos.map((a) => (
-                      <Badge key={a.id} variant="secondary" className="gap-1.5">
-                        {a.nombre}
-                        <button onClick={() => quitarAcceso(a.id)} title="Quitar acceso">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                    {accesos.length === 0 && <p className="text-sm text-muted-foreground">Sin usuarios asignados.</p>}
-                  </div>
+                  {accesos.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sin usuarios asignados.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Usuario</TableHead>
+                          <TableHead className="text-center">Editar cronograma</TableHead>
+                          <TableHead className="text-center">Ver prog. financiera</TableHead>
+                          <TableHead className="text-center">Editar prog. financiera</TableHead>
+                          <TableHead className="w-10" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {accesos.map((a) => (
+                          <TableRow key={a.id}>
+                            <TableCell>{a.nombre}</TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={a.editar_cronograma}
+                                onCheckedChange={() => togglePermisoAcceso(a, "editar_cronograma")}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={a.ver_programacion_financiera}
+                                onCheckedChange={() => togglePermisoAcceso(a, "ver_programacion_financiera")}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={a.editar_programacion_financiera}
+                                onCheckedChange={() => togglePermisoAcceso(a, "editar_programacion_financiera")}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <button onClick={() => quitarAcceso(a.id)} title="Quitar acceso">
+                                <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                              </button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </CardContent>
               </Card>
             )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <History className="h-4 w-4 text-primary" />
+                  Auditoría
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {auditoria.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Sin cambios registrados todavía.</p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {auditoria.map((a) => (
+                      <div key={a.id} className="text-xs border-b border-border/50 pb-1.5 last:border-0">
+                        <span className="font-medium">{a.accion}</span>
+                        {a.valor_anterior && a.valor_nuevo && (
+                          <span className="text-muted-foreground"> · {a.valor_anterior} → {a.valor_nuevo}</span>
+                        )}
+                        <span className="text-muted-foreground"> · {format(new Date(a.created_at), "dd/MM/yyyy HH:mm")}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         )}
       </Tabs>
@@ -695,6 +935,15 @@ export default function ProyectoDetalle() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         partida={dialogPartida}
+        proyectoId={proyecto.id}
+        onSuccess={fetchAll}
+      />
+
+      <CronogramaPartidaDialog
+        open={cronogramaDialogOpen}
+        onOpenChange={setCronogramaDialogOpen}
+        proyectoId={proyecto.id}
+        partida={cronogramaDialogPartida}
         onSuccess={fetchAll}
       />
 

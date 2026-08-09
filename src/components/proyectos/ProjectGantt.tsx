@@ -18,7 +18,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { CalendarRange } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CalendarRange, Share2, FileDown, MessageCircle, Mail, Link as LinkIcon } from "lucide-react";
 
 export interface FilaGantt {
   id: string;
@@ -31,8 +37,16 @@ export interface FilaGantt {
   vencida: boolean;
 }
 
+export interface CronogramaAcciones {
+  onExportarPDF?: () => void;
+  onCompartirWhatsApp?: () => void;
+  onCompartirCorreo?: () => void;
+  onCopiarLink?: () => void;
+}
+
 interface Props {
   filas: FilaGantt[];
+  acciones?: CronogramaAcciones;
 }
 
 type Granularidad = "semana" | "mes" | "anio";
@@ -90,11 +104,17 @@ function CronogramaCard({
   children,
   granularidad,
   onGranularidadChange,
+  acciones,
 }: {
   children: React.ReactNode;
   granularidad: Granularidad;
   onGranularidadChange: (g: Granularidad) => void;
+  acciones?: CronogramaAcciones;
 }) {
+  const tieneAcciones =
+    acciones &&
+    (acciones.onExportarPDF || acciones.onCompartirWhatsApp || acciones.onCompartirCorreo || acciones.onCopiarLink);
+
   return (
     <Card>
       <CardHeader>
@@ -103,18 +123,56 @@ function CronogramaCard({
             <CalendarRange className="h-4 w-4 text-primary" />
             Cronograma
           </CardTitle>
-          <div className="flex gap-1 bg-muted p-1 rounded-lg">
-            {GRANULARIDADES.map((g) => (
-              <Button
-                key={g.value}
-                variant={granularidad === g.value ? "default" : "ghost"}
-                size="sm"
-                className="h-7 px-3 text-xs"
-                onClick={() => onGranularidadChange(g.value)}
-              >
-                {g.label}
-              </Button>
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1 bg-muted p-1 rounded-lg">
+              {GRANULARIDADES.map((g) => (
+                <Button
+                  key={g.value}
+                  variant={granularidad === g.value ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => onGranularidadChange(g.value)}
+                >
+                  {g.label}
+                </Button>
+              ))}
+            </div>
+            {tieneAcciones && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-7 px-3 text-xs gap-1.5">
+                    <Share2 className="h-3.5 w-3.5" />
+                    Compartir
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {acciones?.onCompartirWhatsApp && (
+                    <DropdownMenuItem onClick={acciones.onCompartirWhatsApp} className="gap-2">
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      WhatsApp
+                    </DropdownMenuItem>
+                  )}
+                  {acciones?.onCompartirCorreo && (
+                    <DropdownMenuItem onClick={acciones.onCompartirCorreo} className="gap-2">
+                      <Mail className="h-3.5 w-3.5" />
+                      Correo electrónico
+                    </DropdownMenuItem>
+                  )}
+                  {acciones?.onExportarPDF && (
+                    <DropdownMenuItem onClick={acciones.onExportarPDF} className="gap-2">
+                      <FileDown className="h-3.5 w-3.5" />
+                      Descargar PDF
+                    </DropdownMenuItem>
+                  )}
+                  {acciones?.onCopiarLink && (
+                    <DropdownMenuItem onClick={acciones.onCopiarLink} className="gap-2">
+                      <LinkIcon className="h-3.5 w-3.5" />
+                      Copiar link público
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -123,7 +181,7 @@ function CronogramaCard({
   );
 }
 
-export function ProjectGantt({ filas }: Props) {
+export function ProjectGantt({ filas, acciones }: Props) {
   const [granularidad, setGranularidad] = useState<Granularidad>(
     () => (localStorage.getItem("project_gantt_granularidad") as Granularidad) || "mes"
   );
@@ -181,7 +239,7 @@ export function ProjectGantt({ filas }: Props) {
 
   if (!rango || conFechas.length === 0) {
     return (
-      <CronogramaCard granularidad={granularidad} onGranularidadChange={handleGranularidadChange}>
+      <CronogramaCard granularidad={granularidad} onGranularidadChange={handleGranularidadChange} acciones={acciones}>
         <div className="text-sm text-muted-foreground py-6 text-center">
           Ninguna partida tiene fecha inicio y fecha fin definidas todavía.
         </div>
@@ -203,7 +261,7 @@ export function ProjectGantt({ filas }: Props) {
   };
 
   return (
-    <CronogramaCard granularidad={granularidad} onGranularidadChange={handleGranularidadChange}>
+    <CronogramaCard granularidad={granularidad} onGranularidadChange={handleGranularidadChange} acciones={acciones}>
       <ScrollArea className="w-full whitespace-nowrap">
         <div style={{ minWidth: `${Math.max(760, anchoMinimo + 260)}px` }}>
           {/* Header de periodos */}

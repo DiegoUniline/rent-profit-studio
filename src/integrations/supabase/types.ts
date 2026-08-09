@@ -394,6 +394,7 @@ export type Database = {
       presupuestos: {
         Row: {
           activo: boolean
+          avance_manual: number | null
           cantidad: number
           centro_negocio_id: string | null
           created_at: string
@@ -417,6 +418,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
+          avance_manual?: number | null
           cantidad?: number
           centro_negocio_id?: string | null
           created_at?: string
@@ -440,6 +442,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean
+          avance_manual?: number | null
           cantidad?: number
           centro_negocio_id?: string | null
           created_at?: string
@@ -629,6 +632,196 @@ export type Database = {
           },
         ]
       }
+      proyecto_auditoria: {
+        Row: {
+          accion: string
+          created_at: string
+          entidad_id: string | null
+          id: string
+          proyecto_id: string
+          user_id: string
+          valor_anterior: string | null
+          valor_nuevo: string | null
+        }
+        Insert: {
+          accion: string
+          created_at?: string
+          entidad_id?: string | null
+          id?: string
+          proyecto_id: string
+          user_id: string
+          valor_anterior?: string | null
+          valor_nuevo?: string | null
+        }
+        Update: {
+          accion?: string
+          created_at?: string
+          entidad_id?: string | null
+          id?: string
+          proyecto_id?: string
+          user_id?: string
+          valor_anterior?: string | null
+          valor_nuevo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_auditoria_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyecto_cronograma_shares: {
+        Row: {
+          activo: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          proyecto_id: string
+          token: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          proyecto_id: string
+          token: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          proyecto_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_cronograma_shares_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyecto_programacion_financiera: {
+        Row: {
+          anticipo_monto: number
+          created_at: string
+          created_by: string | null
+          empresa_id: string
+          fecha_inicio: string | null
+          frecuencia:
+            | Database["public"]["Enums"]["programacion_proyecto_frecuencia"]
+            | null
+          id: string
+          modo: Database["public"]["Enums"]["programacion_proyecto_modo"]
+          numero_pagos: number | null
+          proyecto_id: string
+          tiene_anticipo: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          anticipo_monto?: number
+          created_at?: string
+          created_by?: string | null
+          empresa_id: string
+          fecha_inicio?: string | null
+          frecuencia?:
+            | Database["public"]["Enums"]["programacion_proyecto_frecuencia"]
+            | null
+          id?: string
+          modo: Database["public"]["Enums"]["programacion_proyecto_modo"]
+          numero_pagos?: number | null
+          proyecto_id: string
+          tiene_anticipo?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          anticipo_monto?: number
+          created_at?: string
+          created_by?: string | null
+          empresa_id?: string
+          fecha_inicio?: string | null
+          frecuencia?:
+            | Database["public"]["Enums"]["programacion_proyecto_frecuencia"]
+            | null
+          id?: string
+          modo?: Database["public"]["Enums"]["programacion_proyecto_modo"]
+          numero_pagos?: number | null
+          proyecto_id?: string
+          tiene_anticipo?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_programacion_financiera_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_programacion_financiera_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: true
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyecto_programacion_pagos: {
+        Row: {
+          created_at: string
+          fecha: string
+          id: string
+          monto: number
+          orden: number
+          programacion_id: string
+          proyecto_id: string
+        }
+        Insert: {
+          created_at?: string
+          fecha: string
+          id?: string
+          monto: number
+          orden?: number
+          programacion_id: string
+          proyecto_id: string
+        }
+        Update: {
+          created_at?: string
+          fecha?: string
+          id?: string
+          monto?: number
+          orden?: number
+          programacion_id?: string
+          proyecto_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proyecto_programacion_pagos_programacion_id_fkey"
+            columns: ["programacion_id"]
+            isOneToOne: false
+            referencedRelation: "proyecto_programacion_financiera"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proyecto_programacion_pagos_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       proyecto_tareas: {
         Row: {
           color: string | null
@@ -706,26 +899,35 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          editar_cronograma: boolean
+          editar_programacion_financiera: boolean
           empresa_id: string
           id: string
           proyecto_id: string
           user_id: string
+          ver_programacion_financiera: boolean
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          editar_cronograma?: boolean
+          editar_programacion_financiera?: boolean
           empresa_id: string
           id?: string
           proyecto_id: string
           user_id: string
+          ver_programacion_financiera?: boolean
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          editar_cronograma?: boolean
+          editar_programacion_financiera?: boolean
           empresa_id?: string
           id?: string
           proyecto_id?: string
           user_id?: string
+          ver_programacion_financiera?: boolean
         }
         Relationships: [
           {
@@ -928,6 +1130,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      actualizar_cronograma_partida: {
+        Args: {
+          _avance_manual: number | null
+          _fecha_fin: string | null
+          _fecha_inicio: string | null
+          _presupuesto_id: string
+        }
+        Returns: undefined
+      }
+      get_cronograma_publico: {
+        Args: { _token: string }
+        Returns: {
+          avance: number
+          cuenta_codigo: string
+          cuenta_nombre: string
+          fecha_fin: string
+          fecha_inicio: string
+          partida: string
+          proyecto_nombre: string
+          vencida: boolean
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -953,6 +1177,13 @@ export type Database = {
         | "semestral"
         | "anual"
       naturaleza_cuenta: "deudora" | "acreedora"
+      programacion_proyecto_frecuencia:
+        | "semanal"
+        | "mensual"
+        | "trimestral"
+        | "semestral"
+        | "anual"
+      programacion_proyecto_modo: "automatica" | "manual"
       tarea_estado: "pendiente" | "en_progreso" | "bloqueada" | "hecho"
       tipo_asiento: "ingreso" | "egreso" | "diario"
       tipo_persona: "fisica" | "moral"
