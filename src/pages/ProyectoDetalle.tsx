@@ -965,6 +965,7 @@ export default function ProyectoDetalle() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         partida={dialogPartida}
+        proyectoId={proyecto.id}
         onSuccess={fetchAll}
       />
 

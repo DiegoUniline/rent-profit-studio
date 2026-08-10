@@ -27,7 +27,8 @@ import { EmpresaDialog } from "./EmpresaDialog";
 import { CuentaDialog } from "./CuentaDialog";
 import { CentroNegocioDialog } from "./CentroNegocioDialog";
 import { UnidadMedidaDialog } from "./UnidadMedidaDialog";
-import { Plus, Trash2, Copy } from "lucide-react";
+import { ProgramacionPartidaDialog } from "./ProgramacionPartidaDialog";
+import { Plus, Trash2, Copy, Wand2 } from "lucide-react";
 
 interface Empresa {
   id: string;
@@ -70,6 +71,7 @@ interface Presupuesto {
   fecha_inicio: string | null;
   fecha_fin: string | null;
   frecuencia: "semanal" | "mensual" | "bimestral" | "trimestral" | "semestral" | "anual" | null;
+  es_project?: boolean;
 }
 
 interface PresupuestoDialogProps {
@@ -131,6 +133,8 @@ export function PresupuestoDialog({
   const [flujoRows, setFlujoRows] = useState<FlujoRow[]>([]);
   const [programacionProyectoActiva, setProgramacionProyectoActiva] = useState(false);
   const [programadoPartida, setProgramadoPartida] = useState(0);
+  const [proyectoDePartida, setProyectoDePartida] = useState<{ id: string; empresaId: string } | null>(null);
+  const [programacionDialogOpen, setProgramacionDialogOpen] = useState(false);
 
   // Related data states
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
@@ -206,16 +210,32 @@ export function PresupuestoDialog({
     }
   };
 
-  // Anti-duplicación: si esta partida ya tiene programación financiera propia
-  // (Proyecto → Programación financiera), no se vuelve a programar aquí (flujos_programados).
+  // Partidas de Project (es_project = true): la programación financiera se
+  // maneja con la MISMA ventana que Proyecto → Programación financiera (evita
+  // duplicar el flujo y mantiene los números homologados en ambos lados).
   useEffect(() => {
-    if (!open || !presupuesto?.id) {
+    if (!open || !presupuesto?.id || !presupuesto.es_project || !form.centro_negocio_id) {
+      setProyectoDePartida(null);
       setProgramacionProyectoActiva(false);
       setProgramadoPartida(0);
       return;
     }
     let activo = true;
     (async () => {
+      const { data: proyecto } = await supabase
+        .from("proyectos")
+        .select("id, empresa_id")
+        .eq("centro_negocio_id", form.centro_negocio_id)
+        .maybeSingle();
+      if (!activo) return;
+      if (!proyecto) {
+        setProyectoDePartida(null);
+        setProgramacionProyectoActiva(false);
+        setProgramadoPartida(0);
+        return;
+      }
+      setProyectoDePartida({ id: proyecto.id, empresaId: proyecto.empresa_id });
+
       const { data: programacion } = await supabase
         .from("proyecto_programacion_financiera")
         .select("id")
@@ -237,7 +257,27 @@ export function PresupuestoDialog({
     return () => {
       activo = false;
     };
-  }, [open, presupuesto?.id]);
+  }, [open, presupuesto?.id, presupuesto?.es_project, form.centro_negocio_id]);
+
+  const refrescarProgramado = async () => {
+    if (!presupuesto?.id) return;
+    const { data: programacion } = await supabase
+      .from("proyecto_programacion_financiera")
+      .select("id")
+      .eq("presupuesto_id", presupuesto.id)
+      .maybeSingle();
+    if (!programacion) {
+      setProgramacionProyectoActiva(false);
+      setProgramadoPartida(0);
+      return;
+    }
+    setProgramacionProyectoActiva(true);
+    const { data: pagos } = await supabase
+      .from("proyecto_programacion_pagos")
+      .select("monto")
+      .eq("programacion_id", programacion.id);
+    setProgramadoPartida((pagos || []).reduce((s, p) => s + Number(p.monto), 0));
+  };
 
   const loadEmpresas = async () => {
     const { data } = await supabase
@@ -599,15 +639,20 @@ export function PresupuestoDialog({
             </div>
 
             {/* Programación de Flujo */}
-            {programacionProyectoActiva ? (
-              <div className="border rounded-lg p-4 bg-muted/30 space-y-1">
+            {proyectoDePartida ? (
+              <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  📊 Esta partida se programa desde la <strong>Programación financiera</strong> del proyecto
-                  (pestaña "Programación financiera" en el detalle del Project), para evitar duplicar el flujo.
+                  📊 Esta es una partida de Project — se programa con la misma ventana de{" "}
+                  <strong>Programación financiera</strong> del proyecto, para que quede homologada en ambos lados.
                 </p>
-                <p className="text-sm">
-                  Ya programado: <strong className="text-foreground">{formatCurrency(programadoPartida)}</strong>
-                </p>
+                <div className="rounded-lg bg-background p-3 flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Ya programado</span>
+                  <span className="font-semibold">{formatCurrency(programadoPartida)}</span>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => setProgramacionDialogOpen(true)} className="w-full gap-1.5">
+                  <Wand2 className="h-3.5 w-3.5" />
+                  {programacionProyectoActiva ? "Ver / editar programación financiera" : "Programar esta partida"}
+                </Button>
               </div>
             ) : (
             <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
@@ -765,6 +810,23 @@ export function PresupuestoDialog({
         unidad={null}
         onSuccess={handleUnidadCreated}
       />
+
+      {proyectoDePartida && presupuesto?.id && (
+        <ProgramacionPartidaDialog
+          open={programacionDialogOpen}
+          onOpenChange={setProgramacionDialogOpen}
+          proyectoId={proyectoDePartida.id}
+          empresaId={proyectoDePartida.empresaId}
+          partida={{
+            id: presupuesto.id,
+            partida: form.partida,
+            cuenta_codigo: cuentas.find((c) => c.id === form.cuenta_id)?.codigo,
+            cuenta_nombre: cuentas.find((c) => c.id === form.cuenta_id)?.nombre,
+            presupuesto: presupuestoCalculado,
+          }}
+          onSuccess={refrescarProgramado}
+        />
+      )}
     </>
   );
 }
