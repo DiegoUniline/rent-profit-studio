@@ -2,28 +2,37 @@
 -- + permisos granulares por proyecto + auditoría + cronograma compartible sin login.
 -- No modifica ni elimina la programación de flujo existente en Presupuestos
 -- (flujos_programados, PresupuestoDialog, ProyectoPartidaSeguimientoDialog).
+--
+-- Idempotente: seguro de re-ejecutar completo aunque un run previo haya
+-- quedado a medias (usa IF NOT EXISTS / DROP POLICY IF EXISTS en todo lo
+-- que Postgres no soporta nativamente como "crear si no existe").
 
 -- 1. Cronograma: avance manual, independiente del cálculo financiero (ejercido/presupuesto).
 -- NULL = sigue usando el cálculo financiero actual (comportamiento sin cambios).
 ALTER TABLE public.presupuestos
-  ADD COLUMN avance_manual numeric
+  ADD COLUMN IF NOT EXISTS avance_manual numeric
     CHECK (avance_manual IS NULL OR (avance_manual >= 0 AND avance_manual <= 100));
 
 -- 2. Permisos granulares por proyecto: extiende proyecto_usuarios (acceso por-recurso ya existente).
 -- Admin/contador siguen teniendo acceso total sin depender de estas columnas.
 ALTER TABLE public.proyecto_usuarios
-  ADD COLUMN editar_cronograma boolean NOT NULL DEFAULT false,
-  ADD COLUMN ver_programacion_financiera boolean NOT NULL DEFAULT false,
-  ADD COLUMN editar_programacion_financiera boolean NOT NULL DEFAULT false;
+  ADD COLUMN IF NOT EXISTS editar_cronograma boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS ver_programacion_financiera boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS editar_programacion_financiera boolean NOT NULL DEFAULT false;
 
 -- 3. Programación financiera POR PARTIDA (una por presupuesto/partida del proyecto,
 -- nunca a nivel proyecto agregado): todos los presupuestos son por partida, según
 -- confirmó el ingeniero del proyecto. Independiente de la programación de flujo
 -- que ya existe en Presupuestos (flujos_programados).
-CREATE TYPE programacion_proyecto_modo AS ENUM ('automatica', 'manual');
-CREATE TYPE programacion_proyecto_frecuencia AS ENUM ('semanal', 'quincenal', 'mensual', 'trimestral', 'semestral', 'anual', 'personalizada');
+DO $$ BEGIN
+  CREATE TYPE programacion_proyecto_modo AS ENUM ('automatica', 'manual');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE public.proyecto_programacion_financiera (
+DO $$ BEGIN
+  CREATE TYPE programacion_proyecto_frecuencia AS ENUM ('semanal', 'quincenal', 'mensual', 'trimestral', 'semestral', 'anual', 'personalizada');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.proyecto_programacion_financiera (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   presupuesto_id uuid NOT NULL UNIQUE REFERENCES public.presupuestos(id) ON DELETE CASCADE,
   proyecto_id uuid NOT NULL REFERENCES public.proyectos(id) ON DELETE CASCADE,
@@ -41,13 +50,13 @@ CREATE TABLE public.proyecto_programacion_financiera (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_ppf_proyecto ON public.proyecto_programacion_financiera (proyecto_id);
+CREATE INDEX IF NOT EXISTS idx_ppf_proyecto ON public.proyecto_programacion_financiera (proyecto_id);
 
-CREATE TRIGGER update_proyecto_programacion_financiera_updated_at
+CREATE OR REPLACE TRIGGER update_proyecto_programacion_financiera_updated_at
   BEFORE UPDATE ON public.proyecto_programacion_financiera
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-CREATE TABLE public.proyecto_programacion_pagos (
+CREATE TABLE IF NOT EXISTS public.proyecto_programacion_pagos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   programacion_id uuid NOT NULL REFERENCES public.proyecto_programacion_financiera(id) ON DELETE CASCADE,
   proyecto_id uuid NOT NULL REFERENCES public.proyectos(id) ON DELETE CASCADE,
@@ -59,12 +68,13 @@ CREATE TABLE public.proyecto_programacion_pagos (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_ppp_programacion ON public.proyecto_programacion_pagos (programacion_id);
-CREATE INDEX idx_ppp_proyecto ON public.proyecto_programacion_pagos (proyecto_id);
+CREATE INDEX IF NOT EXISTS idx_ppp_programacion ON public.proyecto_programacion_pagos (programacion_id);
+CREATE INDEX IF NOT EXISTS idx_ppp_proyecto ON public.proyecto_programacion_pagos (proyecto_id);
 
 ALTER TABLE public.proyecto_programacion_financiera ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.proyecto_programacion_pagos ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Ver programación financiera del proyecto" ON public.proyecto_programacion_financiera;
 CREATE POLICY "Ver programación financiera del proyecto"
 ON public.proyecto_programacion_financiera
 FOR SELECT
@@ -77,6 +87,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Editar programación financiera del proyecto" ON public.proyecto_programacion_financiera;
 CREATE POLICY "Editar programación financiera del proyecto"
 ON public.proyecto_programacion_financiera
 FOR ALL
@@ -97,6 +108,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Ver pagos programados del proyecto" ON public.proyecto_programacion_pagos;
 CREATE POLICY "Ver pagos programados del proyecto"
 ON public.proyecto_programacion_pagos
 FOR SELECT
@@ -109,6 +121,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Editar pagos programados del proyecto" ON public.proyecto_programacion_pagos;
 CREATE POLICY "Editar pagos programados del proyecto"
 ON public.proyecto_programacion_pagos
 FOR ALL
@@ -179,7 +192,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.actualizar_cronograma_partida(uuid, date, date, numeric) TO authenticated;
 
 -- 5. Auditoría de cambios de cronograma / programación financiera.
-CREATE TABLE public.proyecto_auditoria (
+CREATE TABLE IF NOT EXISTS public.proyecto_auditoria (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   proyecto_id uuid NOT NULL REFERENCES public.proyectos(id) ON DELETE CASCADE,
   user_id uuid NOT NULL,
@@ -190,10 +203,11 @@ CREATE TABLE public.proyecto_auditoria (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_proyecto_auditoria_proyecto ON public.proyecto_auditoria (proyecto_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_proyecto_auditoria_proyecto ON public.proyecto_auditoria (proyecto_id, created_at DESC);
 
 ALTER TABLE public.proyecto_auditoria ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Ver auditoría del proyecto" ON public.proyecto_auditoria;
 CREATE POLICY "Ver auditoría del proyecto"
 ON public.proyecto_auditoria
 FOR SELECT
@@ -205,6 +219,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Registrar auditoría del proyecto" ON public.proyecto_auditoria;
 CREATE POLICY "Registrar auditoría del proyecto"
 ON public.proyecto_auditoria
 FOR INSERT
@@ -221,7 +236,7 @@ WITH CHECK (
 );
 
 -- 6. Compartir cronograma con terceros sin login: link público por token.
-CREATE TABLE public.proyecto_cronograma_shares (
+CREATE TABLE IF NOT EXISTS public.proyecto_cronograma_shares (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   proyecto_id uuid NOT NULL REFERENCES public.proyectos(id) ON DELETE CASCADE,
   token text NOT NULL UNIQUE,
@@ -230,10 +245,11 @@ CREATE TABLE public.proyecto_cronograma_shares (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_proyecto_shares_proyecto ON public.proyecto_cronograma_shares (proyecto_id);
+CREATE INDEX IF NOT EXISTS idx_proyecto_shares_proyecto ON public.proyecto_cronograma_shares (proyecto_id);
 
 ALTER TABLE public.proyecto_cronograma_shares ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Gestionar links de cronograma" ON public.proyecto_cronograma_shares;
 CREATE POLICY "Gestionar links de cronograma"
 ON public.proyecto_cronograma_shares
 FOR ALL
