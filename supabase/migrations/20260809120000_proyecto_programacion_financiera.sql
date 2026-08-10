@@ -16,18 +16,22 @@ ALTER TABLE public.proyecto_usuarios
   ADD COLUMN ver_programacion_financiera boolean NOT NULL DEFAULT false,
   ADD COLUMN editar_programacion_financiera boolean NOT NULL DEFAULT false;
 
--- 3. Programación financiera del proyecto (una por proyecto; importe total agregado,
--- independiente de la programación por-partida de Presupuestos).
+-- 3. Programación financiera POR PARTIDA (una por presupuesto/partida del proyecto,
+-- nunca a nivel proyecto agregado): todos los presupuestos son por partida, según
+-- confirmó el ingeniero del proyecto. Independiente de la programación de flujo
+-- que ya existe en Presupuestos (flujos_programados).
 CREATE TYPE programacion_proyecto_modo AS ENUM ('automatica', 'manual');
-CREATE TYPE programacion_proyecto_frecuencia AS ENUM ('semanal', 'mensual', 'trimestral', 'semestral', 'anual');
+CREATE TYPE programacion_proyecto_frecuencia AS ENUM ('semanal', 'quincenal', 'mensual', 'trimestral', 'semestral', 'anual', 'personalizada');
 
 CREATE TABLE public.proyecto_programacion_financiera (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  proyecto_id uuid NOT NULL UNIQUE REFERENCES public.proyectos(id) ON DELETE CASCADE,
+  presupuesto_id uuid NOT NULL UNIQUE REFERENCES public.presupuestos(id) ON DELETE CASCADE,
+  proyecto_id uuid NOT NULL REFERENCES public.proyectos(id) ON DELETE CASCADE,
   empresa_id uuid NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
   modo programacion_proyecto_modo NOT NULL,
   tiene_anticipo boolean NOT NULL DEFAULT false,
   anticipo_monto numeric NOT NULL DEFAULT 0,
+  anticipo_fecha date,
   frecuencia programacion_proyecto_frecuencia,
   fecha_inicio date,
   numero_pagos integer,
@@ -36,6 +40,8 @@ CREATE TABLE public.proyecto_programacion_financiera (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE INDEX idx_ppf_proyecto ON public.proyecto_programacion_financiera (proyecto_id);
 
 CREATE TRIGGER update_proyecto_programacion_financiera_updated_at
   BEFORE UPDATE ON public.proyecto_programacion_financiera
@@ -47,6 +53,8 @@ CREATE TABLE public.proyecto_programacion_pagos (
   proyecto_id uuid NOT NULL REFERENCES public.proyectos(id) ON DELETE CASCADE,
   fecha date NOT NULL,
   monto numeric NOT NULL CHECK (monto > 0),
+  concepto text,
+  es_anticipo boolean NOT NULL DEFAULT false,
   orden integer NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now()
 );

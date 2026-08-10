@@ -130,6 +130,7 @@ export function PresupuestoDialog({
   const [saving, setSaving] = useState(false);
   const [flujoRows, setFlujoRows] = useState<FlujoRow[]>([]);
   const [programacionProyectoActiva, setProgramacionProyectoActiva] = useState(false);
+  const [programadoPartida, setProgramadoPartida] = useState(0);
 
   // Related data states
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
@@ -205,35 +206,38 @@ export function PresupuestoDialog({
     }
   };
 
-  // Anti-duplicación: si el centro de negocio es un Project con programación
-  // financiera propia, esta partida ya no se programa aquí (flujos_programados).
+  // Anti-duplicación: si esta partida ya tiene programación financiera propia
+  // (Proyecto → Programación financiera), no se vuelve a programar aquí (flujos_programados).
   useEffect(() => {
-    if (!open || !form.centro_negocio_id) {
+    if (!open || !presupuesto?.id) {
       setProgramacionProyectoActiva(false);
+      setProgramadoPartida(0);
       return;
     }
     let activo = true;
     (async () => {
-      const { data: proyecto } = await supabase
-        .from("proyectos")
-        .select("id")
-        .eq("centro_negocio_id", form.centro_negocio_id)
-        .maybeSingle();
-      if (!proyecto) {
-        if (activo) setProgramacionProyectoActiva(false);
-        return;
-      }
       const { data: programacion } = await supabase
         .from("proyecto_programacion_financiera")
         .select("id")
-        .eq("proyecto_id", proyecto.id)
+        .eq("presupuesto_id", presupuesto.id)
         .maybeSingle();
-      if (activo) setProgramacionProyectoActiva(!!programacion);
+      if (!activo) return;
+      if (!programacion) {
+        setProgramacionProyectoActiva(false);
+        setProgramadoPartida(0);
+        return;
+      }
+      setProgramacionProyectoActiva(true);
+      const { data: pagos } = await supabase
+        .from("proyecto_programacion_pagos")
+        .select("monto")
+        .eq("programacion_id", programacion.id);
+      if (activo) setProgramadoPartida((pagos || []).reduce((s, p) => s + Number(p.monto), 0));
     })();
     return () => {
       activo = false;
     };
-  }, [open, form.centro_negocio_id]);
+  }, [open, presupuesto?.id]);
 
   const loadEmpresas = async () => {
     const { data } = await supabase
@@ -596,10 +600,13 @@ export function PresupuestoDialog({
 
             {/* Programación de Flujo */}
             {programacionProyectoActiva ? (
-              <div className="border rounded-lg p-4 bg-muted/30">
+              <div className="border rounded-lg p-4 bg-muted/30 space-y-1">
                 <p className="text-sm text-muted-foreground">
                   📊 Esta partida se programa desde la <strong>Programación financiera</strong> del proyecto
                   (pestaña "Programación financiera" en el detalle del Project), para evitar duplicar el flujo.
+                </p>
+                <p className="text-sm">
+                  Ya programado: <strong className="text-foreground">{formatCurrency(programadoPartida)}</strong>
                 </p>
               </div>
             ) : (

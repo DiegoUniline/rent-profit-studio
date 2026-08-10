@@ -2,10 +2,20 @@
 // Reutiliza los tipos y la fórmula de ejercido ya usados en el Reporte de Flujo
 // (FlujoEfectivoPresupuesto.tsx) para no crear una segunda fuente de verdad.
 
-import { addWeeks, addMonths, addYears } from "date-fns";
+import { addDays, addWeeks, addMonths, addYears } from "date-fns";
 import type { Movimiento, AsientoContable } from "@/lib/accounting-utils";
 
-export type FrecuenciaProgramacion = "semanal" | "mensual" | "trimestral" | "semestral" | "anual";
+export type FrecuenciaProgramacion =
+  | "semanal"
+  | "quincenal"
+  | "mensual"
+  | "trimestral"
+  | "semestral"
+  | "anual"
+  | "personalizada";
+
+/** Frecuencias con cadencia calculable automáticamente (excluye "personalizada": ahí el usuario captura fecha por fecha). */
+export type FrecuenciaConCadencia = Exclude<FrecuenciaProgramacion, "personalizada">;
 
 export interface FlujoProgramadoLite {
   presupuesto_id: string | null;
@@ -104,10 +114,12 @@ export function distribuirSaldoEntrePeriodos(saldo: number, numPeriodos: number)
 }
 
 /** Avanza una fecha una unidad de la frecuencia dada. */
-function avanzarFrecuencia(fecha: Date, frecuencia: FrecuenciaProgramacion, n: number): Date {
+function avanzarFrecuencia(fecha: Date, frecuencia: FrecuenciaConCadencia, n: number): Date {
   switch (frecuencia) {
     case "semanal":
       return addWeeks(fecha, n);
+    case "quincenal":
+      return addDays(fecha, n * 15);
     case "mensual":
       return addMonths(fecha, n);
     case "trimestral":
@@ -119,10 +131,13 @@ function avanzarFrecuencia(fecha: Date, frecuencia: FrecuenciaProgramacion, n: n
   }
 }
 
-/** Calcula las N fechas de pago a partir de una fecha inicial y una frecuencia. */
+/**
+ * Calcula las N fechas de pago a partir de una fecha inicial y una frecuencia.
+ * No aplica a "personalizada": ahí el usuario captura cada fecha manualmente.
+ */
 export function calcularFechasPorFrecuencia(
   fechaInicio: Date,
-  frecuencia: FrecuenciaProgramacion,
+  frecuencia: FrecuenciaConCadencia,
   numPeriodos: number
 ): Date[] {
   if (numPeriodos <= 0) return [];

@@ -64,7 +64,6 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   partida: PartidaSeguimiento | null;
-  proyectoId?: string;
   onSuccess: () => void;
 }
 
@@ -81,7 +80,7 @@ function mesesEntre(inicio: Date, fin: Date): string[] {
   return result;
 }
 
-export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, proyectoId, onSuccess }: Props) {
+export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, onSuccess }: Props) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [terceros, setTerceros] = useState<Tercero[]>([]);
@@ -95,7 +94,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
   const [programacionProyectoActiva, setProgramacionProyectoActiva] = useState(false);
 
   useEffect(() => {
-    if (!open || !proyectoId) {
+    if (!open || !partida?.id) {
       setProgramacionProyectoActiva(false);
       return;
     }
@@ -103,7 +102,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
     supabase
       .from("proyecto_programacion_financiera")
       .select("id")
-      .eq("proyecto_id", proyectoId)
+      .eq("presupuesto_id", partida.id)
       .maybeSingle()
       .then(({ data }) => {
         if (activo) setProgramacionProyectoActiva(!!data);
@@ -111,7 +110,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
     return () => {
       activo = false;
     };
-  }, [open, proyectoId]);
+  }, [open, partida?.id]);
 
   const presupuestoMonto = useMemo(() => {
     if (!partida) return 0;

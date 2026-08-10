@@ -710,6 +710,7 @@ export type Database = {
       }
       proyecto_programacion_financiera: {
         Row: {
+          anticipo_fecha: string | null
           anticipo_monto: number
           created_at: string
           created_by: string | null
@@ -721,12 +722,14 @@ export type Database = {
           id: string
           modo: Database["public"]["Enums"]["programacion_proyecto_modo"]
           numero_pagos: number | null
+          presupuesto_id: string
           proyecto_id: string
           tiene_anticipo: boolean
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          anticipo_fecha?: string | null
           anticipo_monto?: number
           created_at?: string
           created_by?: string | null
@@ -738,12 +741,14 @@ export type Database = {
           id?: string
           modo: Database["public"]["Enums"]["programacion_proyecto_modo"]
           numero_pagos?: number | null
+          presupuesto_id: string
           proyecto_id: string
           tiene_anticipo?: boolean
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          anticipo_fecha?: string | null
           anticipo_monto?: number
           created_at?: string
           created_by?: string | null
@@ -755,6 +760,7 @@ export type Database = {
           id?: string
           modo?: Database["public"]["Enums"]["programacion_proyecto_modo"]
           numero_pagos?: number | null
+          presupuesto_id?: string
           proyecto_id?: string
           tiene_anticipo?: boolean
           updated_at?: string
@@ -769,9 +775,16 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "proyecto_programacion_financiera_presupuesto_id_fkey"
+            columns: ["presupuesto_id"]
+            isOneToOne: true
+            referencedRelation: "presupuestos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "proyecto_programacion_financiera_proyecto_id_fkey"
             columns: ["proyecto_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "proyectos"
             referencedColumns: ["id"]
           },
@@ -779,7 +792,9 @@ export type Database = {
       }
       proyecto_programacion_pagos: {
         Row: {
+          concepto: string | null
           created_at: string
+          es_anticipo: boolean
           fecha: string
           id: string
           monto: number
@@ -788,7 +803,9 @@ export type Database = {
           proyecto_id: string
         }
         Insert: {
+          concepto?: string | null
           created_at?: string
+          es_anticipo?: boolean
           fecha: string
           id?: string
           monto: number
@@ -797,7 +814,9 @@ export type Database = {
           proyecto_id: string
         }
         Update: {
+          concepto?: string | null
           created_at?: string
+          es_anticipo?: boolean
           fecha?: string
           id?: string
           monto?: number
@@ -1179,10 +1198,12 @@ export type Database = {
       naturaleza_cuenta: "deudora" | "acreedora"
       programacion_proyecto_frecuencia:
         | "semanal"
+        | "quincenal"
         | "mensual"
         | "trimestral"
         | "semestral"
         | "anual"
+        | "personalizada"
       programacion_proyecto_modo: "automatica" | "manual"
       tarea_estado: "pendiente" | "en_progreso" | "bloqueada" | "hecho"
       tipo_asiento: "ingreso" | "egreso" | "diario"

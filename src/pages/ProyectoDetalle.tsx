@@ -130,7 +130,9 @@ export default function ProyectoDetalle() {
   const [flujos, setFlujos] = useState<any[]>([]);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [asientos, setAsientos] = useState<AsientoContable[]>([]);
-  const [pagosProyecto, setPagosProyecto] = useState<{ fecha: string; monto: number }[] | null>(null);
+  const [programacionesPorPartida, setProgramacionesPorPartida] = useState<
+    Map<string, { programacionId: string; pagos: { fecha: string; monto: number }[] }>
+  >(new Map());
   const [auditoria, setAuditoria] = useState<AuditoriaRow[]>([]);
 
   const [filtroResponsable, setFiltroResponsable] = useState<string>("todos");
@@ -200,24 +202,38 @@ export default function ProyectoDetalle() {
       if (partidasError) throw partidasError;
       setPartidas((partidasData || []) as any);
 
-      // Programación financiera propia del proyecto: si existe, es la única fuente
-      // activa de programación (evita duplicar el flujo de las partidas).
-      const { data: programacionData } = await supabase
-        .from("proyecto_programacion_financiera")
-        .select("id")
-        .eq("proyecto_id", id)
-        .maybeSingle();
-      if (programacionData) {
-        const { data: pagosData } = await supabase
-          .from("proyecto_programacion_pagos")
-          .select("fecha, monto")
-          .eq("programacion_id", programacionData.id);
-        setPagosProyecto((pagosData || []).map((p) => ({ fecha: p.fecha, monto: Number(p.monto) })));
-      } else {
-        setPagosProyecto(null);
-      }
-
       const idsProject = (partidasData || []).filter((p: any) => p.es_project).map((p: any) => p.id);
+
+      // Programación financiera propia POR PARTIDA: si una partida tiene su
+      // propia programación, es la única fuente activa para ella (evita
+      // duplicar su flujo); las partidas sin programación propia siguen
+      // usando su flujos_programados normal (sin cambios).
+      if (idsProject.length > 0) {
+        const { data: programacionesData } = await supabase
+          .from("proyecto_programacion_financiera")
+          .select("id, presupuesto_id")
+          .in("presupuesto_id", idsProject);
+
+        const map = new Map<string, { programacionId: string; pagos: { fecha: string; monto: number }[] }>();
+        if (programacionesData && programacionesData.length > 0) {
+          const programacionIds = programacionesData.map((p) => p.id);
+          const { data: pagosData } = await supabase
+            .from("proyecto_programacion_pagos")
+            .select("programacion_id, fecha, monto")
+            .in("programacion_id", programacionIds);
+          programacionesData.forEach((prog) => {
+            map.set(prog.presupuesto_id, {
+              programacionId: prog.id,
+              pagos: (pagosData || [])
+                .filter((p) => p.programacion_id === prog.id)
+                .map((p) => ({ fecha: p.fecha, monto: Number(p.monto) })),
+            });
+          });
+        }
+        setProgramacionesPorPartida(map);
+      } else {
+        setProgramacionesPorPartida(new Map());
+      }
 
       if (idsProject.length > 0) {
         const [{ data: flujosData }, { data: movData }] = await Promise.all([
@@ -374,6 +390,18 @@ export default function ProyectoDetalle() {
 
   const partidasProject = useMemo(() => partidas.filter((p) => p.es_project), [partidas]);
 
+  const partidasProgramables = useMemo(
+    () =>
+      partidasProject.map((p) => ({
+        id: p.id,
+        partida: p.partida,
+        cuenta_codigo: p.cuenta?.codigo,
+        cuenta_nombre: p.cuenta?.nombre,
+        presupuesto: p.cantidad * p.precio_unitario,
+      })),
+    [partidasProject]
+  );
+
   const responsablesDisponibles = useMemo(() => {
     const set = new Map<string, string>();
     partidasProject.forEach((p) => {
@@ -392,22 +420,24 @@ export default function ProyectoDetalle() {
 
   const ejercidoMap = useMemo(() => calcularEjercidoPorPartida(movimientos as any, asientos), [movimientos, asientos]);
 
-  // Si el proyecto tiene programación financiera propia, es la única fuente activa:
-  // se reparte cada pago entre las partidas según su peso en el presupuesto total,
-  // en vez de usar los flujos_programados reales de cada partida (evita duplicar).
+  // Si una partida tiene programación financiera propia, es la única fuente
+  // activa para ella (sus pagos, no sus flujos_programados); las partidas sin
+  // programación propia siguen usando su flujos_programados real, sin cambios.
   const flujosEfectivos = useMemo(() => {
-    if (!pagosProyecto) return flujos;
-    const presupuestoTotal = partidasProject.reduce((s, p) => s + p.cantidad * p.precio_unitario, 0);
-    if (presupuestoTotal <= 0) return [];
-    const sintetico: any[] = [];
+    if (programacionesPorPartida.size === 0) return flujos;
+    const resultado: any[] = [];
     partidasProject.forEach((p) => {
-      const peso = (p.cantidad * p.precio_unitario) / presupuestoTotal;
-      pagosProyecto.forEach((pago) => {
-        sintetico.push({ presupuesto_id: p.id, fecha: pago.fecha, monto: pago.monto * peso, tipo: "egreso" });
-      });
+      const propia = programacionesPorPartida.get(p.id);
+      if (propia) {
+        propia.pagos.forEach((pago) => {
+          resultado.push({ presupuesto_id: p.id, fecha: pago.fecha, monto: pago.monto, tipo: "egreso" });
+        });
+      } else {
+        flujos.filter((f: any) => f.presupuesto_id === p.id).forEach((f) => resultado.push(f));
+      }
     });
-    return sintetico;
-  }, [pagosProyecto, flujos, partidasProject]);
+    return resultado;
+  }, [programacionesPorPartida, flujos, partidasProject]);
 
   const proyectadoMap = useMemo(() => calcularProyectadoPorPartida(flujosEfectivos), [flujosEfectivos]);
   const proyectadoAcumuladoMap = useMemo(() => calcularProyectadoPorPartida(flujosEfectivos, new Date()), [flujosEfectivos]);
@@ -781,7 +811,7 @@ export default function ProyectoDetalle() {
             <ProgramacionFinancieraProyecto
               proyectoId={proyecto.id}
               empresaId={proyecto.empresa_id}
-              presupuestoTotal={kpis.presupuesto}
+              partidas={partidasProgramables}
               canView={canViewProgramacionFinanciera}
               canEdit={canEditProgramacionFinanciera}
             />
@@ -935,7 +965,6 @@ export default function ProyectoDetalle() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         partida={dialogPartida}
-        proyectoId={proyecto.id}
         onSuccess={fetchAll}
       />
 
