@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { formatCurrency } from "@/lib/accounting-utils";
 import { ProgramacionPartidaDialog, PartidaProgramable } from "@/components/dialogs/ProgramacionPartidaDialog";
-import { Wand2, Landmark, Wallet, Clock } from "lucide-react";
+import { Wand2, Landmark, Wallet, Clock, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface Props {
@@ -30,6 +30,8 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
   const [loading, setLoading] = useState(true);
   // presupuesto_id -> { programacionId, pagos }
   const [porPartida, setPorPartida] = useState<Map<string, { programacionId: string; pagos: PagoRow[] }>>(new Map());
+  // presupuesto_id -> ejercido real (asientos aplicados), no lo programado
+  const [ejercidoPorPartida, setEjercidoPorPartida] = useState<Map<string, number>>(new Map());
   const [selectedPartidaId, setSelectedPartidaId] = useState<string>("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -65,6 +67,20 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
       });
     }
     setPorPartida(map);
+
+    // Ya pagado real (Asientos contables aplicados), independiente de lo programado.
+    const { data: movimientos } = await supabase
+      .from("asiento_movimientos")
+      .select("presupuesto_id, debe, haber, asientos_contables:asiento_id(estado)")
+      .in("presupuesto_id", ids);
+    const ejercidoMap = new Map<string, number>();
+    (movimientos || []).forEach((m: any) => {
+      if (m.asientos_contables?.estado !== "aplicado") return;
+      const actual = ejercidoMap.get(m.presupuesto_id) || 0;
+      ejercidoMap.set(m.presupuesto_id, actual + Number(m.debe) + Number(m.haber));
+    });
+    setEjercidoPorPartida(ejercidoMap);
+
     setLoading(false);
   };
 
@@ -73,9 +89,10 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
       partidas.map((p) => {
         const registro = porPartida.get(p.id);
         const programado = (registro?.pagos || []).reduce((s, pago) => s + pago.monto, 0);
-        return { partida: p, programado, pendiente: Math.max(0, p.presupuesto - programado) };
+        const ejercido = ejercidoPorPartida.get(p.id) || 0;
+        return { partida: p, programado, ejercido, pendiente: Math.max(0, p.presupuesto - programado) };
       }),
-    [partidas, porPartida]
+    [partidas, porPartida, ejercidoPorPartida]
   );
 
   const selected = overview.find((o) => o.partida.id === selectedPartidaId) || null;
@@ -128,7 +145,7 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
 
       {selected && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             <Card className="overflow-hidden">
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between">
@@ -144,6 +161,15 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground">Importe presupuestado</p>
                 <p className="text-lg font-bold tabular-nums">{formatCurrency(selected.partida.presupuesto)}</p>
+              </CardContent>
+            </Card>
+            <Card className="overflow-hidden">
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">Ya pagado</p>
+                  <CheckCircle2 className="h-4 w-4 text-green-500/70" />
+                </div>
+                <p className="text-lg font-bold tabular-nums text-green-600 dark:text-green-400">{formatCurrency(selected.ejercido)}</p>
               </CardContent>
             </Card>
             <Card className="overflow-hidden">
@@ -212,10 +238,14 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
                       })()}
                     </TableBody>
                   </Table>
-                  <div className="grid grid-cols-3 gap-4 pt-4 mt-4 border-t text-sm">
+                  <div className="grid grid-cols-4 gap-4 pt-4 mt-4 border-t text-sm">
                     <div>
                       <p className="text-muted-foreground">Presupuesto de partida</p>
                       <p className="font-semibold">{formatCurrency(selected.partida.presupuesto)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Ya pagado</p>
+                      <p className="font-semibold">{formatCurrency(selected.ejercido)}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Programado</p>
@@ -243,6 +273,7 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
               <TableRow>
                 <TableHead>Partida</TableHead>
                 <TableHead className="text-right">Presupuesto</TableHead>
+                <TableHead className="text-right">Pagado</TableHead>
                 <TableHead className="text-right">Programado</TableHead>
                 <TableHead className="text-right">Pendiente</TableHead>
                 <TableHead className="w-28">Acción</TableHead>
@@ -253,6 +284,7 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
                 <TableRow key={o.partida.id} className={o.partida.id === selectedPartidaId ? "bg-muted/40" : ""}>
                   <TableCell>{o.partida.partida}</TableCell>
                   <TableCell className="text-right">{formatCurrency(o.partida.presupuesto)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(o.ejercido)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(o.programado)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(o.pendiente)}</TableCell>
                   <TableCell>

@@ -78,10 +78,27 @@ export function ProgramacionPartidaDialog({ open, onOpenChange, proyectoId, empr
   const [fechaInicio, setFechaInicio] = useState<Date | undefined>();
   const [numeroPagos, setNumeroPagos] = useState("4");
   const [filas, setFilas] = useState<FilaPago[]>([]);
+  const [ejercido, setEjercido] = useState(0);
 
   useEffect(() => {
-    if (open && partida) loadExistente(partida.id);
+    if (open && partida) {
+      loadExistente(partida.id);
+      loadEjercido(partida.id);
+    }
   }, [open, partida]);
+
+  // Lo que ya está realmente pagado/ejercido en Asientos contables (no lo
+  // programado): asiento_movimientos de asientos aplicados ligados a esta partida.
+  const loadEjercido = async (presupuestoId: string) => {
+    const { data } = await supabase
+      .from("asiento_movimientos")
+      .select("debe, haber, asientos_contables:asiento_id(estado)")
+      .eq("presupuesto_id", presupuestoId);
+    const total = (data || [])
+      .filter((m: any) => m.asientos_contables?.estado === "aplicado")
+      .reduce((s, m: any) => s + Number(m.debe) + Number(m.haber), 0);
+    setEjercido(total);
+  };
 
   const loadExistente = async (presupuestoId: string) => {
     const { data: programacion } = await supabase
@@ -406,6 +423,8 @@ export function ProgramacionPartidaDialog({ open, onOpenChange, proyectoId, empr
             </Button>
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pt-2 border-t text-sm">
+              <span className="text-muted-foreground">Ya pagado (asientos aplicados)</span>
+              <span className="text-right font-medium text-blue-600 dark:text-blue-400">{formatCurrency(ejercido)}</span>
               <span className="text-muted-foreground">Anticipo</span>
               <span className="text-right font-medium">{formatCurrency(anticipo)}</span>
               <span className="text-muted-foreground">Programado</span>

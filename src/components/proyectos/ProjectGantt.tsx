@@ -260,6 +260,16 @@ export function ProjectGantt({ filas, acciones }: Props) {
     return { left: `${left}%`, width: `${width}%` };
   };
 
+  // Ancho/posición real de cada periodo en días (no columnas de ancho fijo):
+  // los meses y años no duran lo mismo, así que el header y las líneas de
+  // cuadrícula deben usar la misma escala de días que las barras, o no cuadran.
+  const periodoLayout = periodos.map((p, i) => {
+    const finPeriodo = i < periodos.length - 1 ? periodos[i + 1] : rango.fin;
+    const left = (differenceInCalendarDays(p, rango.inicio) / totalDias) * 100;
+    const width = (differenceInCalendarDays(finPeriodo, p) / totalDias) * 100;
+    return { left, width };
+  });
+
   return (
     <CronogramaCard granularidad={granularidad} onGranularidadChange={handleGranularidadChange} acciones={acciones}>
       <ScrollArea className="w-full whitespace-nowrap">
@@ -267,16 +277,18 @@ export function ProjectGantt({ filas, acciones }: Props) {
           {/* Header de periodos */}
           <div className="grid mb-1" style={{ gridTemplateColumns: `${LABEL_COL} 1fr` }}>
             <div />
-            <div className="relative flex rounded-t-md overflow-hidden border border-b-0 border-border/60">
+            <div className="relative h-[26px] rounded-t-md overflow-hidden border border-b-0 border-border/60">
               {periodos.map((p, i) => {
                 const esActual = cfg.isCurrent(p, hoy);
+                const { left, width } = periodoLayout[i];
                 return (
                   <div
                     key={i}
                     className={cn(
-                      "flex-1 py-1.5 text-[11px] font-medium text-center capitalize border-l first:border-l-0 border-border/50",
+                      "absolute top-0 bottom-0 py-1.5 text-[11px] font-medium text-center capitalize border-l first:border-l-0 border-border/50 overflow-hidden",
                       esActual ? "bg-primary/10 text-primary" : "bg-muted/40 text-muted-foreground"
                     )}
+                    style={{ left: `${left}%`, width: `${width}%` }}
                   >
                     {cfg.label(p)}
                   </div>
@@ -304,11 +316,11 @@ export function ProjectGantt({ filas, acciones }: Props) {
                     {items[0].cuentaNombre ? ` · ${items[0].cuentaNombre}` : ""}
                   </div>
                   <div className="relative h-full min-h-[26px]">
-                    {periodos.map((_, i) => (
+                    {periodoLayout.map((p, i) => (
                       <div
                         key={i}
                         className="absolute top-0 bottom-0 border-l border-border/40"
-                        style={{ left: `${(i / periodos.length) * 100}%` }}
+                        style={{ left: `${p.left}%` }}
                       />
                     ))}
                   </div>
@@ -336,11 +348,11 @@ export function ProjectGantt({ filas, acciones }: Props) {
                         {f.partida}
                       </div>
                       <div className="relative h-8">
-                        {periodos.map((_, i) => (
+                        {periodoLayout.map((p, i) => (
                           <div
                             key={i}
                             className="absolute top-0 bottom-0 border-l border-border/40"
-                            style={{ left: `${(i / periodos.length) * 100}%` }}
+                            style={{ left: `${p.left}%` }}
                           />
                         ))}
                         <TooltipProvider>
