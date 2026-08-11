@@ -651,10 +651,10 @@ export default function ProyectoDetalle() {
         <Card className="overflow-hidden">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">Proyectado acumulado</p>
+              <p className="text-xs text-muted-foreground">Pagado</p>
               <CalendarClock className="h-4 w-4 text-amber-500/70" />
             </div>
-            <p className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(kpis.proyectadoAcumulado)}</p>
+            <p className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(kpis.ejercido)}</p>
           </CardContent>
         </Card>
         <Card className="overflow-hidden">
