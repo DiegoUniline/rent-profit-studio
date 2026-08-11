@@ -115,10 +115,12 @@ serve(async (req) => {
           });
         }
 
+        await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+
         const { error } = await supabaseAdmin
           .from("user_roles")
-          .update({ role })
-          .eq("user_id", userId);
+          .insert({ user_id: userId, role });
+
 
         if (error) {
           return new Response(JSON.stringify({ error: error.message }), {
