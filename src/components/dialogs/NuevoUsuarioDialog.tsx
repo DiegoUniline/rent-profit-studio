@@ -32,7 +32,7 @@ const usuarioSchema = z.object({
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
   nombre_completo: z.string().min(2, "El nombre es requerido"),
   nombre_usuario: z.string().min(3, "El nombre de usuario debe tener al menos 3 caracteres"),
-  role: z.enum(["admin", "contador", "usuario"]),
+  role: z.enum(["admin", "contador", "usuario", "arquitecto"]),
 });
 
 interface UsuarioForm {
@@ -40,7 +40,7 @@ interface UsuarioForm {
   password: string;
   nombre_completo: string;
   nombre_usuario: string;
-  role: "admin" | "contador" | "usuario";
+  role: "admin" | "contador" | "usuario" | "arquitecto";
 }
 
 const emptyForm: UsuarioForm = {
@@ -199,6 +199,7 @@ export function NuevoUsuarioDialog({
                 <SelectItem value="admin">Administrador</SelectItem>
                 <SelectItem value="contador">Contador</SelectItem>
                 <SelectItem value="usuario">Usuario</SelectItem>
+                <SelectItem value="arquitecto">Arquitecto</SelectItem>
               </SelectContent>
             </Select>
           </div>

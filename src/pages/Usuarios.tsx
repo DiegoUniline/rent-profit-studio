@@ -34,12 +34,14 @@ const roleLabels: Record<string, string> = {
   admin: "Administrador",
   contador: "Contador",
   usuario: "Usuario",
+  arquitecto: "Arquitecto",
 };
 
 const roleBadgeVariants: Record<string, "default" | "secondary" | "outline"> = {
   admin: "default",
   contador: "secondary",
   usuario: "outline",
+  arquitecto: "outline",
 };
 
 export default function Usuarios() {
