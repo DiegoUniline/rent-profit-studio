@@ -90,7 +90,7 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
         const registro = porPartida.get(p.id);
         const programado = (registro?.pagos || []).reduce((s, pago) => s + pago.monto, 0);
         const ejercido = ejercidoPorPartida.get(p.id) || 0;
-        return { partida: p, programado, ejercido, pendiente: Math.max(0, p.presupuesto - programado) };
+        return { partida: p, programado, ejercido, pendiente: Math.max(0, p.presupuesto - ejercido - programado) };
       }),
     [partidas, porPartida, ejercidoPorPartida]
   );

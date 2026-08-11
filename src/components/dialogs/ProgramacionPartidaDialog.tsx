@@ -138,13 +138,14 @@ export function ProgramacionPartidaDialog({ open, onOpenChange, proyectoId, empr
 
   const presupuestoPartida = partida?.presupuesto || 0;
   const anticipo = tieneAnticipo ? Math.max(0, parseFloat(anticipoMonto) || 0) : 0;
-  const saldo = Math.max(0, presupuestoPartida - anticipo);
-  const excedeAnticipo = anticipo > presupuestoPartida;
+  // Lo ya pagado (ejercido) también reduce lo que falta por programar/anticipar.
+  const saldo = Math.max(0, presupuestoPartida - anticipo - ejercido);
+  const excedeAnticipo = anticipo + ejercido > presupuestoPartida;
 
   const totalFilas = filas.reduce((s, f) => s + (parseFloat(f.monto) || 0), 0);
   const totalConAnticipo = totalFilas + anticipo;
-  const excedePresupuesto = totalConAnticipo > presupuestoPartida + 0.01;
-  const pendiente = Math.max(0, presupuestoPartida - totalConAnticipo);
+  const excedePresupuesto = totalConAnticipo + ejercido > presupuestoPartida + 0.01;
+  const pendiente = Math.max(0, presupuestoPartida - ejercido - totalConAnticipo);
 
   const handleGenerar = () => {
     if (frecuencia === "personalizada") {
@@ -170,13 +171,17 @@ export function ProgramacionPartidaDialog({ open, onOpenChange, proyectoId, empr
   const handleGuardar = async () => {
     if (!partida) return;
     if (excedeAnticipo) {
-      toast({ title: "El anticipo no puede ser mayor al presupuesto de la partida", variant: "destructive" });
+      toast({
+        title: "El anticipo no puede ser mayor al saldo pendiente de la partida",
+        description: ejercido > 0 ? `Ya pagado: ${formatCurrency(ejercido)}.` : undefined,
+        variant: "destructive",
+      });
       return;
     }
     if (excedePresupuesto) {
       toast({
         title: "El importe supera el presupuesto de la partida",
-        description: `Presupuesto: ${formatCurrency(presupuestoPartida)}. Programado + anticipo: ${formatCurrency(totalConAnticipo)}.`,
+        description: `Presupuesto: ${formatCurrency(presupuestoPartida)}. Ya pagado: ${formatCurrency(ejercido)}. Programado + anticipo: ${formatCurrency(totalConAnticipo)}.`,
         variant: "destructive",
       });
       return;
