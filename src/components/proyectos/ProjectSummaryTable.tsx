@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { formatDateNumeric } from "@/lib/date-utils";
 import {
   Table,
   TableBody,
@@ -108,10 +109,10 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
                     <TableCell className="text-sm">
                       {f.responsable || <span className="text-muted-foreground">Sin responsable</span>}
                     </TableCell>
-                    <TableCell className="text-sm">{f.fechaInicio || "-"}</TableCell>
+                    <TableCell className="text-sm">{f.fechaInicio ? formatDateNumeric(f.fechaInicio) : "-"}</TableCell>
                     <TableCell className="text-sm">
                       <span className={f.vencida ? "text-red-600 dark:text-red-400 font-medium" : ""}>
-                        {f.fechaFin || "-"}
+                        {f.fechaFin ? formatDateNumeric(f.fechaFin) : "-"}
                       </span>
                     </TableCell>
                     <TableCell className="text-right text-sm">{formatCurrency(f.presupuesto)}</TableCell>

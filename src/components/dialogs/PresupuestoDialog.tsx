@@ -27,7 +27,8 @@ import { EmpresaDialog } from "./EmpresaDialog";
 import { CuentaDialog } from "./CuentaDialog";
 import { CentroNegocioDialog } from "./CentroNegocioDialog";
 import { UnidadMedidaDialog } from "./UnidadMedidaDialog";
-import { Plus, Trash2, Copy } from "lucide-react";
+import { ProgramacionPartidaDialog } from "./ProgramacionPartidaDialog";
+import { Plus, Trash2, Copy, Wand2 } from "lucide-react";
 
 interface Empresa {
   id: string;
@@ -70,6 +71,7 @@ interface Presupuesto {
   fecha_inicio: string | null;
   fecha_fin: string | null;
   frecuencia: "semanal" | "mensual" | "bimestral" | "trimestral" | "semestral" | "anual" | null;
+  es_project?: boolean;
 }
 
 interface PresupuestoDialogProps {
@@ -129,7 +131,11 @@ export function PresupuestoDialog({
   const [form, setForm] = useState<PresupuestoForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [flujoRows, setFlujoRows] = useState<FlujoRow[]>([]);
-  
+  const [programacionProyectoActiva, setProgramacionProyectoActiva] = useState(false);
+  const [programadoPartida, setProgramadoPartida] = useState(0);
+  const [proyectoDePartida, setProyectoDePartida] = useState<{ id: string; empresaId: string } | null>(null);
+  const [programacionDialogOpen, setProgramacionDialogOpen] = useState(false);
+
   // Related data states
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [centros, setCentros] = useState<CentroNegocio[]>([]);
@@ -202,6 +208,75 @@ export function PresupuestoDialog({
         descripcion: f.descripcion || "",
       })));
     }
+  };
+
+  // Partidas de Project (es_project = true): la programación financiera se
+  // maneja con la MISMA ventana que Proyecto → Programación financiera (evita
+  // duplicar el flujo y mantiene los números homologados en ambos lados).
+  useEffect(() => {
+    if (!open || !presupuesto?.id || !presupuesto.es_project || !form.centro_negocio_id) {
+      setProyectoDePartida(null);
+      setProgramacionProyectoActiva(false);
+      setProgramadoPartida(0);
+      return;
+    }
+    let activo = true;
+    (async () => {
+      const { data: proyecto } = await supabase
+        .from("proyectos")
+        .select("id, empresa_id")
+        .eq("centro_negocio_id", form.centro_negocio_id)
+        .maybeSingle();
+      if (!activo) return;
+      if (!proyecto) {
+        setProyectoDePartida(null);
+        setProgramacionProyectoActiva(false);
+        setProgramadoPartida(0);
+        return;
+      }
+      setProyectoDePartida({ id: proyecto.id, empresaId: proyecto.empresa_id });
+
+      const { data: programacion } = await supabase
+        .from("proyecto_programacion_financiera")
+        .select("id")
+        .eq("presupuesto_id", presupuesto.id)
+        .maybeSingle();
+      if (!activo) return;
+      if (!programacion) {
+        setProgramacionProyectoActiva(false);
+        setProgramadoPartida(0);
+        return;
+      }
+      setProgramacionProyectoActiva(true);
+      const { data: pagos } = await supabase
+        .from("proyecto_programacion_pagos")
+        .select("monto")
+        .eq("programacion_id", programacion.id);
+      if (activo) setProgramadoPartida((pagos || []).reduce((s, p) => s + Number(p.monto), 0));
+    })();
+    return () => {
+      activo = false;
+    };
+  }, [open, presupuesto?.id, presupuesto?.es_project, form.centro_negocio_id]);
+
+  const refrescarProgramado = async () => {
+    if (!presupuesto?.id) return;
+    const { data: programacion } = await supabase
+      .from("proyecto_programacion_financiera")
+      .select("id")
+      .eq("presupuesto_id", presupuesto.id)
+      .maybeSingle();
+    if (!programacion) {
+      setProgramacionProyectoActiva(false);
+      setProgramadoPartida(0);
+      return;
+    }
+    setProgramacionProyectoActiva(true);
+    const { data: pagos } = await supabase
+      .from("proyecto_programacion_pagos")
+      .select("monto")
+      .eq("programacion_id", programacion.id);
+    setProgramadoPartida((pagos || []).reduce((s, p) => s + Number(p.monto), 0));
   };
 
   const loadEmpresas = async () => {
@@ -352,26 +427,30 @@ export function PresupuestoDialog({
         presupuestoId = insertData.id;
       }
 
-      // Save flujos_programados: delete all existing and re-insert
-      await supabase
-        .from("flujos_programados")
-        .delete()
-        .eq("presupuesto_id", presupuestoId);
-
-      const validFlujos = flujoRows.filter(r => r.fecha && parseFloat(r.monto) > 0);
-      if (validFlujos.length > 0) {
-        const flujosToInsert = validFlujos.map(r => ({
-          presupuesto_id: presupuestoId,
-          fecha: format(r.fecha!, "yyyy-MM-dd"),
-          monto: parseFloat(r.monto),
-          tipo: r.tipo,
-          descripcion: r.descripcion || null,
-        }));
-
-        const { error: flujoError } = await supabase
+      // Save flujos_programados: delete all existing and re-insert.
+      // Si el proyecto ya tiene programación financiera propia, esta partida
+      // no se programa aquí (evita duplicar el flujo) — no se toca la tabla.
+      if (!programacionProyectoActiva) {
+        await supabase
           .from("flujos_programados")
-          .insert(flujosToInsert);
-        if (flujoError) throw flujoError;
+          .delete()
+          .eq("presupuesto_id", presupuestoId);
+
+        const validFlujos = flujoRows.filter(r => r.fecha && parseFloat(r.monto) > 0);
+        if (validFlujos.length > 0) {
+          const flujosToInsert = validFlujos.map(r => ({
+            presupuesto_id: presupuestoId,
+            fecha: format(r.fecha!, "yyyy-MM-dd"),
+            monto: parseFloat(r.monto),
+            tipo: r.tipo,
+            descripcion: r.descripcion || null,
+          }));
+
+          const { error: flujoError } = await supabase
+            .from("flujos_programados")
+            .insert(flujosToInsert);
+          if (flujoError) throw flujoError;
+        }
       }
 
       toast({ title: presupuesto?.id ? "Presupuesto actualizado" : "Presupuesto creado" });
@@ -560,6 +639,22 @@ export function PresupuestoDialog({
             </div>
 
             {/* Programación de Flujo */}
+            {proyectoDePartida ? (
+              <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  📊 Esta es una partida de Project — se programa con la misma ventana de{" "}
+                  <strong>Programación financiera</strong> del proyecto, para que quede homologada en ambos lados.
+                </p>
+                <div className="rounded-lg bg-background p-3 flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Ya programado</span>
+                  <span className="font-semibold">{formatCurrency(programadoPartida)}</span>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => setProgramacionDialogOpen(true)} className="w-full gap-1.5">
+                  <Wand2 className="h-3.5 w-3.5" />
+                  {programacionProyectoActiva ? "Ver / editar programación financiera" : "Programar esta partida"}
+                </Button>
+              </div>
+            ) : (
             <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium text-sm flex items-center gap-2">
@@ -658,6 +753,7 @@ export function PresupuestoDialog({
                 </p>
               )}
             </div>
+            )}
 
             {/* Notas */}
             <div className="space-y-2">
@@ -714,6 +810,23 @@ export function PresupuestoDialog({
         unidad={null}
         onSuccess={handleUnidadCreated}
       />
+
+      {proyectoDePartida && presupuesto?.id && (
+        <ProgramacionPartidaDialog
+          open={programacionDialogOpen}
+          onOpenChange={setProgramacionDialogOpen}
+          proyectoId={proyectoDePartida.id}
+          empresaId={proyectoDePartida.empresaId}
+          partida={{
+            id: presupuesto.id,
+            partida: form.partida,
+            cuenta_codigo: cuentas.find((c) => c.id === form.cuenta_id)?.codigo,
+            cuenta_nombre: cuentas.find((c) => c.id === form.cuenta_id)?.nombre,
+            presupuesto: presupuestoCalculado,
+          }}
+          onSuccess={refrescarProgramado}
+        />
+      )}
     </>
   );
 }

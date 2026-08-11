@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { formatDateObj } from "@/lib/date-utils";
 import {
   Table,
   TableBody,
@@ -148,7 +149,7 @@ export function EstadoFinanciero({
     
     doc.setFontSize(10);
     doc.text(
-      `Al ${fechaCorte.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}`,
+      `Al ${formatDateObj(fechaCorte)}`,
       pageWidth / 2,
       35,
       { align: "center" }
@@ -318,11 +319,7 @@ export function EstadoFinanciero({
           <p className="text-sm text-muted-foreground">{empresaNombre}</p>
           <p className="text-xs text-muted-foreground">
             Al{" "}
-            {fechaCorte.toLocaleDateString("es-MX", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
+            {formatDateObj(fechaCorte)}
           </p>
         </CardHeader>
         <CardContent className="pt-4">

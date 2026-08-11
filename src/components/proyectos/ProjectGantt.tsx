@@ -18,7 +18,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { CalendarRange } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CalendarRange, Share2, FileDown, MessageCircle, Mail, Link as LinkIcon } from "lucide-react";
 
 export interface FilaGantt {
   id: string;
@@ -31,8 +37,16 @@ export interface FilaGantt {
   vencida: boolean;
 }
 
+export interface CronogramaAcciones {
+  onExportarPDF?: () => void;
+  onCompartirWhatsApp?: () => void;
+  onCompartirCorreo?: () => void;
+  onCopiarLink?: () => void;
+}
+
 interface Props {
   filas: FilaGantt[];
+  acciones?: CronogramaAcciones;
 }
 
 type Granularidad = "semana" | "mes" | "anio";
@@ -90,11 +104,17 @@ function CronogramaCard({
   children,
   granularidad,
   onGranularidadChange,
+  acciones,
 }: {
   children: React.ReactNode;
   granularidad: Granularidad;
   onGranularidadChange: (g: Granularidad) => void;
+  acciones?: CronogramaAcciones;
 }) {
+  const tieneAcciones =
+    acciones &&
+    (acciones.onExportarPDF || acciones.onCompartirWhatsApp || acciones.onCompartirCorreo || acciones.onCopiarLink);
+
   return (
     <Card>
       <CardHeader>
@@ -103,18 +123,56 @@ function CronogramaCard({
             <CalendarRange className="h-4 w-4 text-primary" />
             Cronograma
           </CardTitle>
-          <div className="flex gap-1 bg-muted p-1 rounded-lg">
-            {GRANULARIDADES.map((g) => (
-              <Button
-                key={g.value}
-                variant={granularidad === g.value ? "default" : "ghost"}
-                size="sm"
-                className="h-7 px-3 text-xs"
-                onClick={() => onGranularidadChange(g.value)}
-              >
-                {g.label}
-              </Button>
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1 bg-muted p-1 rounded-lg">
+              {GRANULARIDADES.map((g) => (
+                <Button
+                  key={g.value}
+                  variant={granularidad === g.value ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => onGranularidadChange(g.value)}
+                >
+                  {g.label}
+                </Button>
+              ))}
+            </div>
+            {tieneAcciones && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-7 px-3 text-xs gap-1.5">
+                    <Share2 className="h-3.5 w-3.5" />
+                    Compartir
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {acciones?.onCompartirWhatsApp && (
+                    <DropdownMenuItem onClick={acciones.onCompartirWhatsApp} className="gap-2">
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      WhatsApp
+                    </DropdownMenuItem>
+                  )}
+                  {acciones?.onCompartirCorreo && (
+                    <DropdownMenuItem onClick={acciones.onCompartirCorreo} className="gap-2">
+                      <Mail className="h-3.5 w-3.5" />
+                      Correo electrónico
+                    </DropdownMenuItem>
+                  )}
+                  {acciones?.onExportarPDF && (
+                    <DropdownMenuItem onClick={acciones.onExportarPDF} className="gap-2">
+                      <FileDown className="h-3.5 w-3.5" />
+                      Descargar PDF
+                    </DropdownMenuItem>
+                  )}
+                  {acciones?.onCopiarLink && (
+                    <DropdownMenuItem onClick={acciones.onCopiarLink} className="gap-2">
+                      <LinkIcon className="h-3.5 w-3.5" />
+                      Copiar link público
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -123,7 +181,7 @@ function CronogramaCard({
   );
 }
 
-export function ProjectGantt({ filas }: Props) {
+export function ProjectGantt({ filas, acciones }: Props) {
   const [granularidad, setGranularidad] = useState<Granularidad>(
     () => (localStorage.getItem("project_gantt_granularidad") as Granularidad) || "mes"
   );
@@ -181,7 +239,7 @@ export function ProjectGantt({ filas }: Props) {
 
   if (!rango || conFechas.length === 0) {
     return (
-      <CronogramaCard granularidad={granularidad} onGranularidadChange={handleGranularidadChange}>
+      <CronogramaCard granularidad={granularidad} onGranularidadChange={handleGranularidadChange} acciones={acciones}>
         <div className="text-sm text-muted-foreground py-6 text-center">
           Ninguna partida tiene fecha inicio y fecha fin definidas todavía.
         </div>
@@ -202,23 +260,35 @@ export function ProjectGantt({ filas }: Props) {
     return { left: `${left}%`, width: `${width}%` };
   };
 
+  // Ancho/posición real de cada periodo en días (no columnas de ancho fijo):
+  // los meses y años no duran lo mismo, así que el header y las líneas de
+  // cuadrícula deben usar la misma escala de días que las barras, o no cuadran.
+  const periodoLayout = periodos.map((p, i) => {
+    const finPeriodo = i < periodos.length - 1 ? periodos[i + 1] : rango.fin;
+    const left = (differenceInCalendarDays(p, rango.inicio) / totalDias) * 100;
+    const width = (differenceInCalendarDays(finPeriodo, p) / totalDias) * 100;
+    return { left, width };
+  });
+
   return (
-    <CronogramaCard granularidad={granularidad} onGranularidadChange={handleGranularidadChange}>
+    <CronogramaCard granularidad={granularidad} onGranularidadChange={handleGranularidadChange} acciones={acciones}>
       <ScrollArea className="w-full whitespace-nowrap">
         <div style={{ minWidth: `${Math.max(760, anchoMinimo + 260)}px` }}>
           {/* Header de periodos */}
           <div className="grid mb-1" style={{ gridTemplateColumns: `${LABEL_COL} 1fr` }}>
             <div />
-            <div className="relative flex rounded-t-md overflow-hidden border border-b-0 border-border/60">
+            <div className="relative h-[26px] rounded-t-md overflow-hidden border border-b-0 border-border/60">
               {periodos.map((p, i) => {
                 const esActual = cfg.isCurrent(p, hoy);
+                const { left, width } = periodoLayout[i];
                 return (
                   <div
                     key={i}
                     className={cn(
-                      "flex-1 py-1.5 text-[11px] font-medium text-center capitalize border-l first:border-l-0 border-border/50",
+                      "absolute top-0 bottom-0 py-1.5 text-[11px] font-medium text-center capitalize border-l first:border-l-0 border-border/50 overflow-hidden",
                       esActual ? "bg-primary/10 text-primary" : "bg-muted/40 text-muted-foreground"
                     )}
+                    style={{ left: `${left}%`, width: `${width}%` }}
                   >
                     {cfg.label(p)}
                   </div>
@@ -246,11 +316,11 @@ export function ProjectGantt({ filas }: Props) {
                     {items[0].cuentaNombre ? ` · ${items[0].cuentaNombre}` : ""}
                   </div>
                   <div className="relative h-full min-h-[26px]">
-                    {periodos.map((_, i) => (
+                    {periodoLayout.map((p, i) => (
                       <div
                         key={i}
                         className="absolute top-0 bottom-0 border-l border-border/40"
-                        style={{ left: `${(i / periodos.length) * 100}%` }}
+                        style={{ left: `${p.left}%` }}
                       />
                     ))}
                   </div>
@@ -278,11 +348,11 @@ export function ProjectGantt({ filas }: Props) {
                         {f.partida}
                       </div>
                       <div className="relative h-8">
-                        {periodos.map((_, i) => (
+                        {periodoLayout.map((p, i) => (
                           <div
                             key={i}
                             className="absolute top-0 bottom-0 border-l border-border/40"
-                            style={{ left: `${(i / periodos.length) * 100}%` }}
+                            style={{ left: `${p.left}%` }}
                           />
                         ))}
                         <TooltipProvider>

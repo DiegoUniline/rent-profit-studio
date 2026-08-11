@@ -24,6 +24,7 @@ import Reportes from "./pages/Reportes";
 import Proyectos from "./pages/Proyectos";
 import { PROYECTOS_ALLOWED_EMAILS } from "@/lib/feature-access";
 import ProyectoDetalle from "./pages/ProyectoDetalle";
+import CronogramaPublico from "./pages/CronogramaPublico";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -85,6 +86,8 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+      {/* Cronograma público: sin login, accesible por link con token, sin datos financieros */}
+      <Route path="/cronograma/:token" element={<CronogramaPublico />} />
       <Route
         path="/"
         element={
