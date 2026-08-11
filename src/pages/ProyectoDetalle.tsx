@@ -55,7 +55,6 @@ import {
   Briefcase,
   Pencil,
   Landmark,
-  CalendarClock,
   CheckCircle2,
   Wallet,
   Percent,
@@ -638,7 +637,7 @@ export default function ProyectoDetalle() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="overflow-hidden">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
@@ -652,15 +651,6 @@ export default function ProyectoDetalle() {
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">Pagado</p>
-              <CalendarClock className="h-4 w-4 text-amber-500/70" />
-            </div>
-            <p className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(kpis.ejercido)}</p>
-          </CardContent>
-        </Card>
-        <Card className="overflow-hidden">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">Ejercido acumulado</p>
               <CheckCircle2 className="h-4 w-4 text-blue-500/70" />
             </div>
             <p className="text-lg font-bold tabular-nums text-blue-600 dark:text-blue-400">{formatCurrency(kpis.ejercido)}</p>
