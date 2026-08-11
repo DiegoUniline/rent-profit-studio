@@ -85,7 +85,7 @@ export function AppSidebar() {
         (item) =>
           role &&
           item.roles.includes(role) &&
-          (item.href !== "/proyectos" || canAccessProyectos(user?.email))
+          (item.href !== "/proyectos" || role === "arquitecto" || canAccessProyectos(user?.email))
       ),
     }))
     .filter((group) => group.items.length > 0);

@@ -58,6 +58,7 @@ const roleLabels: Record<string, string> = {
   admin: "Administrador",
   contador: "Contador",
   usuario: "Usuario",
+  arquitecto: "Arquitecto",
 };
 
 export default function Dashboard() {

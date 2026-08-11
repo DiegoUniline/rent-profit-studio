@@ -108,7 +108,7 @@ serve(async (req) => {
 
       case "update_role": {
         const { role } = data;
-        if (!["admin", "contador", "usuario"].includes(role)) {
+        if (!["admin", "contador", "usuario", "arquitecto"].includes(role)) {
           return new Response(JSON.stringify({ error: "Invalid role" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
