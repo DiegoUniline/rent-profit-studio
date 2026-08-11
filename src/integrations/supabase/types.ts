@@ -722,7 +722,7 @@ export type Database = {
           id: string
           modo: Database["public"]["Enums"]["programacion_proyecto_modo"]
           numero_pagos: number | null
-          presupuesto_id: string
+          presupuesto_id: string | null
           proyecto_id: string
           tiene_anticipo: boolean
           updated_at: string
@@ -741,7 +741,7 @@ export type Database = {
           id?: string
           modo: Database["public"]["Enums"]["programacion_proyecto_modo"]
           numero_pagos?: number | null
-          presupuesto_id: string
+          presupuesto_id?: string | null
           proyecto_id: string
           tiene_anticipo?: boolean
           updated_at?: string
@@ -760,7 +760,7 @@ export type Database = {
           id?: string
           modo?: Database["public"]["Enums"]["programacion_proyecto_modo"]
           numero_pagos?: number | null
-          presupuesto_id?: string
+          presupuesto_id?: string | null
           proyecto_id?: string
           tiene_anticipo?: boolean
           updated_at?: string
@@ -1151,9 +1151,9 @@ export type Database = {
     Functions: {
       actualizar_cronograma_partida: {
         Args: {
-          _avance_manual: number | null
-          _fecha_fin: string | null
-          _fecha_inicio: string | null
+          _avance_manual: number
+          _fecha_fin: string
+          _fecha_inicio: string
           _presupuesto_id: string
         }
         Returns: undefined
@@ -1198,11 +1198,11 @@ export type Database = {
       naturaleza_cuenta: "deudora" | "acreedora"
       programacion_proyecto_frecuencia:
         | "semanal"
-        | "quincenal"
         | "mensual"
         | "trimestral"
         | "semestral"
         | "anual"
+        | "quincenal"
         | "personalizada"
       programacion_proyecto_modo: "automatica" | "manual"
       tarea_estado: "pendiente" | "en_progreso" | "bloqueada" | "hecho"
@@ -1349,6 +1349,16 @@ export const Constants = {
         "anual",
       ],
       naturaleza_cuenta: ["deudora", "acreedora"],
+      programacion_proyecto_frecuencia: [
+        "semanal",
+        "mensual",
+        "trimestral",
+        "semestral",
+        "anual",
+        "quincenal",
+        "personalizada",
+      ],
+      programacion_proyecto_modo: ["automatica", "manual"],
       tarea_estado: ["pendiente", "en_progreso", "bloqueada", "hecho"],
       tipo_asiento: ["ingreso", "egreso", "diario"],
       tipo_persona: ["fisica", "moral"],
