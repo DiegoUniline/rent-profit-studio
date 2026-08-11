@@ -92,7 +92,11 @@ export default function ProyectoDetalle() {
 
   const canEdit = role === "admin" || role === "contador";
   const isAdmin = role === "admin";
+  const isArquitecto = role === "arquitecto";
   const readOnly = role === "usuario";
+  // El arquitecto puede editar fecha_inicio/fecha_fin de las partidas, pero no
+  // los montos ni la programación financiera (flujos_programados).
+  const canEditFechas = canEdit || isArquitecto;
 
   const [loading, setLoading] = useState(true);
   const [proyecto, setProyecto] = useState<ProyectoInfo | null>(null);
@@ -542,8 +546,8 @@ export default function ProyectoDetalle() {
             <CardContent>
               <ProjectSummaryTable
                 filas={filasResumen}
-                onEdit={canEdit ? openSeguimiento : undefined}
-                readOnly={readOnly}
+                onEdit={canEditFechas ? openSeguimiento : undefined}
+                readOnly={!canEditFechas}
               />
             </CardContent>
           </Card>
@@ -556,8 +560,8 @@ export default function ProyectoDetalle() {
             asientos={asientos}
             empresaNombre={proyecto.nombre}
             seguimientoPorPartida={seguimientoPorPartida}
-            onEditSeguimiento={canEdit ? openSeguimiento : undefined}
-            readOnlySeguimiento={readOnly}
+            onEditSeguimiento={canEditFechas ? openSeguimiento : undefined}
+            readOnlySeguimiento={!canEditFechas}
           />
         </>
       )}
@@ -643,6 +647,7 @@ export default function ProyectoDetalle() {
         onOpenChange={setDialogOpen}
         partida={dialogPartida}
         onSuccess={fetchAll}
+        mode={isArquitecto ? "fechas" : "full"}
       />
 
       <ProyectoEditDialog

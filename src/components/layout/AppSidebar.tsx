@@ -61,14 +61,14 @@ const menuGroups = [
     label: "Análisis",
     items: [
       { title: "Reportes", icon: BarChart3, href: "/reportes", roles: ["admin", "contador"] },
-      { title: "Proyectos", icon: FolderKanban, href: "/proyectos", roles: ["admin", "contador", "usuario"] },
+      { title: "Proyectos", icon: FolderKanban, href: "/proyectos", roles: ["admin", "contador", "usuario", "arquitecto"] },
     ],
   },
   {
     label: "Configuración",
     items: [
       { title: "Usuarios", icon: Users, href: "/usuarios", roles: ["admin"] },
-      { title: "Mi Perfil", icon: User, href: "/perfil", roles: ["admin", "contador", "usuario"] },
+      { title: "Mi Perfil", icon: User, href: "/perfil", roles: ["admin", "contador", "usuario", "arquitecto"] },
     ],
   },
 ];

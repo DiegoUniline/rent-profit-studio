@@ -237,6 +237,7 @@ export function EditUsuarioDialog({ open, onOpenChange, usuario, onSuccess }: Ed
                   <SelectItem value="admin">Administrador</SelectItem>
                   <SelectItem value="contador">Contador</SelectItem>
                   <SelectItem value="usuario">Usuario</SelectItem>
+                  <SelectItem value="arquitecto">Arquitecto</SelectItem>
                 </SelectContent>
               </Select>
             </div>

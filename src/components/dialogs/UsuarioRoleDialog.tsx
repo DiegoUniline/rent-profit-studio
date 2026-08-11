@@ -51,7 +51,7 @@ export function UsuarioRoleDialog({ open, onOpenChange, usuario, onSuccess }: Us
 
     const { error } = await supabase
       .from("user_roles")
-      .update({ role: newRole as "admin" | "contador" | "usuario" })
+      .update({ role: newRole as "admin" | "contador" | "usuario" | "arquitecto" })
       .eq("user_id", usuario.user_id);
 
     if (error) {
@@ -87,6 +87,7 @@ export function UsuarioRoleDialog({ open, onOpenChange, usuario, onSuccess }: Us
                 <SelectItem value="admin">Administrador</SelectItem>
                 <SelectItem value="contador">Contador</SelectItem>
                 <SelectItem value="usuario">Usuario</SelectItem>
+                <SelectItem value="arquitecto">Arquitecto</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -64,6 +64,8 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   partida: PartidaSeguimiento | null;
   onSuccess: () => void;
+  /** "fechas": solo permite editar fecha_inicio/fecha_fin, sin tocar responsable ni programación financiera. */
+  mode?: "full" | "fechas";
 }
 
 function mesesEntre(inicio: Date, fin: Date): string[] {
@@ -79,7 +81,8 @@ function mesesEntre(inicio: Date, fin: Date): string[] {
   return result;
 }
 
-export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, onSuccess }: Props) {
+export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, onSuccess, mode = "full" }: Props) {
+  const soloFechas = mode === "fechas";
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [terceros, setTerceros] = useState<Tercero[]>([]);
@@ -175,6 +178,33 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
   const doSave = async (rangoConfirmado: boolean) => {
     if (!partida) return;
 
+    if (soloFechas) {
+      if (fechaFin && fechaInicio && fechaFin < fechaInicio) {
+        toast({ title: "La fecha fin no puede ser anterior a la fecha inicio", variant: "destructive" });
+        return;
+      }
+      setSaving(true);
+      try {
+        const { error: updateError } = await supabase
+          .from("presupuestos")
+          .update({
+            fecha_inicio: fechaInicio ? format(fechaInicio, "yyyy-MM-dd") : null,
+            fecha_fin: fechaFin ? format(fechaFin, "yyyy-MM-dd") : null,
+          })
+          .eq("id", partida.id);
+        if (updateError) throw updateError;
+
+        toast({ title: "Fechas actualizadas" });
+        onOpenChange(false);
+        onSuccess();
+      } catch (error: any) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     if (!cuadra) {
       toast({
         title: "La programación no cuadra con el presupuesto",
@@ -263,7 +293,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar seguimiento de partida</DialogTitle>
+            <DialogTitle>{soloFechas ? "Editar fechas de partida" : "Editar seguimiento de partida"}</DialogTitle>
             <DialogDescription>
               {partida.cuenta_codigo ? `${partida.cuenta_codigo} · ` : ""}
               {partida.cuenta_nombre || ""}
@@ -281,17 +311,19 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
               <span className="font-bold text-primary">{formatCurrency(presupuestoMonto)}</span>
             </div>
 
-            <div className="space-y-2">
-              <Label>Responsable</Label>
-              <SearchableSelect
-                value={responsableId}
-                onValueChange={setResponsableId}
-                options={terceros.map((t) => ({ id: t.id, label: t.razon_social }))}
-                placeholder="Seleccionar responsable"
-                searchPlaceholder="Buscar en terceros..."
-                emptyMessage="No hay terceros"
-              />
-            </div>
+            {!soloFechas && (
+              <div className="space-y-2">
+                <Label>Responsable</Label>
+                <SearchableSelect
+                  value={responsableId}
+                  onValueChange={setResponsableId}
+                  options={terceros.map((t) => ({ id: t.id, label: t.razon_social }))}
+                  placeholder="Seleccionar responsable"
+                  searchPlaceholder="Buscar en terceros..."
+                  emptyMessage="No hay terceros"
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -304,19 +336,22 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Tipo de flujo</Label>
-              <Select value={tipo} onValueChange={(v: "ingreso" | "egreso") => setTipo(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ingreso">Ingreso</SelectItem>
-                  <SelectItem value="egreso">Egreso</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {!soloFechas && (
+              <div className="space-y-2">
+                <Label>Tipo de flujo</Label>
+                <Select value={tipo} onValueChange={(v: "ingreso" | "egreso") => setTipo(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ingreso">Ingreso</SelectItem>
+                    <SelectItem value="egreso">Egreso</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
+            {!soloFechas && (
             <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium text-sm">Programación financiera</h4>
@@ -367,13 +402,14 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
                 </p>
               )}
             </div>
+            )}
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button onClick={() => doSave(false)} disabled={saving || !cuadra}>
+            <Button onClick={() => doSave(false)} disabled={saving || (!soloFechas && !cuadra)}>
               {saving ? "Guardando..." : "Guardar"}
             </Button>
           </DialogFooter>
