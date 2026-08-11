@@ -49,7 +49,9 @@ function ProtectedRoute({ children, allowedRoles, allowedEmails }: { children: R
     return <Navigate to="/" replace />;
   }
 
-  if (allowedEmails && !allowedEmails.includes((user.email ?? "").toLowerCase())) {
+  // El rol arquitecto existe únicamente para el módulo Proyectos: no depende
+  // de la lista de correos de acceso temporal (esa lista es para admin/contador/usuario).
+  if (allowedEmails && role !== "arquitecto" && !allowedEmails.includes((user.email ?? "").toLowerCase())) {
     return <Navigate to="/" replace />;
   }
 

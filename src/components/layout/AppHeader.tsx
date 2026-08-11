@@ -9,6 +9,7 @@ const roleLabels = {
   admin: "Administrador",
   contador: "Contador",
   usuario: "Usuario",
+  arquitecto: "Arquitecto",
 };
 
 export function AppHeader() {
