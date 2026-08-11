@@ -22,7 +22,6 @@ import AsientoDetalle from "./pages/AsientoDetalle";
 import Programacion from "./pages/Programacion";
 import Reportes from "./pages/Reportes";
 import Proyectos from "./pages/Proyectos";
-import { PROYECTOS_ALLOWED_EMAILS } from "@/lib/feature-access";
 import ProyectoDetalle from "./pages/ProyectoDetalle";
 import CronogramaPublico from "./pages/CronogramaPublico";
 import NotFound from "./pages/NotFound";
@@ -205,7 +204,7 @@ function AppRoutes() {
       <Route
         path="/proyectos"
         element={
-          <ProtectedRoute allowedRoles={["admin", "contador", "usuario", "arquitecto"]} allowedEmails={PROYECTOS_ALLOWED_EMAILS}>
+          <ProtectedRoute allowedRoles={["admin", "contador", "usuario", "arquitecto"]}>
             <Proyectos />
           </ProtectedRoute>
         }
@@ -213,7 +212,7 @@ function AppRoutes() {
       <Route
         path="/proyectos/:id"
         element={
-          <ProtectedRoute allowedRoles={["admin", "contador", "usuario", "arquitecto"]} allowedEmails={PROYECTOS_ALLOWED_EMAILS}>
+          <ProtectedRoute allowedRoles={["admin", "contador", "usuario", "arquitecto"]}>
             <ProyectoDetalle />
           </ProtectedRoute>
         }

@@ -30,7 +30,6 @@ import {
   FolderKanban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { canAccessProyectos } from "@/lib/feature-access";
 
 // Menu grouped logically
 const menuGroups = [
@@ -75,18 +74,13 @@ const menuGroups = [
 
 export function AppSidebar() {
   const location = useLocation();
-  const { role, signOut, user } = useAuth();
+  const { role, signOut } = useAuth();
 
   // Filter groups and items based on role
   const filteredGroups = menuGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter(
-        (item) =>
-          role &&
-          item.roles.includes(role) &&
-          (item.href !== "/proyectos" || role === "arquitecto" || canAccessProyectos(user?.email))
-      ),
+      items: group.items.filter((item) => role && item.roles.includes(role)),
     }))
     .filter((group) => group.items.length > 0);
 
