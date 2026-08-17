@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
+import { CheckCircle2 } from "lucide-react";
 
 export interface CronogramaPartida {
   id: string;
@@ -126,15 +127,26 @@ export function CronogramaPartidaDialog({ open, onOpenChange, proyectoId, partid
 
           <div className="space-y-2">
             <Label>Avance (%)</Label>
-            <Input
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              value={avance}
-              onChange={(e) => setAvance(e.target.value)}
-              placeholder="Vacío = calcular automáticamente por lo ejercido"
-            />
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={avance}
+                onChange={(e) => setAvance(e.target.value)}
+                placeholder="Vacío = calcular automáticamente por lo ejercido"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 gap-1.5"
+                onClick={() => setAvance("100")}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Completada
+              </Button>
+            </div>
           </div>
         </div>
 
