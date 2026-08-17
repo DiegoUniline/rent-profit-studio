@@ -16,7 +16,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { formatCurrency } from "@/lib/accounting-utils";
 import { format } from "date-fns";
-import { Wand2 } from "lucide-react";
+import { Wand2, CheckCircle2 } from "lucide-react";
 import { ProgramacionPartidaDialog } from "./ProgramacionPartidaDialog";
 
 interface Tercero {
@@ -183,15 +183,26 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
 
             <div className="space-y-2">
               <Label>Avance del cronograma (%)</Label>
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                step="1"
-                value={avanceManual}
-                onChange={(e) => setAvanceManual(e.target.value)}
-                placeholder="Vacío = calcular automáticamente por lo ejercido"
-              />
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={avanceManual}
+                  onChange={(e) => setAvanceManual(e.target.value)}
+                  placeholder="Vacío = calcular automáticamente por lo ejercido"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0 gap-1.5"
+                  onClick={() => setAvanceManual("100")}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Completada
+                </Button>
+              </div>
             </div>
 
             <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
