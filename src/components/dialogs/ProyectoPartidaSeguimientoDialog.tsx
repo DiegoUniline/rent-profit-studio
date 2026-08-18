@@ -102,13 +102,15 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
     setProgramado((pagos || []).reduce((s, p) => s + Number(p.monto), 0));
   };
 
-  const doSave = async () => {
+  const doSave = async (avanceOverride?: string) => {
     if (!partida) return;
 
     if (fechaFin && fechaInicio && fechaFin < fechaInicio) {
       toast({ title: "La fecha fin no puede ser anterior a la fecha inicio", variant: "destructive" });
       return;
     }
+
+    const avanceValor = avanceOverride ?? avanceManual;
 
     setSaving(true);
     try {
@@ -118,7 +120,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
           responsable_tercero_id: responsableId || null,
           fecha_inicio: fechaInicio ? format(fechaInicio, "yyyy-MM-dd") : null,
           fecha_fin: fechaFin ? format(fechaFin, "yyyy-MM-dd") : null,
-          avance_manual: avanceManual.trim() === "" ? null : Math.min(100, Math.max(0, parseFloat(avanceManual) || 0)),
+          avance_manual: avanceValor.trim() === "" ? null : Math.min(100, Math.max(0, parseFloat(avanceValor) || 0)),
         })
         .eq("id", partida.id);
       if (updateError) throw updateError;
@@ -131,6 +133,11 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
     } finally {
       setSaving(false);
     }
+  };
+
+  const marcarCompletada = () => {
+    setAvanceManual("100");
+    doSave("100");
   };
 
   if (!partida) return null;
@@ -197,7 +204,8 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
                   type="button"
                   variant="outline"
                   className="shrink-0 gap-1.5"
-                  onClick={() => setAvanceManual("100")}
+                  disabled={saving}
+                  onClick={marcarCompletada}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   Completada
@@ -222,7 +230,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button onClick={doSave} disabled={saving}>
+            <Button onClick={() => doSave()} disabled={saving}>
               {saving ? "Guardando..." : "Guardar"}
             </Button>
           </DialogFooter>

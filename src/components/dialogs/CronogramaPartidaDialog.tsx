@@ -56,13 +56,14 @@ export function CronogramaPartidaDialog({ open, onOpenChange, proyectoId, partid
     }
   }, [open, partida]);
 
-  const handleGuardar = async () => {
+  const handleGuardar = async (avanceOverride?: string) => {
     if (!partida) return;
     if (fechaInicio && fechaFin && fechaFin < fechaInicio) {
       toast({ title: "La fecha fin no puede ser anterior a la fecha inicio", variant: "destructive" });
       return;
     }
-    const avanceNum = avance.trim() === "" ? null : Math.min(100, Math.max(0, parseFloat(avance) || 0));
+    const avanceValor = avanceOverride ?? avance;
+    const avanceNum = avanceValor.trim() === "" ? null : Math.min(100, Math.max(0, parseFloat(avanceValor) || 0));
 
     setSaving(true);
     try {
@@ -93,6 +94,11 @@ export function CronogramaPartidaDialog({ open, onOpenChange, proyectoId, partid
     } finally {
       setSaving(false);
     }
+  };
+
+  const marcarCompletada = () => {
+    setAvance("100");
+    handleGuardar("100");
   };
 
   if (!partida) return null;
@@ -141,7 +147,8 @@ export function CronogramaPartidaDialog({ open, onOpenChange, proyectoId, partid
                 type="button"
                 variant="outline"
                 className="shrink-0 gap-1.5"
-                onClick={() => setAvance("100")}
+                disabled={saving}
+                onClick={marcarCompletada}
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 Completada
@@ -154,7 +161,7 @@ export function CronogramaPartidaDialog({ open, onOpenChange, proyectoId, partid
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleGuardar} disabled={saving}>
+          <Button onClick={() => handleGuardar()} disabled={saving}>
             {saving ? "Guardando..." : "Guardar"}
           </Button>
         </DialogFooter>
