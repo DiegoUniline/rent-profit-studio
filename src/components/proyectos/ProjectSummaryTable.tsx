@@ -108,8 +108,8 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
                     {formatCurrency(agregadoCuenta.disponible)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Badge variant="outline" className={avanceBadgeClass(agregadoCuenta.avance)}>
-                      {agregadoCuenta.avance.toFixed(1)}%
+                    <Badge variant="outline" className={avanceBadgeClass(avancePonderado(items))}>
+                      {avancePonderado(items).toFixed(1)}%
                     </Badge>
                   </TableCell>
                   {!readOnly && <TableCell />}
@@ -172,8 +172,8 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
             {formatCurrency(totalGeneral.disponible)}
           </TableCell>
           <TableCell className="text-right">
-            <Badge variant="outline" className={avanceBadgeClass(totalGeneral.avance)}>
-              {totalGeneral.avance.toFixed(1)}%
+            <Badge variant="outline" className={avanceBadgeClass(avancePonderado(filas))}>
+              {avancePonderado(filas).toFixed(1)}%
             </Badge>
           </TableCell>
           {!readOnly && <TableCell />}
