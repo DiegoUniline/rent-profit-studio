@@ -516,7 +516,11 @@ export default function ProyectoDetalle() {
         ejercido,
         avance: p.avance_manual ?? calcularAvance(ejercido, presupuesto),
         pendienteAjustar: programacionPendienteDeAjustar(totalProgramado, presupuesto),
-        vencida: !!p.fecha_fin && new Date(p.fecha_fin + "T00:00:00") < new Date(),
+        vencida:
+          !!p.fecha_fin &&
+          new Date(p.fecha_fin + "T00:00:00") < new Date() &&
+          (p.avance_manual ?? calcularAvance(ejercido, presupuesto)) < 100,
+
       };
     });
   }, [partidasFiltradas, ejercidoMap, proyectadoMap, proyectadoAcumuladoMap]);
