@@ -461,12 +461,19 @@ export default function ProyectoDetalle() {
 
   const indicadores = useMemo(() => {
     const hoy = new Date();
+    // Una partida no se considera vencida si ya está al 100% (avance manual
+    // "Completada" o ejercido completo): se terminó, aunque la fecha ya pasó.
+    const estaCompleta = (p: (typeof partidasProject)[number]) =>
+      (p.avance_manual ?? calcularAvance(ejercidoMap.get(p.id) || 0, p.cantidad * p.precio_unitario)) >= 100;
     return {
       total: partidasProject.length,
       sinResponsable: partidasProject.filter((p) => !p.responsable_tercero_id).length,
-      vencidas: partidasProject.filter((p) => p.fecha_fin && new Date(p.fecha_fin + "T00:00:00") < hoy).length,
+      vencidas: partidasProject.filter(
+        (p) => p.fecha_fin && new Date(p.fecha_fin + "T00:00:00") < hoy && !estaCompleta(p),
+      ).length,
     };
-  }, [partidasProject]);
+  }, [partidasProject, ejercidoMap]);
+
 
   const seguimientoPorPartida = useMemo(() => {
     const map = new Map<string, SeguimientoPartida>();
