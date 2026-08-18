@@ -33,7 +33,7 @@ import {
 import { ProyectoPartidaSeguimientoDialog, PartidaSeguimiento } from "@/components/dialogs/ProyectoPartidaSeguimientoDialog";
 import { CronogramaPartidaDialog, CronogramaPartida } from "@/components/dialogs/CronogramaPartidaDialog";
 import { ProyectoEditDialog } from "@/components/dialogs/ProyectoEditDialog";
-import { ProjectSummaryTable, FilaResumenPartida } from "@/components/proyectos/ProjectSummaryTable";
+import { ProjectSummaryTable, FilaResumenPartida, avancePonderado } from "@/components/proyectos/ProjectSummaryTable";
 import { ProjectGantt } from "@/components/proyectos/ProjectGantt";
 import { ProyectoTareas } from "@/components/proyectos/ProyectoTareas";
 import { ProgramacionFinancieraProyecto } from "@/components/proyectos/ProgramacionFinancieraProyecto";
@@ -510,6 +510,10 @@ export default function ProyectoDetalle() {
     });
   }, [partidasFiltradas, ejercidoMap, proyectadoMap, proyectadoAcumuladoMap]);
 
+  // Avance del Project: promedio ponderado por presupuesto de los avances de
+  // cada partida, respetando el avance manual ("Completada" = 100%).
+  const avanceProject = useMemo(() => avancePonderado(filasResumen), [filasResumen]);
+
   const presupuestosParaTree = useMemo(
     () =>
       partidasFiltradas.map((p) => ({
@@ -673,8 +677,8 @@ export default function ProyectoDetalle() {
               <p className="text-xs text-muted-foreground">Avance financiero</p>
               <Percent className="h-4 w-4 text-primary/70" />
             </div>
-            <p className="text-lg font-bold tabular-nums">{kpis.avance.toFixed(1)}%</p>
-            <Progress value={Math.min(100, kpis.avance)} className="h-1.5 mt-2" />
+            <p className="text-lg font-bold tabular-nums">{avanceProject.toFixed(1)}%</p>
+            <Progress value={Math.min(100, avanceProject)} className="h-1.5 mt-2" />
           </CardContent>
         </Card>
       </div>
