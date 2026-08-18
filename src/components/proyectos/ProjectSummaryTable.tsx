@@ -44,6 +44,17 @@ function avanceBadgeClass(avance: number) {
   return "";
 }
 
+/** Avance agregado: promedio ponderado por presupuesto de los avances de cada
+ * partida (así se respeta el avance manual / "Completada"). */
+export function avancePonderado(filas: { presupuesto: number; avance: number }[]) {
+  const base = filas.reduce((s, f) => s + f.presupuesto, 0);
+  if (!base) {
+    return filas.length ? filas.reduce((s, f) => s + f.avance, 0) / filas.length : 0;
+  }
+  return filas.reduce((s, f) => s + f.avance * f.presupuesto, 0) / base;
+}
+
+
 export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
   const grupos = new Map<string, FilaResumenPartida[]>();
   filas.forEach((f) => {
