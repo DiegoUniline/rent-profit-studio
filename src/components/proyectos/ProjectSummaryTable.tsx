@@ -44,6 +44,17 @@ function avanceBadgeClass(avance: number) {
   return "";
 }
 
+/** Avance agregado: promedio ponderado por presupuesto de los avances de cada
+ * partida (así se respeta el avance manual / "Completada"). */
+export function avancePonderado(filas: { presupuesto: number; avance: number }[]) {
+  const base = filas.reduce((s, f) => s + f.presupuesto, 0);
+  if (!base) {
+    return filas.length ? filas.reduce((s, f) => s + f.avance, 0) / filas.length : 0;
+  }
+  return filas.reduce((s, f) => s + f.avance * f.presupuesto, 0) / base;
+}
+
+
 export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
   const grupos = new Map<string, FilaResumenPartida[]>();
   filas.forEach((f) => {
@@ -97,8 +108,8 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
                     {formatCurrency(agregadoCuenta.disponible)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Badge variant="outline" className={avanceBadgeClass(agregadoCuenta.avance)}>
-                      {agregadoCuenta.avance.toFixed(1)}%
+                    <Badge variant="outline" className={avanceBadgeClass(avancePonderado(items))}>
+                      {avancePonderado(items).toFixed(1)}%
                     </Badge>
                   </TableCell>
                   {!readOnly && <TableCell />}
@@ -161,8 +172,8 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
             {formatCurrency(totalGeneral.disponible)}
           </TableCell>
           <TableCell className="text-right">
-            <Badge variant="outline" className={avanceBadgeClass(totalGeneral.avance)}>
-              {totalGeneral.avance.toFixed(1)}%
+            <Badge variant="outline" className={avanceBadgeClass(avancePonderado(filas))}>
+              {avancePonderado(filas).toFixed(1)}%
             </Badge>
           </TableCell>
           {!readOnly && <TableCell />}
