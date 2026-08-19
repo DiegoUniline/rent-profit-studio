@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import rafaAvatar from "@/assets/rafa-avatar.png";
 import { RafaCaptura, type CapturaPayload } from "@/components/rafa/RafaCaptura";
 import { RafaPropuesta } from "@/components/rafa/RafaPropuesta";
+import { RafaSesiones, type SesionRafa } from "@/components/rafa/RafaSesiones";
 import { aplicarPlanRafa } from "@/lib/rafa-apply";
 import { mejorCoincidencia, normalizar, type PlanRafa, type PropuestaEditable } from "@/lib/rafa-types";
 
@@ -23,6 +24,23 @@ export default function Rafa() {
   const [guardando, setGuardando] = useState(false);
   const [plan, setPlan] = useState<PlanRafa | null>(null);
   const [propuesta, setPropuesta] = useState<PropuestaEditable | null>(null);
+  const [sesiones, setSesiones] = useState<SesionRafa[]>([]);
+  const [sesionId, setSesionId] = useState<string | null>(null);
+  const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cargarSesiones = useCallback(async () => {
+    const { data } = await supabase
+      .from("rafa_sesiones")
+      .select("id, titulo, resumen, estado, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(30);
+    setSesiones((data || []) as SesionRafa[]);
+  }, []);
+
+  useEffect(() => {
+    cargarSesiones();
+  }, [cargarSesiones]);
+
 
   useEffect(() => {
     (async () => {
