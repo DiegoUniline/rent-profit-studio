@@ -9,7 +9,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { DateInput } from "@/components/ui/date-input";
 import { RafaPartidasTable } from "@/components/rafa/RafaPartidasTable";
 import { formatCurrency } from "@/lib/accounting-utils";
-import { formatDateNumeric } from "@/lib/date-utils";
+import { formatDateObj } from "@/lib/date-utils";
 import { calcularFechasPorFrecuencia, distribuirSaldoEntrePeriodos, type FrecuenciaConCadencia } from "@/lib/project-utils";
 import { importePartida, type PropuestaEditable } from "@/lib/rafa-types";
 import { Check, Loader2, RotateCcw } from "lucide-react";
@@ -275,7 +275,7 @@ export function RafaPropuesta({
               <div className="flex flex-wrap gap-2">
                 {fechas.map((f, i) => (
                   <Badge key={i} variant="outline" className="font-normal">
-                    {formatDateNumeric(f)} · {formatCurrency(montos[i])}
+                    {formatDateObj(f)} · {formatCurrency(montos[i])}
                   </Badge>
                 ))}
               </div>
