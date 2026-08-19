@@ -33,6 +33,7 @@ export default function Rafa() {
   const [sesiones, setSesiones] = useState<SesionRafa[]>([]);
   const [sesionId, setSesionId] = useState<string | null>(null);
   const [reinstruir, setReinstruir] = useState(false);
+  const [porEliminar, setPorEliminar] = useState<{ id: string; ids: string[] } | null>(null);
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aplicandoRef = useRef(false);
 
