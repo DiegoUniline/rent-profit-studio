@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
-import { Bot } from "lucide-react";
+import rafaAvatar from "@/assets/rafa-avatar.png";
 import { RafaCaptura, type CapturaPayload } from "@/components/rafa/RafaCaptura";
 import { RafaPropuesta } from "@/components/rafa/RafaPropuesta";
 import { aplicarPlanRafa } from "@/lib/rafa-apply";
@@ -133,17 +133,27 @@ export default function Rafa() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="rounded-lg bg-primary/10 p-2">
-          <Bot className="h-5 w-5 text-primary" />
+      <div className="flex items-start gap-4">
+        <div className="relative shrink-0">
+          <img
+            src={rafaAvatar}
+            alt="Rafa, asistente de proyectos"
+            width={816}
+            height={816}
+            className="h-20 w-20 rounded-full object-cover object-top bg-primary/10 ring-2 ring-primary/30"
+          />
+          <span className="absolute bottom-1 right-1 h-3.5 w-3.5 rounded-full bg-green-500 ring-2 ring-background" />
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">Rafa · Asistente</h1>
-          <p className="text-sm text-muted-foreground">
-            Dicta o escribe la instrucción y adjunta el catálogo de conceptos; Rafa propone el centro, las partidas y el flujo.
-          </p>
+        <div className="space-y-1.5">
+          <h1 className="text-2xl font-bold">Rafa · Asistente de proyectos</h1>
+          <div className="relative rounded-2xl rounded-tl-sm border bg-muted/50 px-4 py-2.5 text-sm max-w-2xl">
+            ¡Hola! Soy Rafa. Dime por voz o por escrito qué necesitas y adjunta el presupuesto o catálogo de
+            conceptos: yo te propongo el centro de negocio, el contratista, las partidas y el flujo de pagos.
+            Tú nada más revisas y confirmas.
+          </div>
         </div>
       </div>
+
 
       {!propuesta ? (
         <>
