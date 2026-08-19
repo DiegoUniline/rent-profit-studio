@@ -111,6 +111,35 @@ export async function aplicarPlanRafa(p: PropuestaEditable): Promise<ResultadoAp
     descripcion: aplicarFormatoTexto(partida.descripcion, formato),
   }));
 
+  // --- Blindaje anti-duplicados -------------------------------------------
+  // Se relee de la base lo que esta sesión ya creó. Sólo se consideran vigentes
+  // los ids que siguen existiendo y activos; el resto se trata como inexistente.
+  const idsPrevios = Array.from(
+    new Set([
+      ...(p.aplicado?.presupuestoIds || []),
+      ...p.partidas.map((x) => x.presupuestoId).filter(Boolean) as string[],
+    ])
+  );
+  const existentes = new Map<string, { id: string; partida: string }>();
+  if (idsPrevios.length > 0) {
+    for (let i = 0; i < idsPrevios.length; i += 200) {
+      const { data } = await supabase
+        .from("presupuestos")
+        .select("id, partida")
+        .in("id", idsPrevios.slice(i, i + 200))
+        .eq("activo", true);
+      (data || []).forEach((r) => existentes.set(r.id, r));
+    }
+  }
+  // Índice por texto normalizado para reasignar cuando el orden de las partidas
+  // cambió tras reinterpretar (evita crear una copia de algo ya guardado).
+  const porTexto = new Map<string, string>();
+  existentes.forEach((r) => {
+    const k = normalizar(r.partida);
+    if (!porTexto.has(k)) porTexto.set(k, r.id);
+  });
+  const usados = new Set<string>();
+
   const fila = (partida: (typeof partidas)[number], i: number) => ({
     empresa_id: p.empresaId,
     centro_negocio_id: centroId!,
@@ -123,6 +152,7 @@ export async function aplicarPlanRafa(p: PropuestaEditable): Promise<ResultadoAp
     orden: ordenBase + i,
     activo: true,
   });
+
 
   const idsFinales: (string | undefined)[] = [];
   let actualizadas = 0;
