@@ -377,6 +377,36 @@ export default function Rafa() {
           />
         </>
       )}
+
+      <AlertDialog open={Boolean(porEliminar)} onOpenChange={(o) => !o && setPorEliminar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar interpretación</AlertDialogTitle>
+            <AlertDialogDescription>
+              {porEliminar && porEliminar.ids.length > 0
+                ? `Esta interpretación guardó ${porEliminar.ids.length} partida(s) en presupuestos. ¿Quieres eliminarlas también junto con sus flujos programados?`
+                : "Esta interpretación no tiene partidas guardadas en presupuestos."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            {porEliminar && porEliminar.ids.length > 0 && (
+              <Button variant="outline" onClick={() => ejecutarEliminar(false)}>
+                Solo la interpretación
+              </Button>
+            )}
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => ejecutarEliminar(true)}
+            >
+              {porEliminar && porEliminar.ids.length > 0
+                ? "Eliminar también de presupuestos"
+                : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+
   );
 }
