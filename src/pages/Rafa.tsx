@@ -7,7 +7,7 @@ import { RafaCaptura, type CapturaPayload } from "@/components/rafa/RafaCaptura"
 import { RafaPropuesta } from "@/components/rafa/RafaPropuesta";
 import { RafaSesiones, type SesionRafa } from "@/components/rafa/RafaSesiones";
 import { aplicarPlanRafa } from "@/lib/rafa-apply";
-import { mejorCoincidencia, normalizar, type PlanRafa, type PropuestaEditable } from "@/lib/rafa-types";
+import { aplicarFormatoTexto, mejorCoincidencia, normalizar, type PlanRafa, type PropuestaEditable } from "@/lib/rafa-types";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Pencil } from "lucide-react";
@@ -90,11 +90,12 @@ export default function Rafa() {
         const porCodigo = pa.cuenta_codigo
           ? cuentasEmpresa.find((c) => normalizar(c.codigo) === normalizar(pa.cuenta_codigo || ""))
           : undefined;
+        const formato = previa?.formatoTexto || "original";
         return {
           key: `${i}-${pa.clave || pa.descripcion.slice(0, 12)}`,
           // Conserva el vínculo con lo ya guardado para actualizar en vez de duplicar.
           presupuestoId: previa?.partidas[i]?.presupuestoId,
-          descripcion: pa.descripcion,
+          descripcion: aplicarFormatoTexto(pa.descripcion, formato),
           unidad: pa.unidad || "",
           cantidad: Number(pa.cantidad) || 0,
           precioUnitario: Number(pa.precio_unitario) || 0,
