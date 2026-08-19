@@ -161,30 +161,45 @@ export async function aplicarPlanRafa(p: PropuestaEditable): Promise<ResultadoAp
 
   for (let i = 0; i < partidas.length; i++) {
     const partida = partidas[i];
-    if (partida.presupuestoId) {
+    // Id a reutilizar: el vinculado (si sigue vivo) o, si no, el de una partida
+    // ya guardada con el mismo texto (reinterpretaciones que reordenan).
+    let destino: string | undefined =
+      partida.presupuestoId && existentes.has(partida.presupuestoId) && !usados.has(partida.presupuestoId)
+        ? partida.presupuestoId
+        : undefined;
+    if (!destino) {
+      const candidato = porTexto.get(normalizar(partida.descripcion));
+      if (candidato && !usados.has(candidato)) destino = candidato;
+    }
+
+    if (destino) {
+      usados.add(destino);
       const { partida: texto, cuenta_id, tercero_id, cantidad, precio_unitario, notas, centro_negocio_id } = fila(partida, i);
       const { error } = await supabase
         .from("presupuestos")
-        .update({ partida: texto, cuenta_id, tercero_id, cantidad, precio_unitario, notas, centro_negocio_id })
-        .eq("id", partida.presupuestoId);
+        .update({ partida: texto, cuenta_id, tercero_id, cantidad, precio_unitario, notas, centro_negocio_id, activo: true })
+        .eq("id", destino);
       if (error) throw new Error(`No se pudo actualizar la partida: ${error.message}`);
-      idsFinales.push(partida.presupuestoId);
+      idsFinales.push(destino);
       actualizadas++;
     } else {
       const { data, error } = await supabase.from("presupuestos").insert(fila(partida, i)).select("id").single();
       if (error) throw new Error(`No se pudo crear la partida: ${error.message}`);
+      usados.add(data.id);
       idsFinales.push(data.id);
       creadas++;
     }
   }
 
-  // Partidas que estaban guardadas y el usuario eliminó de la propuesta: se dan de baja.
+  // Partidas que estaban guardadas y el usuario eliminó de la propuesta: se
+  // borran sus flujos y se dan de baja (no se dejan colgadas).
   const vigentes = new Set(idsFinales.filter(Boolean) as string[]);
-  const sobrantes = (p.aplicado?.presupuestoIds || []).filter((id) => !vigentes.has(id));
+  const sobrantes = idsPrevios.filter((id) => !vigentes.has(id));
   if (sobrantes.length > 0) {
     await supabase.from("flujos_programados").delete().in("presupuesto_id", sobrantes);
     await supabase.from("presupuestos").update({ activo: false }).in("id", sobrantes);
   }
+
 
   // 4. Flujos programados por partida (se regeneran sobre las partidas vigentes)
   const idsVigentes = Array.from(vigentes);
