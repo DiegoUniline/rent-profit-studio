@@ -287,7 +287,9 @@ export default function Rafa() {
           onReiniciar={() => {
             setPlan(null);
             setPropuesta(null);
+            setSesionId(null);
           }}
+
         />
       )}
     </div>
