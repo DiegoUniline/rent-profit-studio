@@ -28,6 +28,8 @@ import {
   BarChart3,
   Settings,
   FolderKanban,
+  Bot,
+
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
