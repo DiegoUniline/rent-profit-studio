@@ -37,8 +37,10 @@ const menuGroups = [
     label: "Principal",
     items: [
       { title: "Dashboard", icon: LayoutDashboard, href: "/", roles: ["admin", "contador", "usuario"] },
+      { title: "Rafa · Asistente", icon: Bot, href: "/rafa", roles: ["admin", "contador"] },
     ],
   },
+
   {
     label: "Catálogos",
     items: [
