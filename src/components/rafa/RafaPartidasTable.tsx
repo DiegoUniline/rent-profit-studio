@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { formatCurrency } from "@/lib/accounting-utils";
-import { importePartida, type PartidaEditable } from "@/lib/rafa-types";
+import { aplicarFormatoTexto, importePartida, type FormatoTexto, type PartidaEditable } from "@/lib/rafa-types";
 import { Trash2 } from "lucide-react";
 
 interface CuentaOpcion {
@@ -17,12 +17,17 @@ interface Props {
   cuentas: CuentaOpcion[];
   ivaIncluir: boolean;
   ivaTasa: number;
+  formatoTexto?: FormatoTexto;
   onChange: (partidas: PartidaEditable[]) => void;
 }
 
-export function RafaPartidasTable({ partidas, cuentas, ivaIncluir, ivaTasa, onChange }: Props) {
-  const actualizar = (key: string, cambios: Partial<PartidaEditable>) =>
+export function RafaPartidasTable({ partidas, cuentas, ivaIncluir, ivaTasa, formatoTexto = "original", onChange }: Props) {
+  const actualizar = (key: string, cambios: Partial<PartidaEditable>) => {
+    if (cambios.descripcion !== undefined) {
+      cambios.descripcion = aplicarFormatoTexto(cambios.descripcion, formatoTexto);
+    }
     onChange(partidas.map((p) => (p.key === key ? { ...p, ...cambios } : p)));
+  };
 
   const opciones = cuentas.map((c) => ({ id: c.id, label: `${c.codigo} · ${c.nombre}` }));
   const total = partidas.reduce((s, p) => s + importePartida(p, ivaIncluir, ivaTasa), 0);

@@ -198,10 +198,10 @@ export function RafaPropuesta({
 
       <Card>
         <CardHeader className="pb-3 space-y-3">
-          <CardTitle className="text-base">Partidas del presupuesto</CardTitle>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs whitespace-nowrap">Formato de texto</Label>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Partidas del presupuesto</CardTitle>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Formato global</span>
               <Select
                 value={propuesta.formatoTexto || "original"}
                 onValueChange={(v: FormatoTexto) =>
@@ -211,14 +211,21 @@ export function RafaPropuesta({
                   })
                 }
               >
-                <SelectTrigger className="h-9 w-48"><SelectValue placeholder="Como viene" /></SelectTrigger>
+                <SelectTrigger className="h-8 w-44 text-xs">
+                  <SelectValue placeholder="Como viene" />
+                </SelectTrigger>
                 <SelectContent className="z-50 bg-popover">
                   {FORMATOS_TEXTO.map((f) => (
-                    <SelectItem key={f.valor} value={f.valor}>{f.etiqueta}</SelectItem>
+                    <SelectItem key={f.valor} value={f.valor} className="text-xs">{f.etiqueta}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            El formato elegido se aplica a todas las partidas de la propuesta, incluidas las que edites manualmente.
+          </p>
+          <div className="flex flex-wrap items-end gap-4">
             <div className="flex items-center gap-2 pb-2">
               <Switch checked={propuesta.ivaIncluir} onCheckedChange={(v) => set({ ivaIncluir: v })} id="rafa-iva" />
               <Label htmlFor="rafa-iva" className="text-xs">Sumar IVA</Label>
@@ -241,6 +248,7 @@ export function RafaPropuesta({
             cuentas={cuentasEmpresa}
             ivaIncluir={propuesta.ivaIncluir}
             ivaTasa={propuesta.ivaTasa}
+            formatoTexto={propuesta.formatoTexto || "original"}
             onChange={(partidas) => set({ partidas })}
           />
         </CardContent>
