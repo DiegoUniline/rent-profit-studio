@@ -8,6 +8,7 @@ import { calcularFechasPorFrecuencia, distribuirSaldoEntrePeriodos } from "@/lib
 import {
   aplicarFormatoTexto,
   importePartida,
+  normalizar,
   precioUnitarioFinal,
   type PropuestaEditable,
 } from "@/lib/rafa-types";
