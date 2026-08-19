@@ -34,6 +34,8 @@ export interface PlanRafa {
 
 export interface PartidaEditable {
   key: string;
+  /** Id del presupuesto ya guardado en la base (si la sesión ya se aplicó). */
+  presupuestoId?: string;
   descripcion: string;
   unidad: string;
   cantidad: number;
@@ -48,11 +50,18 @@ export interface PropuestaEditable {
   ivaIncluir: boolean;
   ivaTasa: number;
   partidas: PartidaEditable[];
+  formatoTexto?: FormatoTexto;
   programacion: {
     tipo: "ingreso" | "egreso";
     frecuencia: FrecuenciaConCadencia;
     fechaInicio: string;
     numeroPagos: number;
+  };
+  /** Rastro de lo ya guardado para que volver a guardar actualice, no duplique. */
+  aplicado?: {
+    centroId?: string;
+    terceroId?: string | null;
+    presupuestoIds?: string[];
   };
 }
 
@@ -117,4 +126,32 @@ export function importePartida(p: PartidaEditable, ivaIncluir: boolean, ivaTasa:
 /** Precio unitario final que se guardará en el presupuesto. */
 export function precioUnitarioFinal(p: PartidaEditable, ivaIncluir: boolean, ivaTasa: number): number {
   return ivaIncluir ? p.precioUnitario * (1 + ivaTasa / 100) : p.precioUnitario;
+}
+
+/** Formato de texto aplicable a las descripciones de las partidas. */
+export type FormatoTexto = "original" | "mayusculas" | "minusculas" | "oracion";
+
+export const FORMATOS_TEXTO: { valor: FormatoTexto; etiqueta: string }[] = [
+  { valor: "original", etiqueta: "Como viene" },
+  { valor: "mayusculas", etiqueta: "MAYÚSCULAS" },
+  { valor: "minusculas", etiqueta: "minúsculas" },
+  { valor: "oracion", etiqueta: "Formato oración" },
+];
+
+/** Aplica el formato de texto elegido a un texto. */
+export function aplicarFormatoTexto(texto: string, formato: FormatoTexto): string {
+  const limpio = (texto || "").trim();
+  if (!limpio) return limpio;
+  switch (formato) {
+    case "mayusculas":
+      return limpio.toUpperCase();
+    case "minusculas":
+      return limpio.toLowerCase();
+    case "oracion": {
+      const bajo = limpio.toLowerCase();
+      return bajo.charAt(0).toUpperCase() + bajo.slice(1);
+    }
+    default:
+      return limpio;
+  }
 }

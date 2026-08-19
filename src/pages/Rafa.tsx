@@ -8,6 +8,9 @@ import { RafaPropuesta } from "@/components/rafa/RafaPropuesta";
 import { RafaSesiones, type SesionRafa } from "@/components/rafa/RafaSesiones";
 import { aplicarPlanRafa } from "@/lib/rafa-apply";
 import { mejorCoincidencia, normalizar, type PlanRafa, type PropuestaEditable } from "@/lib/rafa-types";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Pencil } from "lucide-react";
 
 interface Empresa { id: string; nombre: string }
 interface Centro { id: string; nombre: string; empresa_id: string; codigo?: string }
@@ -16,6 +19,9 @@ interface Cuenta { id: string; codigo: string; nombre: string; empresa_id: strin
 
 export default function Rafa() {
   const { toast } = useToast();
+  const { role } = useAuth();
+  // Solo quien puede editar presupuestos puede guardar desde Rafa.
+  const puedeEditarPresupuestos = role === "admin" || role === "contador";
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [centros, setCentros] = useState<Centro[]>([]);
   const [terceros, setTerceros] = useState<Tercero[]>([]);
@@ -26,6 +32,7 @@ export default function Rafa() {
   const [propuesta, setPropuesta] = useState<PropuestaEditable | null>(null);
   const [sesiones, setSesiones] = useState<SesionRafa[]>([]);
   const [sesionId, setSesionId] = useState<string | null>(null);
+  const [reinstruir, setReinstruir] = useState(false);
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cargarSesiones = useCallback(async () => {
@@ -57,9 +64,9 @@ export default function Rafa() {
     })();
   }, []);
 
-  const construirPropuesta = (p: PlanRafa): PropuestaEditable => {
+  const construirPropuesta = (p: PlanRafa, previa?: PropuestaEditable | null): PropuestaEditable => {
     const empresa = mejorCoincidencia(p.empresa_detectada || "", empresas) || empresas[0];
-    const empresaId = empresa?.id || "";
+    const empresaId = previa?.empresaId || empresa?.id || "";
     const centroMatch = mejorCoincidencia(p.centro_negocio?.nombre || "", centros.filter((c) => c.empresa_id === empresaId), 0.6);
     const terceroMatch = mejorCoincidencia(p.tercero?.nombre || "", terceros.filter((t) => t.empresa_id === empresaId), 0.5);
     const cuentasEmpresa = cuentas.filter((c) => c.empresa_id === empresaId);
@@ -85,6 +92,8 @@ export default function Rafa() {
           : undefined;
         return {
           key: `${i}-${pa.clave || pa.descripcion.slice(0, 12)}`,
+          // Conserva el vínculo con lo ya guardado para actualizar en vez de duplicar.
+          presupuestoId: previa?.partidas[i]?.presupuestoId,
           descripcion: pa.descripcion,
           unidad: pa.unidad || "",
           cantidad: Number(pa.cantidad) || 0,
@@ -92,6 +101,8 @@ export default function Rafa() {
           cuentaId: porCodigo?.id || "",
         };
       }),
+      formatoTexto: previa?.formatoTexto || "original",
+      aplicado: previa?.aplicado,
       programacion: {
         tipo: p.programacion?.tipo || "egreso",
         frecuencia: p.programacion?.frecuencia || "mensual",
@@ -114,9 +125,25 @@ export default function Rafa() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       const nuevoPlan = data.plan as PlanRafa;
-      const nuevaPropuesta = construirPropuesta(nuevoPlan);
+      const nuevaPropuesta = construirPropuesta(nuevoPlan, propuesta);
       setPlan(nuevoPlan);
       setPropuesta(nuevaPropuesta);
+      setReinstruir(false);
+
+      // Si ya hay una sesión abierta, se actualiza esa misma interpretación.
+      if (sesionId) {
+        await supabase
+          .from("rafa_sesiones")
+          .update({
+            resumen: nuevoPlan.resumen || null,
+            transcripcion: nuevoPlan.transcripcion || null,
+            plan: nuevoPlan as unknown as never,
+            propuesta: nuevaPropuesta as unknown as never,
+          })
+          .eq("id", sesionId);
+        cargarSesiones();
+        return;
+      }
 
       const { data: user } = await supabase.auth.getUser();
       if (user?.user) {
@@ -201,19 +228,17 @@ export default function Rafa() {
     setGuardando(true);
     try {
       const r = await aplicarPlanRafa(propuesta);
+      setPropuesta(r.propuesta);
       if (sesionId) {
         await supabase
           .from("rafa_sesiones")
-          .update({ estado: "aplicado", propuesta: propuesta as unknown as never })
+          .update({ estado: "aplicado", propuesta: r.propuesta as unknown as never })
           .eq("id", sesionId);
       }
       toast({
         title: "Listo",
-        description: `Se crearon ${r.partidasCreadas} partidas y ${r.flujosCreados} flujos programados.`,
+        description: `${r.partidasCreadas} partidas nuevas, ${r.partidasActualizadas} actualizadas y ${r.flujosCreados} flujos programados.`,
       });
-      setPlan(null);
-      setPropuesta(null);
-      setSesionId(null);
       cargarSesiones();
     } catch (e) {
       toast({
@@ -272,8 +297,18 @@ export default function Rafa() {
           </Card>
         </>
       ) : (
-
-        <RafaPropuesta
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setReinstruir((v) => !v)}>
+              <Pencil className="h-3.5 w-3.5" />
+              {reinstruir ? "Ocultar instrucción" : "Cambiar instrucción"}
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Al cambiar la instrucción se corrige esta misma interpretación; no se crea otra.
+            </span>
+          </div>
+          {reinstruir && <RafaCaptura loading={loading} onEnviar={interpretar} />}
+          <RafaPropuesta
           resumen={plan?.resumen || ""}
           transcripcion={plan?.transcripcion}
           propuesta={propuesta}
@@ -284,13 +319,16 @@ export default function Rafa() {
           guardando={guardando}
           onChange={setPropuesta}
           onAplicar={aplicar}
+          soloLectura={!puedeEditarPresupuestos}
+          yaGuardado={Boolean(propuesta.aplicado?.presupuestoIds?.length)}
           onReiniciar={() => {
             setPlan(null);
             setPropuesta(null);
             setSesionId(null);
+            setReinstruir(false);
           }}
-
-        />
+          />
+        </>
       )}
     </div>
   );

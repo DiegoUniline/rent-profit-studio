@@ -11,7 +11,7 @@ import { RafaPartidasTable } from "@/components/rafa/RafaPartidasTable";
 import { formatCurrency } from "@/lib/accounting-utils";
 import { formatDateObj } from "@/lib/date-utils";
 import { calcularFechasPorFrecuencia, distribuirSaldoEntrePeriodos, type FrecuenciaConCadencia } from "@/lib/project-utils";
-import { importePartida, type PropuestaEditable } from "@/lib/rafa-types";
+import { aplicarFormatoTexto, FORMATOS_TEXTO, importePartida, type FormatoTexto, type PropuestaEditable } from "@/lib/rafa-types";
 import { Check, Loader2, RotateCcw } from "lucide-react";
 import rafaAvatar from "@/assets/rafa-avatar.png";
 
@@ -24,6 +24,8 @@ interface Props {
   terceros: { id: string; nombre: string; empresa_id: string }[];
   cuentas: { id: string; codigo: string; nombre: string; empresa_id: string }[];
   guardando: boolean;
+  soloLectura?: boolean;
+  yaGuardado?: boolean;
   onChange: (p: PropuestaEditable) => void;
   onAplicar: () => void;
   onReiniciar: () => void;
@@ -40,6 +42,8 @@ export function RafaPropuesta({
   terceros,
   cuentas,
   guardando,
+  soloLectura = false,
+  yaGuardado = false,
   onChange,
   onAplicar,
   onReiniciar,
@@ -80,7 +84,9 @@ export function RafaPropuesta({
             <p className="text-muted-foreground italic border-l-2 border-primary/40 pl-3">“{transcripcion}”</p>
           )}
           <p className="text-xs text-muted-foreground">
-            Nada se guarda hasta que confirmes. Revisa y ajusta las coincidencias sugeridas.
+            {yaGuardado
+              ? "Esta interpretación ya está guardada: al confirmar se actualizan las partidas y flujos existentes, no se duplican."
+              : "Nada se guarda hasta que confirmes. Revisa y ajusta las coincidencias sugeridas."}
           </p>
         </CardContent>
       </Card>
@@ -195,6 +201,25 @@ export function RafaPropuesta({
           <CardTitle className="text-base">Partidas del presupuesto</CardTitle>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
+              <Label className="text-xs whitespace-nowrap">Texto</Label>
+              <Select
+                value={propuesta.formatoTexto || "original"}
+                onValueChange={(v: FormatoTexto) =>
+                  set({
+                    formatoTexto: v,
+                    partidas: propuesta.partidas.map((p) => ({ ...p, descripcion: aplicarFormatoTexto(p.descripcion, v) })),
+                  })
+                }
+              >
+                <SelectTrigger className="h-8 w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {FORMATOS_TEXTO.map((f) => (
+                    <SelectItem key={f.valor} value={f.valor}>{f.etiqueta}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
               <Switch checked={propuesta.ivaIncluir} onCheckedChange={(v) => set({ ivaIncluir: v })} id="rafa-iva" />
               <Label htmlFor="rafa-iva" className="text-xs">Sumar IVA</Label>
             </div>
@@ -294,10 +319,15 @@ export function RafaPropuesta({
       </Card>
 
       <div className="flex flex-wrap gap-2">
-        <Button onClick={onAplicar} disabled={guardando} className="gap-1.5">
+        <Button onClick={onAplicar} disabled={guardando || soloLectura} className="gap-1.5">
           {guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-          Confirmar y guardar
+          {yaGuardado ? "Actualizar lo guardado" : "Confirmar y guardar"}
         </Button>
+        {soloLectura && (
+          <p className="self-center text-xs text-muted-foreground">
+            Solo los usuarios con permiso para editar presupuestos pueden guardar.
+          </p>
+        )}
         <Button variant="outline" onClick={onReiniciar} className="gap-1.5">
           <RotateCcw className="h-4 w-4" />
           Empezar de nuevo
