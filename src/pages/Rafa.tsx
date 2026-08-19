@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import rafaAvatar from "@/assets/rafa-avatar.png";
 import { RafaCaptura, type CapturaPayload } from "@/components/rafa/RafaCaptura";
 import { RafaPropuesta } from "@/components/rafa/RafaPropuesta";
+import { RafaSesiones, type SesionRafa } from "@/components/rafa/RafaSesiones";
 import { aplicarPlanRafa } from "@/lib/rafa-apply";
 import { mejorCoincidencia, normalizar, type PlanRafa, type PropuestaEditable } from "@/lib/rafa-types";
 
@@ -23,6 +24,23 @@ export default function Rafa() {
   const [guardando, setGuardando] = useState(false);
   const [plan, setPlan] = useState<PlanRafa | null>(null);
   const [propuesta, setPropuesta] = useState<PropuestaEditable | null>(null);
+  const [sesiones, setSesiones] = useState<SesionRafa[]>([]);
+  const [sesionId, setSesionId] = useState<string | null>(null);
+  const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cargarSesiones = useCallback(async () => {
+    const { data } = await supabase
+      .from("rafa_sesiones")
+      .select("id, titulo, resumen, estado, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(30);
+    setSesiones((data || []) as SesionRafa[]);
+  }, []);
+
+  useEffect(() => {
+    cargarSesiones();
+  }, [cargarSesiones]);
+
 
   useEffect(() => {
     (async () => {
@@ -96,8 +114,32 @@ export default function Rafa() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       const nuevoPlan = data.plan as PlanRafa;
+      const nuevaPropuesta = construirPropuesta(nuevoPlan);
       setPlan(nuevoPlan);
-      setPropuesta(construirPropuesta(nuevoPlan));
+      setPropuesta(nuevaPropuesta);
+
+      const { data: user } = await supabase.auth.getUser();
+      if (user?.user) {
+        const titulo =
+          nuevoPlan.centro_negocio?.nombre?.trim() ||
+          nuevoPlan.resumen?.slice(0, 60) ||
+          "Interpretación de Rafa";
+        const { data: fila, error: errSesion } = await supabase
+          .from("rafa_sesiones")
+          .insert({
+            user_id: user.user.id,
+            titulo,
+            resumen: nuevoPlan.resumen || null,
+            transcripcion: nuevoPlan.transcripcion || null,
+            plan: nuevoPlan as unknown as never,
+            propuesta: nuevaPropuesta as unknown as never,
+            estado: "borrador",
+          })
+          .select("id")
+          .single();
+        if (!errSesion && fila) setSesionId(fila.id);
+        cargarSesiones();
+      }
     } catch (e) {
       toast({
         variant: "destructive",
@@ -109,17 +151,70 @@ export default function Rafa() {
     }
   };
 
+  // Autoguardado de los cambios que el usuario hace sobre la propuesta.
+  useEffect(() => {
+    if (!sesionId || !propuesta) return;
+    if (autosaveRef.current) clearTimeout(autosaveRef.current);
+    autosaveRef.current = setTimeout(() => {
+      supabase
+        .from("rafa_sesiones")
+        .update({ propuesta: propuesta as unknown as never })
+        .eq("id", sesionId)
+        .then(() => cargarSesiones());
+    }, 900);
+    return () => {
+      if (autosaveRef.current) clearTimeout(autosaveRef.current);
+    };
+  }, [propuesta, sesionId, cargarSesiones]);
+
+  const abrirSesion = async (id: string) => {
+    const { data, error } = await supabase
+      .from("rafa_sesiones")
+      .select("id, plan, propuesta")
+      .eq("id", id)
+      .maybeSingle();
+    if (error || !data?.propuesta) {
+      toast({ variant: "destructive", title: "No se pudo abrir la interpretación" });
+      return;
+    }
+    setPlan((data.plan as unknown as PlanRafa) || null);
+    setPropuesta(data.propuesta as unknown as PropuestaEditable);
+    setSesionId(data.id);
+  };
+
+  const eliminarSesion = async (id: string) => {
+    const { error } = await supabase.from("rafa_sesiones").delete().eq("id", id);
+    if (error) {
+      toast({ variant: "destructive", title: "No se pudo eliminar", description: error.message });
+      return;
+    }
+    if (sesionId === id) {
+      setSesionId(null);
+      setPlan(null);
+      setPropuesta(null);
+    }
+    cargarSesiones();
+  };
+
   const aplicar = async () => {
     if (!propuesta) return;
     setGuardando(true);
     try {
       const r = await aplicarPlanRafa(propuesta);
+      if (sesionId) {
+        await supabase
+          .from("rafa_sesiones")
+          .update({ estado: "aplicado", propuesta: propuesta as unknown as never })
+          .eq("id", sesionId);
+      }
       toast({
         title: "Listo",
         description: `Se crearon ${r.partidasCreadas} partidas y ${r.flujosCreados} flujos programados.`,
       });
       setPlan(null);
       setPropuesta(null);
+      setSesionId(null);
+      cargarSesiones();
     } catch (e) {
       toast({
         variant: "destructive",
@@ -130,6 +225,7 @@ export default function Rafa() {
       setGuardando(false);
     }
   };
+
 
   return (
     <div className="space-y-6">
@@ -158,6 +254,12 @@ export default function Rafa() {
       {!propuesta ? (
         <>
           <RafaCaptura loading={loading} onEnviar={interpretar} />
+          <RafaSesiones
+            sesiones={sesiones}
+            activaId={sesionId}
+            onAbrir={abrirSesion}
+            onEliminar={eliminarSesion}
+          />
           <Card>
             <CardContent className="pt-6 text-sm text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">Qué puede hacer Rafa</p>
@@ -165,10 +267,12 @@ export default function Rafa() {
               <p>· Cargar las partidas del archivo con cantidad, precio unitario e IVA.</p>
               <p>· Sugerir la cuenta contable de cada partida.</p>
               <p>· Programar los flujos de efectivo por semana, quincena o mes.</p>
+              <p>· Guardar cada interpretación para retomarla y corregirla después.</p>
             </CardContent>
           </Card>
         </>
       ) : (
+
         <RafaPropuesta
           resumen={plan?.resumen || ""}
           transcripcion={plan?.transcripcion}
@@ -183,7 +287,9 @@ export default function Rafa() {
           onReiniciar={() => {
             setPlan(null);
             setPropuesta(null);
+            setSesionId(null);
           }}
+
         />
       )}
     </div>
