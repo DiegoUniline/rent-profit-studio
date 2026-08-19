@@ -34,6 +34,7 @@ export default function Rafa() {
   const [sesionId, setSesionId] = useState<string | null>(null);
   const [reinstruir, setReinstruir] = useState(false);
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aplicandoRef = useRef(false);
 
   const cargarSesiones = useCallback(async () => {
     const { data } = await supabase
