@@ -11,6 +11,16 @@ import { aplicarFormatoTexto, mejorCoincidencia, normalizar, type PlanRafa, type
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Pencil } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Empresa { id: string; nombre: string }
 interface Centro { id: string; nombre: string; empresa_id: string; codigo?: string }
