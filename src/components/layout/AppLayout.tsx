@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { AppHeader } from "./AppHeader";
+import { RafaFab } from "./RafaFab";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 
 interface AppLayoutProps {
@@ -19,6 +20,8 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </main>
       </SidebarInset>
+      <RafaFab />
     </SidebarProvider>
   );
 }
+
