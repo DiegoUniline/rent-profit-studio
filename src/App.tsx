@@ -22,6 +22,8 @@ import AsientoDetalle from "./pages/AsientoDetalle";
 import Programacion from "./pages/Programacion";
 import Reportes from "./pages/Reportes";
 import Proyectos from "./pages/Proyectos";
+import Rafa from "./pages/Rafa";
+
 import ProyectoDetalle from "./pages/ProyectoDetalle";
 import CronogramaPublico from "./pages/CronogramaPublico";
 import NotFound from "./pages/NotFound";
