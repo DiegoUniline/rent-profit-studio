@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
-import { Bot } from "lucide-react";
+import rafaAvatar from "@/assets/rafa-avatar.png";
 import { RafaCaptura, type CapturaPayload } from "@/components/rafa/RafaCaptura";
 import { RafaPropuesta } from "@/components/rafa/RafaPropuesta";
 import { aplicarPlanRafa } from "@/lib/rafa-apply";
