@@ -217,6 +217,16 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/rafa"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "contador"]}>
+            <Rafa />
+          </ProtectedRoute>
+        }
+      />
+
+
 
       <Route path="*" element={<NotFound />} />
     </Routes>
