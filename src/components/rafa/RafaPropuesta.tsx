@@ -13,6 +13,7 @@ import { formatDateObj } from "@/lib/date-utils";
 import { calcularFechasPorFrecuencia, distribuirSaldoEntrePeriodos, type FrecuenciaConCadencia } from "@/lib/project-utils";
 import { importePartida, type PropuestaEditable } from "@/lib/rafa-types";
 import { Check, Loader2, RotateCcw } from "lucide-react";
+import rafaAvatar from "@/assets/rafa-avatar.png";
 
 interface Props {
   resumen: string;
@@ -62,7 +63,15 @@ export function RafaPropuesta({
   return (
     <div className="space-y-6">
       <Card className="border-primary/30 bg-primary/[0.03]">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 flex-row items-center gap-3 space-y-0">
+          <img
+            src={rafaAvatar}
+            alt="Rafa"
+            loading="lazy"
+            width={816}
+            height={816}
+            className="h-10 w-10 rounded-full object-cover object-top bg-primary/10 ring-2 ring-primary/30"
+          />
           <CardTitle className="text-base">Rafa entendió esto</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
