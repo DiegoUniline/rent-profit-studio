@@ -1016,6 +1016,45 @@ export type Database = {
           },
         ]
       }
+      rafa_sesiones: {
+        Row: {
+          created_at: string
+          estado: string
+          id: string
+          plan: Json | null
+          propuesta: Json | null
+          resumen: string | null
+          titulo: string
+          transcripcion: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          estado?: string
+          id?: string
+          plan?: Json | null
+          propuesta?: Json | null
+          resumen?: string | null
+          titulo?: string
+          transcripcion?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          estado?: string
+          id?: string
+          plan?: Json | null
+          propuesta?: Json | null
+          resumen?: string | null
+          titulo?: string
+          transcripcion?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       terceros: {
         Row: {
           activo: boolean
