@@ -211,6 +211,35 @@ export default function Rafa() {
   };
 
   const eliminarSesion = async (id: string) => {
+    // Al borrar la interpretación se elimina también lo que ella creó:
+    // sus flujos programados y sus partidas de presupuesto.
+    const { data: fila } = await supabase
+      .from("rafa_sesiones")
+      .select("propuesta")
+      .eq("id", id)
+      .maybeSingle();
+    const prop = (fila?.propuesta as unknown as PropuestaEditable) || null;
+    const ids = Array.from(
+      new Set([
+        ...(prop?.aplicado?.presupuestoIds || []),
+        ...((prop?.partidas || []).map((x) => x.presupuestoId).filter(Boolean) as string[]),
+      ])
+    );
+
+    if (ids.length > 0) {
+      const ok = window.confirm(
+        `Esta interpretación tiene ${ids.length} partida(s) de presupuesto guardadas. ¿Eliminarlas también junto con sus flujos programados?`
+      );
+      if (!ok) return;
+      await supabase.from("flujos_programados").delete().in("presupuesto_id", ids);
+      // Se intenta el borrado real; si alguna partida ya se usó en asientos o
+      // programaciones, se deja como baja para no romper la contabilidad.
+      const { error: errDel } = await supabase.from("presupuestos").delete().in("id", ids);
+      if (errDel) {
+        await supabase.from("presupuestos").update({ activo: false }).in("id", ids);
+      }
+    }
+
     const { error } = await supabase.from("rafa_sesiones").delete().eq("id", id);
     if (error) {
       toast({ variant: "destructive", title: "No se pudo eliminar", description: error.message });
@@ -221,11 +250,18 @@ export default function Rafa() {
       setPlan(null);
       setPropuesta(null);
     }
+    toast({
+      title: "Interpretación eliminada",
+      description: ids.length > 0 ? "También se eliminaron sus partidas y flujos." : undefined,
+    });
     cargarSesiones();
   };
 
   const aplicar = async () => {
     if (!propuesta) return;
+    // Candado contra doble clic / doble envío: nunca dos guardados en paralelo.
+    if (aplicandoRef.current) return;
+    aplicandoRef.current = true;
     setGuardando(true);
     try {
       const r = await aplicarPlanRafa(propuesta);
@@ -248,9 +284,11 @@ export default function Rafa() {
         description: e instanceof Error ? e.message : "Error inesperado",
       });
     } finally {
+      aplicandoRef.current = false;
       setGuardando(false);
     }
   };
+
 
 
   return (
