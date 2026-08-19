@@ -230,13 +230,26 @@ export default function Rafa() {
       .eq("id", id)
       .maybeSingle();
     const prop = (fila?.propuesta as unknown as PropuestaEditable) || null;
-    const ids = Array.from(
+    const candidatos = Array.from(
       new Set([
         ...(prop?.aplicado?.presupuestoIds || []),
         ...((prop?.partidas || []).map((x) => x.presupuestoId).filter(Boolean) as string[]),
       ])
     );
+
+    // Sólo cuentan las partidas que realmente existen todavía en presupuestos.
+    // Si la interpretación nunca se aplicó (o ya se borraron), no hay nada que quitar.
+    let ids: string[] = [];
+    for (let i = 0; i < candidatos.length; i += 200) {
+      const { data } = await supabase
+        .from("presupuestos")
+        .select("id")
+        .in("id", candidatos.slice(i, i + 200));
+      ids = ids.concat((data || []).map((r) => r.id));
+    }
+
     setPorEliminar({ id, ids });
+
   };
 
   // Paso 2: ejecuta el borrado, con o sin las partidas de presupuesto.
