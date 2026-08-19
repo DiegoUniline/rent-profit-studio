@@ -11,6 +11,16 @@ import { aplicarFormatoTexto, mejorCoincidencia, normalizar, type PlanRafa, type
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Pencil } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Empresa { id: string; nombre: string }
 interface Centro { id: string; nombre: string; empresa_id: string; codigo?: string }
@@ -33,6 +43,7 @@ export default function Rafa() {
   const [sesiones, setSesiones] = useState<SesionRafa[]>([]);
   const [sesionId, setSesionId] = useState<string | null>(null);
   const [reinstruir, setReinstruir] = useState(false);
+  const [porEliminar, setPorEliminar] = useState<{ id: string; ids: string[] } | null>(null);
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aplicandoRef = useRef(false);
 
@@ -211,9 +222,8 @@ export default function Rafa() {
     setSesionId(data.id);
   };
 
+  // Paso 1: se consulta qué partidas creó esa interpretación y se pregunta.
   const eliminarSesion = async (id: string) => {
-    // Al borrar la interpretación se elimina también lo que ella creó:
-    // sus flujos programados y sus partidas de presupuesto.
     const { data: fila } = await supabase
       .from("rafa_sesiones")
       .select("propuesta")
@@ -226,12 +236,16 @@ export default function Rafa() {
         ...((prop?.partidas || []).map((x) => x.presupuestoId).filter(Boolean) as string[]),
       ])
     );
+    setPorEliminar({ id, ids });
+  };
 
-    if (ids.length > 0) {
-      const ok = window.confirm(
-        `Esta interpretación tiene ${ids.length} partida(s) de presupuesto guardadas. ¿Eliminarlas también junto con sus flujos programados?`
-      );
-      if (!ok) return;
+  // Paso 2: ejecuta el borrado, con o sin las partidas de presupuesto.
+  const ejecutarEliminar = async (conPresupuestos: boolean) => {
+    if (!porEliminar) return;
+    const { id, ids } = porEliminar;
+    setPorEliminar(null);
+
+    if (conPresupuestos && ids.length > 0) {
       await supabase.from("flujos_programados").delete().in("presupuesto_id", ids);
       // Se intenta el borrado real; si alguna partida ya se usó en asientos o
       // programaciones, se deja como baja para no romper la contabilidad.
@@ -253,10 +267,13 @@ export default function Rafa() {
     }
     toast({
       title: "Interpretación eliminada",
-      description: ids.length > 0 ? "También se eliminaron sus partidas y flujos." : undefined,
+      description: conPresupuestos && ids.length > 0
+        ? "También se eliminaron sus partidas y flujos."
+        : "Las partidas de presupuesto se conservaron.",
     });
     cargarSesiones();
   };
+
 
   const aplicar = async () => {
     if (!propuesta) return;
@@ -370,6 +387,36 @@ export default function Rafa() {
           />
         </>
       )}
+
+      <AlertDialog open={Boolean(porEliminar)} onOpenChange={(o) => !o && setPorEliminar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar interpretación</AlertDialogTitle>
+            <AlertDialogDescription>
+              {porEliminar && porEliminar.ids.length > 0
+                ? `Esta interpretación guardó ${porEliminar.ids.length} partida(s) en presupuestos. ¿Quieres eliminarlas también junto con sus flujos programados?`
+                : "Esta interpretación no tiene partidas guardadas en presupuestos."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            {porEliminar && porEliminar.ids.length > 0 && (
+              <Button variant="outline" onClick={() => ejecutarEliminar(false)}>
+                Solo la interpretación
+              </Button>
+            )}
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => ejecutarEliminar(true)}
+            >
+              {porEliminar && porEliminar.ids.length > 0
+                ? "Eliminar también de presupuestos"
+                : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+
   );
 }
