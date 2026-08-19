@@ -254,6 +254,12 @@ export default function Rafa() {
       {!propuesta ? (
         <>
           <RafaCaptura loading={loading} onEnviar={interpretar} />
+          <RafaSesiones
+            sesiones={sesiones}
+            activaId={sesionId}
+            onAbrir={abrirSesion}
+            onEliminar={eliminarSesion}
+          />
           <Card>
             <CardContent className="pt-6 text-sm text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">Qué puede hacer Rafa</p>
@@ -261,10 +267,12 @@ export default function Rafa() {
               <p>· Cargar las partidas del archivo con cantidad, precio unitario e IVA.</p>
               <p>· Sugerir la cuenta contable de cada partida.</p>
               <p>· Programar los flujos de efectivo por semana, quincena o mes.</p>
+              <p>· Guardar cada interpretación para retomarla y corregirla después.</p>
             </CardContent>
           </Card>
         </>
       ) : (
+
         <RafaPropuesta
           resumen={plan?.resumen || ""}
           transcripcion={plan?.transcripcion}
