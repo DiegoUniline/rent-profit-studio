@@ -197,11 +197,11 @@ export function RafaPropuesta({
       </Card>
 
       <Card>
-        <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
+        <CardHeader className="pb-3 space-y-3">
           <CardTitle className="text-base">Partidas del presupuesto</CardTitle>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Label className="text-xs whitespace-nowrap">Texto</Label>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs whitespace-nowrap">Formato de texto</Label>
               <Select
                 value={propuesta.formatoTexto || "original"}
                 onValueChange={(v: FormatoTexto) =>
@@ -211,25 +211,28 @@ export function RafaPropuesta({
                   })
                 }
               >
-                <SelectTrigger className="h-8 w-40"><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="h-9 w-48"><SelectValue placeholder="Como viene" /></SelectTrigger>
+                <SelectContent className="z-50 bg-popover">
                   {FORMATOS_TEXTO.map((f) => (
                     <SelectItem key={f.valor} value={f.valor}>{f.etiqueta}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pb-2">
               <Switch checked={propuesta.ivaIncluir} onCheckedChange={(v) => set({ ivaIncluir: v })} id="rafa-iva" />
               <Label htmlFor="rafa-iva" className="text-xs">Sumar IVA</Label>
             </div>
-            <Input
-              type="number"
-              className="h-8 w-20"
-              value={propuesta.ivaTasa}
-              disabled={!propuesta.ivaIncluir}
-              onChange={(e) => set({ ivaTasa: Number(e.target.value) })}
-            />
+            <div className="space-y-1.5">
+              <Label className="text-xs whitespace-nowrap">Tasa IVA %</Label>
+              <Input
+                type="number"
+                className="h-9 w-24"
+                value={propuesta.ivaTasa}
+                disabled={!propuesta.ivaIncluir}
+                onChange={(e) => set({ ivaTasa: Number(e.target.value) })}
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
