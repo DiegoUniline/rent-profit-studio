@@ -211,9 +211,8 @@ export default function Rafa() {
     setSesionId(data.id);
   };
 
+  // Paso 1: se consulta qué partidas creó esa interpretación y se pregunta.
   const eliminarSesion = async (id: string) => {
-    // Al borrar la interpretación se elimina también lo que ella creó:
-    // sus flujos programados y sus partidas de presupuesto.
     const { data: fila } = await supabase
       .from("rafa_sesiones")
       .select("propuesta")
@@ -226,12 +225,16 @@ export default function Rafa() {
         ...((prop?.partidas || []).map((x) => x.presupuestoId).filter(Boolean) as string[]),
       ])
     );
+    setPorEliminar({ id, ids });
+  };
 
-    if (ids.length > 0) {
-      const ok = window.confirm(
-        `Esta interpretación tiene ${ids.length} partida(s) de presupuesto guardadas. ¿Eliminarlas también junto con sus flujos programados?`
-      );
-      if (!ok) return;
+  // Paso 2: ejecuta el borrado, con o sin las partidas de presupuesto.
+  const ejecutarEliminar = async (conPresupuestos: boolean) => {
+    if (!porEliminar) return;
+    const { id, ids } = porEliminar;
+    setPorEliminar(null);
+
+    if (conPresupuestos && ids.length > 0) {
       await supabase.from("flujos_programados").delete().in("presupuesto_id", ids);
       // Se intenta el borrado real; si alguna partida ya se usó en asientos o
       // programaciones, se deja como baja para no romper la contabilidad.
@@ -253,10 +256,13 @@ export default function Rafa() {
     }
     toast({
       title: "Interpretación eliminada",
-      description: ids.length > 0 ? "También se eliminaron sus partidas y flujos." : undefined,
+      description: conPresupuestos && ids.length > 0
+        ? "También se eliminaron sus partidas y flujos."
+        : "Las partidas de presupuesto se conservaron.",
     });
     cargarSesiones();
   };
+
 
   const aplicar = async () => {
     if (!propuesta) return;
