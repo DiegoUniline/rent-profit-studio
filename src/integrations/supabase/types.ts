@@ -517,6 +517,7 @@ export type Database = {
           id: string
           nombre_completo: string
           nombre_usuario: string
+          puesto: string | null
           telefono: string | null
           updated_at: string
           user_id: string
@@ -528,6 +529,7 @@ export type Database = {
           id?: string
           nombre_completo: string
           nombre_usuario: string
+          puesto?: string | null
           telefono?: string | null
           updated_at?: string
           user_id: string
@@ -539,6 +541,7 @@ export type Database = {
           id?: string
           nombre_completo?: string
           nombre_usuario?: string
+          puesto?: string | null
           telefono?: string | null
           updated_at?: string
           user_id?: string
