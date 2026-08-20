@@ -111,6 +111,20 @@ export function NuevoUsuarioDialog({
       }
     }
 
+    // Guardar el puesto asignado en el perfil recién creado
+    if (authData.user && form.puesto.trim()) {
+      const { error: puestoError } = await supabase
+        .from("profiles")
+        .update({ puesto: form.puesto.trim() })
+        .eq("user_id", authData.user.id);
+
+      if (puestoError) {
+        console.error("Error updating puesto:", puestoError);
+      }
+    }
+
+
+
     setSaving(false);
 
     toast({
