@@ -32,6 +32,7 @@ const usuarioSchema = z.object({
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
   nombre_completo: z.string().min(2, "El nombre es requerido"),
   nombre_usuario: z.string().min(3, "El nombre de usuario debe tener al menos 3 caracteres"),
+  puesto: z.string().max(100).optional(),
   role: z.enum(["admin", "contador", "usuario", "arquitecto"]),
 });
 
@@ -40,6 +41,7 @@ interface UsuarioForm {
   password: string;
   nombre_completo: string;
   nombre_usuario: string;
+  puesto: string;
   role: "admin" | "contador" | "usuario" | "arquitecto";
 }
 
@@ -48,6 +50,7 @@ const emptyForm: UsuarioForm = {
   password: "",
   nombre_completo: "",
   nombre_usuario: "",
+  puesto: "",
   role: "usuario",
 };
 
@@ -107,6 +110,20 @@ export function NuevoUsuarioDialog({
         console.error("Error updating role:", roleError);
       }
     }
+
+    // Guardar el puesto asignado en el perfil recién creado
+    if (authData.user && form.puesto.trim()) {
+      const { error: puestoError } = await supabase
+        .from("profiles")
+        .update({ puesto: form.puesto.trim() })
+        .eq("user_id", authData.user.id);
+
+      if (puestoError) {
+        console.error("Error updating puesto:", puestoError);
+      }
+    }
+
+
 
     setSaving(false);
 

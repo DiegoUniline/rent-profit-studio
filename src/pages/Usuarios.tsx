@@ -26,6 +26,7 @@ interface UserWithRole {
   nombre_completo: string;
   nombre_usuario: string;
   telefono: string | null;
+  puesto: string | null;
   created_at: string;
   role: string;
 }
@@ -109,7 +110,8 @@ export default function Usuarios() {
   const filteredUsers = users.filter(
     (user) =>
       user.nombre_completo.toLowerCase().includes(search.toLowerCase()) ||
-      user.nombre_usuario.toLowerCase().includes(search.toLowerCase())
+      user.nombre_usuario.toLowerCase().includes(search.toLowerCase()) ||
+      (user.puesto || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const pagination = useTablePagination(filteredUsers);
@@ -139,7 +141,7 @@ export default function Usuarios() {
             <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nombre o usuario..."
+                placeholder="Buscar por nombre, usuario o puesto..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-10"
@@ -161,6 +163,7 @@ export default function Usuarios() {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Usuario</TableHead>
+                    <TableHead>Puesto</TableHead>
                     <TableHead>Teléfono</TableHead>
                     <TableHead>Rol</TableHead>
                     <TableHead>Fecha de Registro</TableHead>
@@ -172,6 +175,7 @@ export default function Usuarios() {
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.nombre_completo}</TableCell>
                       <TableCell>@{user.nombre_usuario}</TableCell>
+                      <TableCell>{user.puesto || "-"}</TableCell>
                       <TableCell>{user.telefono || "-"}</TableCell>
                       <TableCell>
                         <Badge variant={roleBadgeVariants[user.role]}>

@@ -27,6 +27,7 @@ interface UserWithRole {
   nombre_completo: string;
   nombre_usuario: string;
   telefono: string | null;
+  puesto?: string | null;
   role: string;
 }
 
@@ -46,6 +47,7 @@ export function EditUsuarioDialog({ open, onOpenChange, usuario, onSuccess }: Ed
   const [nombreCompleto, setNombreCompleto] = useState("");
   const [nombreUsuario, setNombreUsuario] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [puesto, setPuesto] = useState("");
   const [role, setRole] = useState("");
   
   // Password reset
@@ -58,6 +60,7 @@ export function EditUsuarioDialog({ open, onOpenChange, usuario, onSuccess }: Ed
       setNombreCompleto(usuario.nombre_completo);
       setNombreUsuario(usuario.nombre_usuario);
       setTelefono(usuario.telefono || "");
+      setPuesto(usuario.puesto || "");
       setRole(usuario.role);
       setNewPassword("");
       setConfirmPassword("");
@@ -106,6 +109,7 @@ export function EditUsuarioDialog({ open, onOpenChange, usuario, onSuccess }: Ed
         nombre_completo: nombreCompleto.trim(),
         nombre_usuario: nombreUsuario.trim().toLowerCase().replace(/\s/g, "_"),
         telefono: telefono.trim() || null,
+        puesto: puesto.trim() || null,
       });
 
       // Update role if changed
@@ -215,6 +219,15 @@ export function EditUsuarioDialog({ open, onOpenChange, usuario, onSuccess }: Ed
                 value={nombreUsuario}
                 onChange={(e) => setNombreUsuario(e.target.value.toLowerCase().replace(/\s/g, "_"))}
                 placeholder="nombre_usuario"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Puesto</Label>
+              <Input
+                value={puesto}
+                onChange={(e) => setPuesto(e.target.value)}
+                placeholder="Ej. Contador, Arquitecto, Residente de obra"
               />
             </div>
 

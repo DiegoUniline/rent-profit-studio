@@ -82,7 +82,7 @@ serve(async (req) => {
       }
 
       case "update_profile": {
-        const { nombre_completo, nombre_usuario, telefono } = data;
+        const { nombre_completo, nombre_usuario, telefono, puesto } = data;
 
         const { error } = await supabaseAdmin
           .from("profiles")
@@ -90,6 +90,7 @@ serve(async (req) => {
             nombre_completo,
             nombre_usuario,
             telefono,
+            puesto,
             updated_at: new Date().toISOString(),
           })
           .eq("user_id", userId);
