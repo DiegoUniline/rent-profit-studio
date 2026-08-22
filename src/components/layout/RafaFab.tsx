@@ -1,12 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import rafaAvatar from "@/assets/rafa-avatar.png";
 
-/** Botón flotante siempre visible que lleva al asistente Rafa. */
+/** Botón flotante visible solo dentro de la vista de Rafa. */
 export function RafaFab() {
-  const { role } = useAuth();
   const location = useLocation();
+
 
   if (location.pathname !== "/rafa") return null;
 
