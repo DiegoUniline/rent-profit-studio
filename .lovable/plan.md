@@ -1,74 +1,27 @@
+# Plan: Evitar duplicados al editar instrucciones de Rafa
 
-# Plan: Ocultar Nombre en Cuentas de Saldo en Vista Consolidada
+## Objetivo
+Garantizar que una interpretación ya aplicada actualice sus partidas y flujos existentes, incluso si la nueva instrucción cambia textos, cantidades, orden o número de partidas.
 
-## Problema Identificado
-En la vista consolidada ("Todas las empresas"):
-- Las cuentas de tipo **Saldo** (nivel 4) muestran el nombre de cuenta de una empresa específica
-- Esto es incorrecto porque el saldo consolidado agrupa valores de múltiples empresas
-- Cada empresa puede tener nombres diferentes para la misma cuenta
+## Cambios
 
-## Comportamiento Correcto
-| Vista | Cuenta Titulo | Cuenta Saldo |
-|-------|---------------|--------------|
-| Empresa específica | Codigo + Nombre + Saldo acumulado | Codigo + Nombre + Saldo directo |
-| Consolidada | Codigo + Nombre + Saldo acumulado | Codigo + **Sin nombre** + Saldo consolidado |
+1. **Eliminar la carrera entre autoguardado y aplicación**
+   - Cancelar cualquier autoguardado pendiente antes de confirmar.
+   - Suspender el autoguardado mientras se crean o actualizan registros.
+   - Persistir primero el resultado con sus IDs y reanudar después el autoguardado.
 
-## Cambio a Realizar
+2. **Recuperar vínculos desde la sesión guardada**
+   - Antes de aplicar, releer la propuesta vigente de la interpretación en la base de datos.
+   - Unir sus IDs de presupuesto con los que existen en pantalla para no depender de una copia local potencialmente desactualizada.
 
-### Archivo: `src/pages/Cuentas.tsx`
+3. **Conciliar partidas de forma estable**
+   - Al reinterpretar, conservar el ID por coincidencia de descripción normalizada antes de recurrir a la posición.
+   - No reutilizar un mismo ID para dos partidas.
+   - Mantener los IDs previamente aplicados aunque la IA reordene los conceptos.
 
-Modificar la celda del nombre en la renderización de la tabla (líneas 494-501):
+4. **Pruebas de regresión**
+   - Probar reordenamiento, cambios de cantidad/texto, partidas agregadas y partidas eliminadas.
+   - Verificar que una segunda confirmación reporte actualizaciones y no inserciones para las partidas existentes.
 
-**Antes:**
-```tsx
-<TableCell>
-  <span 
-    className="inline-block"
-    style={{ paddingLeft: `${(level - 1) * 24}px` }}
-  >
-    {cuenta.nombre}
-  </span>
-</TableCell>
-```
-
-**Después:**
-```tsx
-<TableCell>
-  <span 
-    className="inline-block"
-    style={{ paddingLeft: `${(level - 1) * 24}px` }}
-  >
-    {/* En vista consolidada, no mostrar nombre para cuentas de saldo */}
-    {isConsolidated && cuenta.clasificacion === "saldo" 
-      ? <span className="text-muted-foreground italic">—</span>
-      : cuenta.nombre
-    }
-  </span>
-</TableCell>
-```
-
-## Resultado Visual
-
-**Vista consolidada:**
-```
-100-000-000-000  ACTIVO                    Titulo   $1,000,000
-100-100-000-000  Activo Circulante         Titulo     $500,000
-100-100-100-000  Caja y Bancos             Titulo     $200,000
-100-100-100-001  —                         Saldo      $150,000
-100-100-100-002  —                         Saldo       $50,000
-```
-
-**Vista empresa específica (sin cambios):**
-```
-100-000-000-000  ACTIVO                    Titulo   $1,000,000
-100-100-000-000  Activo Circulante         Titulo     $500,000
-100-100-100-000  Caja y Bancos             Titulo     $200,000
-100-100-100-001  Banco Nacional MXN        Saldo      $150,000
-100-100-100-002  Caja General              Saldo       $50,000
-```
-
-## Beneficios
-- Se evita mostrar nombres incorrectos o parciales en vista consolidada
-- Se mantiene coherencia visual con un guión (—) indicando que no aplica
-- No genera confusión cuando varias empresas usan la misma cuenta contable
-- Vista por empresa específica mantiene su comportamiento actual completo
+## Alcance de datos existentes
+No se eliminarán registros históricos automáticamente. La corrección impedirá nuevas duplicaciones; cualquier limpieza de duplicados anteriores se hará por separado tras identificar cuáles deben conservarse.
