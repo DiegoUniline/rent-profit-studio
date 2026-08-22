@@ -7,7 +7,14 @@ import { RafaCaptura, type CapturaPayload } from "@/components/rafa/RafaCaptura"
 import { RafaPropuesta } from "@/components/rafa/RafaPropuesta";
 import { RafaSesiones, type SesionRafa } from "@/components/rafa/RafaSesiones";
 import { aplicarPlanRafa } from "@/lib/rafa-apply";
-import { aplicarFormatoTexto, mejorCoincidencia, normalizar, type PlanRafa, type PropuestaEditable } from "@/lib/rafa-types";
+import {
+  aplicarFormatoTexto,
+  conciliarVinculosPresupuesto,
+  mejorCoincidencia,
+  normalizar,
+  type PlanRafa,
+  type PropuestaEditable,
+} from "@/lib/rafa-types";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Pencil } from "lucide-react";
@@ -45,6 +52,7 @@ export default function Rafa() {
   const [reinstruir, setReinstruir] = useState(false);
   const [porEliminar, setPorEliminar] = useState<{ id: string; ids: string[] } | null>(null);
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosavePromiseRef = useRef<Promise<unknown> | null>(null);
   const aplicandoRef = useRef(false);
 
   const cargarSesiones = useCallback(async () => {
@@ -138,7 +146,7 @@ export default function Rafa() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       const nuevoPlan = data.plan as PlanRafa;
-      const nuevaPropuesta = construirPropuesta(nuevoPlan, propuesta);
+      const nuevaPropuesta = conciliarVinculosPresupuesto(construirPropuesta(nuevoPlan, propuesta), propuesta);
       setPlan(nuevoPlan);
       setPropuesta(nuevaPropuesta);
       setReinstruir(false);
@@ -193,14 +201,19 @@ export default function Rafa() {
 
   // Autoguardado de los cambios que el usuario hace sobre la propuesta.
   useEffect(() => {
-    if (!sesionId || !propuesta) return;
+    if (!sesionId || !propuesta || aplicandoRef.current) return;
     if (autosaveRef.current) clearTimeout(autosaveRef.current);
     autosaveRef.current = setTimeout(() => {
-      supabase
-        .from("rafa_sesiones")
-        .update({ propuesta: propuesta as unknown as never })
-        .eq("id", sesionId)
-        .then(() => cargarSesiones());
+      autosavePromiseRef.current = Promise.resolve(
+        supabase
+          .from("rafa_sesiones")
+          .update({ propuesta: propuesta as unknown as never })
+          .eq("id", sesionId)
+      )
+        .then(() => cargarSesiones())
+        .finally(() => {
+          autosavePromiseRef.current = null;
+        });
     }, 900);
     return () => {
       if (autosaveRef.current) clearTimeout(autosaveRef.current);
@@ -295,7 +308,27 @@ export default function Rafa() {
     aplicandoRef.current = true;
     setGuardando(true);
     try {
-      const r = await aplicarPlanRafa(propuesta);
+      if (autosaveRef.current) {
+        clearTimeout(autosaveRef.current);
+        autosaveRef.current = null;
+      }
+      if (autosavePromiseRef.current) await autosavePromiseRef.current;
+
+      let propuestaAplicar = propuesta;
+      if (sesionId) {
+        const { data: sesion, error: errorSesion } = await supabase
+          .from("rafa_sesiones")
+          .select("propuesta")
+          .eq("id", sesionId)
+          .maybeSingle();
+        if (errorSesion) throw new Error(`No se pudo verificar la interpretación guardada: ${errorSesion.message}`);
+        propuestaAplicar = conciliarVinculosPresupuesto(
+          propuesta,
+          (sesion?.propuesta as unknown as PropuestaEditable) || null
+        );
+      }
+
+      const r = await aplicarPlanRafa(propuestaAplicar);
       setPropuesta(r.propuesta);
       if (sesionId) {
         await supabase

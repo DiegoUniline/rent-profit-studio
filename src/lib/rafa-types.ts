@@ -72,6 +72,68 @@ export interface CatalogoItem {
   codigo?: string;
 }
 
+/**
+ * Recupera los vínculos de presupuesto de una propuesta ya aplicada.
+ * Primero concilia por descripción y después por posición, para soportar tanto
+ * reordenamientos como correcciones completas del texto hechas por la IA.
+ */
+export function conciliarVinculosPresupuesto(
+  actual: PropuestaEditable,
+  guardada?: PropuestaEditable | null
+): PropuestaEditable {
+  if (!guardada) return actual;
+
+  const idsGuardados = guardada.aplicado?.presupuestoIds || [];
+  const anteriores = guardada.partidas.map((partida, indice) => ({
+    id: partida.presupuestoId || idsGuardados[indice],
+    descripcion: normalizar(partida.descripcion),
+    indice,
+  }));
+  const usados = new Set<string>();
+
+  const partidas = actual.partidas.map((partida, indice) => {
+    if (partida.presupuestoId) {
+      usados.add(partida.presupuestoId);
+      return partida;
+    }
+
+    const descripcion = normalizar(partida.descripcion);
+    const porDescripcion = anteriores.find(
+      (anterior) => anterior.id && !usados.has(anterior.id) && anterior.descripcion === descripcion
+    );
+    const porPosicion = anteriores.find(
+      (anterior) => anterior.id && !usados.has(anterior.id) && anterior.indice === indice
+    );
+    const coincidencia = porDescripcion || porPosicion;
+    if (!coincidencia?.id) return partida;
+
+    usados.add(coincidencia.id);
+    return { ...partida, presupuestoId: coincidencia.id };
+  });
+
+  const presupuestoIds = Array.from(
+    new Set([
+      ...idsGuardados,
+      ...anteriores.map((anterior) => anterior.id).filter((id): id is string => Boolean(id)),
+      ...(actual.aplicado?.presupuestoIds || []),
+    ])
+  );
+
+  return {
+    ...actual,
+    partidas,
+    aplicado: presupuestoIds.length > 0
+      ? {
+          ...guardada.aplicado,
+          ...actual.aplicado,
+          centroId: actual.aplicado?.centroId || guardada.aplicado?.centroId,
+          terceroId: actual.aplicado?.terceroId ?? guardada.aplicado?.terceroId,
+          presupuestoIds,
+        }
+      : actual.aplicado,
+  };
+}
+
 /** Normaliza texto para comparar: sin acentos, minúsculas, sin puntuación. */
 export function normalizar(texto: string): string {
   return (texto || "")
