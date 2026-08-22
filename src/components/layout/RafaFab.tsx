@@ -8,8 +8,8 @@ export function RafaFab() {
   const { role } = useAuth();
   const location = useLocation();
 
-  if (role !== "admin" && role !== "contador") return null;
-  if (location.pathname === "/rafa") return null;
+  if (location.pathname !== "/rafa") return null;
+
 
   return (
     <Tooltip>
