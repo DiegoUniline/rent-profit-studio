@@ -204,10 +204,12 @@ export default function Rafa() {
     if (!sesionId || !propuesta || aplicandoRef.current) return;
     if (autosaveRef.current) clearTimeout(autosaveRef.current);
     autosaveRef.current = setTimeout(() => {
-      autosavePromiseRef.current = supabase
-        .from("rafa_sesiones")
-        .update({ propuesta: propuesta as unknown as never })
-        .eq("id", sesionId)
+      autosavePromiseRef.current = Promise.resolve(
+        supabase
+          .from("rafa_sesiones")
+          .update({ propuesta: propuesta as unknown as never })
+          .eq("id", sesionId)
+      )
         .then(() => cargarSesiones())
         .finally(() => {
           autosavePromiseRef.current = null;
