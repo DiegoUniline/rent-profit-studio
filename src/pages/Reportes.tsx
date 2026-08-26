@@ -31,6 +31,7 @@ import {
   AsientoContable,
   calcularSaldosCuentas,
 } from "@/lib/accounting-utils";
+import { resolverFlujosEfectivos } from "@/lib/project-utils";
 import { EstadoFinanciero } from "@/components/reportes/EstadoFinanciero";
 import { FlujoEfectivoPresupuesto } from "@/components/reportes/FlujoEfectivoPresupuesto";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -335,7 +336,7 @@ export default function Reportes() {
       // Get presupuesto IDs for the selected empresas
       let presQuery = supabase
         .from("presupuestos")
-        .select("id")
+        .select("id, es_project")
         .eq("activo", true);
 
       if (empresaId !== "todas") {
@@ -352,6 +353,7 @@ export default function Reportes() {
       if (presError) throw presError;
 
       const ids = (presIds || []).map((p: any) => p.id);
+      const idsProject = (presIds || []).filter((p: any) => p.es_project).map((p: any) => p.id);
 
       let allFlujos: any[] = [];
       const PAGE_SIZE = 1000;
@@ -412,7 +414,34 @@ export default function Reportes() {
         }
       }
 
-      setFlujosProgramados(allFlujos);
+      // Partidas convertidas en Proyecto (es_project=true) con programación
+      // financiera propia: esa es su única fuente de proyección (evita
+      // duplicar/desactualizar el flujo — misma regla que Project → Flujo
+      // mensual en ProyectoDetalle.tsx, ver resolverFlujosEfectivos).
+      const programacionesPorPartida = new Map<string, { pagos: { fecha: string; monto: number }[] }>();
+      if (idsProject.length > 0) {
+        const { data: programacionesData } = await supabase
+          .from("proyecto_programacion_financiera")
+          .select("id, presupuesto_id")
+          .in("presupuesto_id", idsProject);
+
+        if (programacionesData && programacionesData.length > 0) {
+          const programacionIds = programacionesData.map((p) => p.id);
+          const { data: pagosData } = await supabase
+            .from("proyecto_programacion_pagos")
+            .select("programacion_id, fecha, monto")
+            .in("programacion_id", programacionIds);
+          programacionesData.forEach((prog) => {
+            programacionesPorPartida.set(prog.presupuesto_id, {
+              pagos: (pagosData || [])
+                .filter((p) => p.programacion_id === prog.id)
+                .map((p) => ({ fecha: p.fecha, monto: Number(p.monto) })),
+            });
+          });
+        }
+      }
+
+      setFlujosProgramados(resolverFlujosEfectivos(allFlujos, programacionesPorPartida));
     } catch (error: any) {
       console.error("Error loading flujos programados:", error);
     }

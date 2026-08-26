@@ -100,6 +100,41 @@ export function programacionPendienteDeAjustar(
   return Math.abs(totalProgramado - presupuestoPartida) > 0.01;
 }
 
+export interface ProgramacionPropiaPartida {
+  pagos: { fecha: string; monto: number }[];
+}
+
+/**
+ * Fuente única de proyección por partida: si una partida tiene programación
+ * financiera propia (proyecto_programacion_pagos, vía módulo Proyectos), esa
+ * es la única fuente activa para ella — sus filas de flujos_programados
+ * (legacy) se excluyen para no duplicar el flujo proyectado. Las partidas sin
+ * programación propia (o que no son Project) siguen usando flujos_programados
+ * normal, sin cambios. Úsalo en cualquier pantalla que combine ambas fuentes
+ * (Project → Flujo mensual, Reporte de Flujo) para no divergir la regla.
+ */
+export function resolverFlujosEfectivos<T extends { presupuesto_id: string | null }>(
+  flujosLegacy: T[],
+  programacionesPorPartida: Map<string, ProgramacionPropiaPartida>
+): (T | { presupuesto_id: string; fecha: string; monto: number; tipo: "egreso" })[] {
+  if (programacionesPorPartida.size === 0) return flujosLegacy;
+
+  const resultado: (T | { presupuesto_id: string; fecha: string; monto: number; tipo: "egreso" })[] = [];
+
+  flujosLegacy.forEach((f) => {
+    if (f.presupuesto_id && programacionesPorPartida.has(f.presupuesto_id)) return; // reemplazada por su programación propia
+    resultado.push(f);
+  });
+
+  programacionesPorPartida.forEach((propia, presupuestoId) => {
+    propia.pagos.forEach((pago) => {
+      resultado.push({ presupuesto_id: presupuestoId, fecha: pago.fecha, monto: pago.monto, tipo: "egreso" });
+    });
+  });
+
+  return resultado;
+}
+
 /**
  * Reparte un saldo en N periodos sin perder ni agregar centavos: cada periodo
  * recibe el monto base redondeado a 2 decimales, y el último absorbe el
