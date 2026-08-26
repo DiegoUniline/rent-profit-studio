@@ -143,8 +143,12 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
                           {f.avance.toFixed(1)}%
                         </Badge>
                         {f.pendienteAjustar && (
-                          <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
-                            Pendiente
+                          <Badge
+                            variant="outline"
+                            className="bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+                            title="La suma programada no coincide con el presupuesto autorizado vigente de esta partida"
+                          >
+                            Programación pendiente de ajustar
                           </Badge>
                         )}
                       </div>

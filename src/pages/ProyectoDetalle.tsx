@@ -46,6 +46,7 @@ import {
   calcularAvance,
   calcularDisponible,
   programacionPendienteDeAjustar,
+  resolverFlujosEfectivos,
 } from "@/lib/project-utils";
 import {
   ArrowLeft,
@@ -422,21 +423,11 @@ export default function ProyectoDetalle() {
   // Si una partida tiene programación financiera propia, es la única fuente
   // activa para ella (sus pagos, no sus flujos_programados); las partidas sin
   // programación propia siguen usando su flujos_programados real, sin cambios.
-  const flujosEfectivos = useMemo(() => {
-    if (programacionesPorPartida.size === 0) return flujos;
-    const resultado: any[] = [];
-    partidasProject.forEach((p) => {
-      const propia = programacionesPorPartida.get(p.id);
-      if (propia) {
-        propia.pagos.forEach((pago) => {
-          resultado.push({ presupuesto_id: p.id, fecha: pago.fecha, monto: pago.monto, tipo: "egreso" });
-        });
-      } else {
-        flujos.filter((f: any) => f.presupuesto_id === p.id).forEach((f) => resultado.push(f));
-      }
-    });
-    return resultado;
-  }, [programacionesPorPartida, flujos, partidasProject]);
+  // Misma regla que usa el Reporte de Flujo global (src/pages/Reportes.tsx).
+  const flujosEfectivos = useMemo(
+    () => resolverFlujosEfectivos(flujos, programacionesPorPartida),
+    [programacionesPorPartida, flujos]
+  );
 
   const proyectadoMap = useMemo(() => calcularProyectadoPorPartida(flujosEfectivos), [flujosEfectivos]);
   const proyectadoAcumuladoMap = useMemo(() => calcularProyectadoPorPartida(flujosEfectivos, new Date()), [flujosEfectivos]);
@@ -846,7 +837,7 @@ export default function ProyectoDetalle() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12">Project</TableHead>
+                      <TableHead className="w-32">Convertir en Proyecto</TableHead>
                       <TableHead>Cuenta</TableHead>
                       <TableHead>Partida</TableHead>
                       <TableHead className="text-right">Presupuesto</TableHead>

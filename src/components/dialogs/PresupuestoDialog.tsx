@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -28,7 +29,7 @@ import { CuentaDialog } from "./CuentaDialog";
 import { CentroNegocioDialog } from "./CentroNegocioDialog";
 import { UnidadMedidaDialog } from "./UnidadMedidaDialog";
 import { ProgramacionPartidaDialog } from "./ProgramacionPartidaDialog";
-import { Plus, Trash2, Copy, Wand2 } from "lucide-react";
+import { Plus, Trash2, Copy, Wand2, ExternalLink } from "lucide-react";
 
 interface Empresa {
   id: string;
@@ -128,6 +129,7 @@ export function PresupuestoDialog({
   onSuccess,
 }: PresupuestoDialogProps) {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [form, setForm] = useState<PresupuestoForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [flujoRows, setFlujoRows] = useState<FlujoRow[]>([]);
@@ -428,9 +430,11 @@ export function PresupuestoDialog({
       }
 
       // Save flujos_programados: delete all existing and re-insert.
-      // Si el proyecto ya tiene programación financiera propia, esta partida
-      // no se programa aquí (evita duplicar el flujo) — no se toca la tabla.
-      if (!programacionProyectoActiva) {
+      // Si la partida ya es de un Proyecto (proyectoDePartida), su programación
+      // temporal se administra EXCLUSIVAMENTE desde Proyectos — sin importar si
+      // ya tiene o no una programación propia creada todavía. No se toca la
+      // tabla aquí para no dejar (ni refrescar) flujos_programados huérfanos.
+      if (!proyectoDePartida) {
         await supabase
           .from("flujos_programados")
           .delete()
@@ -630,7 +634,7 @@ export function PresupuestoDialog({
             <div className="rounded-lg bg-muted p-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-muted-foreground">
-                  Presupuesto (Cantidad × Precio)
+                  Presupuesto autorizado (Cantidad × Precio)
                 </span>
                 <span className="text-2xl font-bold text-primary">
                   {formatCurrency(presupuestoCalculado)}
@@ -642,17 +646,31 @@ export function PresupuestoDialog({
             {proyectoDePartida ? (
               <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  📊 Esta es una partida de Project — se programa con la misma ventana de{" "}
-                  <strong>Programación financiera</strong> del proyecto, para que quede homologada en ambos lados.
+                  📊 La programación de este presupuesto se administra desde Proyectos.
                 </p>
                 <div className="rounded-lg bg-background p-3 flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Ya programado</span>
                   <span className="font-semibold">{formatCurrency(programadoPartida)}</span>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={() => setProgramacionDialogOpen(true)} className="w-full gap-1.5">
-                  <Wand2 className="h-3.5 w-3.5" />
-                  {programacionProyectoActiva ? "Ver / editar programación financiera" : "Programar esta partida"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className="flex-1 gap-1.5"
+                    onClick={() => {
+                      onOpenChange(false);
+                      navigate(`/proyectos/${proyectoDePartida.id}`);
+                    }}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Ver programación del proyecto
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setProgramacionDialogOpen(true)} className="gap-1.5">
+                    <Wand2 className="h-3.5 w-3.5" />
+                    Editar aquí
+                  </Button>
+                </div>
               </div>
             ) : (
             <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
