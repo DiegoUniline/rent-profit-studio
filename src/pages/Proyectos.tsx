@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { formatCurrency } from "@/lib/accounting-utils";
-import { calcularEjercidoPorPartida, agregarFinanciero } from "@/lib/project-utils";
+import { calcularEjercidoPorPartida, calcularMontoPresupuestado, agregarFinanciero } from "@/lib/project-utils";
 import { FolderKanban, Search } from "lucide-react";
 
 interface ProyectoRow {
@@ -125,7 +125,7 @@ export default function Proyectos() {
       const partidasProy = partidas.filter((p) => p.centro_negocio_id === proy.centro_negocio_id);
       const agregado = agregarFinanciero(
         partidasProy.map((p) => ({
-          presupuesto: p.cantidad * p.precio_unitario,
+          presupuesto: calcularMontoPresupuestado(p.cantidad, p.precio_unitario),
           proyectado: 0,
           ejercido: ejercidoMap.get(p.id) || 0,
         }))

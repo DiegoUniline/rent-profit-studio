@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Edit, Power, GripVertical, AlertTriangle, Eye, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { calcularMontoPresupuestado } from "@/lib/project-utils";
 
 interface Presupuesto {
   id: string;
@@ -59,7 +60,7 @@ export function SortablePresupuestoRow({
     transition,
   };
 
-  const presupuestado = p.cantidad * p.precio_unitario;
+  const presupuestado = calcularMontoPresupuestado(p.cantidad, p.precio_unitario);
   const ejercido = p.ejercido || 0;
   const porEjercer = p.porEjercer || 0;
   const porcentaje = p.porcentaje || 0;

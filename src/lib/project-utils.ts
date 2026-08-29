@@ -27,6 +27,21 @@ export interface MovimientoConPresupuesto extends Movimiento {
   presupuesto_id: string | null;
 }
 
+/** Convierte valores numéricos de Supabase a un número finito; ausencia o dato inválido = 0. */
+export function numeroFinito(valor: unknown): number {
+  if (valor === null || valor === undefined || valor === "") return 0;
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
+/**
+ * Importe autorizado de una partida. Proyectos y Presupuestos deben usar
+ * siempre esta misma fórmula para evitar diferencias por null/undefined/NaN.
+ */
+export function calcularMontoPresupuestado(cantidad: unknown, precioUnitario: unknown): number {
+  return numeroFinito(cantidad) * numeroFinito(precioUnitario);
+}
+
 /**
  * Ejercido por partida: suma de debe+haber de los movimientos de asientos
  * `aplicado` ligados a esa partida (mismo cálculo que FlujoEfectivoPresupuesto).
@@ -42,7 +57,7 @@ export function calcularEjercidoPorPartida(
     if (!mov.presupuesto_id) return;
     const asiento = asientoMap.get(mov.asiento_id);
     if (!asiento || asiento.estado !== "aplicado") return;
-    const monto = Number(mov.debe) + Number(mov.haber);
+    const monto = numeroFinito(mov.debe) + numeroFinito(mov.haber);
     result.set(mov.presupuesto_id, (result.get(mov.presupuesto_id) || 0) + monto);
   });
 
@@ -65,7 +80,8 @@ export function calcularProyectadoPorPartida(
       const fecha = new Date(f.fecha + "T00:00:00");
       if (fecha > hastaFecha) return;
     }
-    result.set(f.presupuesto_id, (result.get(f.presupuesto_id) || 0) + Number(f.monto));
+    const monto = numeroFinito(f.monto);
+    result.set(f.presupuesto_id, (result.get(f.presupuesto_id) || 0) + monto);
   });
 
   return result;
@@ -109,26 +125,39 @@ export interface ProgramacionPropiaPartida {
  * financiera propia (proyecto_programacion_pagos, vía módulo Proyectos), esa
  * es la única fuente activa para ella — sus filas de flujos_programados
  * (legacy) se excluyen para no duplicar el flujo proyectado. Las partidas sin
- * programación propia (o que no son Project) siguen usando flujos_programados
- * normal, sin cambios. Úsalo en cualquier pantalla que combine ambas fuentes
- * (Project → Flujo mensual, Reporte de Flujo) para no divergir la regla.
+ * programación propia pero que YA son Project no deben revivir filas legacy:
+ * su proyectado es $0 hasta que exista programación propia. Las partidas que
+ * no son Project siguen usando flujos_programados sin cambios.
+ *
+ * `presupuestosGestionadosPorProyecto` contiene IDs exactos, activos y dentro
+ * del alcance empresa/proyecto de la consulta llamante. No se relaciona por
+ * nombre, fecha ni coincidencias aproximadas.
  */
 export function resolverFlujosEfectivos<T extends { presupuesto_id: string | null }>(
   flujosLegacy: T[],
-  programacionesPorPartida: Map<string, ProgramacionPropiaPartida>
+  programacionesPorPartida: Map<string, ProgramacionPropiaPartida>,
+  presupuestosGestionadosPorProyecto: ReadonlySet<string> = new Set(programacionesPorPartida.keys()),
+  presupuestosVigentes?: ReadonlySet<string>
 ): (T | { presupuesto_id: string; fecha: string; monto: number; tipo: "egreso" })[] {
-  if (programacionesPorPartida.size === 0) return flujosLegacy;
-
   const resultado: (T | { presupuesto_id: string; fecha: string; monto: number; tipo: "egreso" })[] = [];
 
   flujosLegacy.forEach((f) => {
-    if (f.presupuesto_id && programacionesPorPartida.has(f.presupuesto_id)) return; // reemplazada por su programación propia
+    if (f.presupuesto_id && presupuestosVigentes && !presupuestosVigentes.has(f.presupuesto_id)) return;
+    // Toda partida administrada por Project excluye su programación legacy,
+    // incluso si aún no tiene una programación propia creada.
+    if (f.presupuesto_id && presupuestosGestionadosPorProyecto.has(f.presupuesto_id)) return;
     resultado.push(f);
   });
 
   programacionesPorPartida.forEach((propia, presupuestoId) => {
+    // Si el llamante proporcionó el alcance, no aceptar programaciones de otra
+    // empresa/proyecto o de una partida inactiva.
+    if (!presupuestosGestionadosPorProyecto.has(presupuestoId)) return;
+    if (presupuestosVigentes && !presupuestosVigentes.has(presupuestoId)) return;
     propia.pagos.forEach((pago) => {
-      resultado.push({ presupuesto_id: presupuestoId, fecha: pago.fecha, monto: pago.monto, tipo: "egreso" });
+      const monto = numeroFinito(pago.monto);
+      if (monto <= 0) return;
+      resultado.push({ presupuesto_id: presupuestoId, fecha: pago.fecha, monto, tipo: "egreso" });
     });
   });
 

@@ -227,7 +227,9 @@ export function PresupuestoDialog({
       const { data: proyecto } = await supabase
         .from("proyectos")
         .select("id, empresa_id")
+        .eq("empresa_id", form.empresa_id)
         .eq("centro_negocio_id", form.centro_negocio_id)
+        .eq("activo", true)
         .maybeSingle();
       if (!activo) return;
       if (!proyecto) {
@@ -242,6 +244,8 @@ export function PresupuestoDialog({
         .from("proyecto_programacion_financiera")
         .select("id")
         .eq("presupuesto_id", presupuesto.id)
+        .eq("proyecto_id", proyecto.id)
+        .eq("empresa_id", proyecto.empresa_id)
         .maybeSingle();
       if (!activo) return;
       if (!programacion) {
@@ -253,20 +257,23 @@ export function PresupuestoDialog({
       const { data: pagos } = await supabase
         .from("proyecto_programacion_pagos")
         .select("monto")
-        .eq("programacion_id", programacion.id);
+        .eq("programacion_id", programacion.id)
+        .eq("proyecto_id", proyecto.id);
       if (activo) setProgramadoPartida((pagos || []).reduce((s, p) => s + Number(p.monto), 0));
     })();
     return () => {
       activo = false;
     };
-  }, [open, presupuesto?.id, presupuesto?.es_project, form.centro_negocio_id]);
+  }, [open, presupuesto?.id, presupuesto?.es_project, form.empresa_id, form.centro_negocio_id]);
 
   const refrescarProgramado = async () => {
-    if (!presupuesto?.id) return;
+    if (!presupuesto?.id || !proyectoDePartida) return;
     const { data: programacion } = await supabase
       .from("proyecto_programacion_financiera")
       .select("id")
       .eq("presupuesto_id", presupuesto.id)
+      .eq("proyecto_id", proyectoDePartida.id)
+      .eq("empresa_id", proyectoDePartida.empresaId)
       .maybeSingle();
     if (!programacion) {
       setProgramacionProyectoActiva(false);
@@ -277,7 +284,8 @@ export function PresupuestoDialog({
     const { data: pagos } = await supabase
       .from("proyecto_programacion_pagos")
       .select("monto")
-      .eq("programacion_id", programacion.id);
+      .eq("programacion_id", programacion.id)
+      .eq("proyecto_id", proyectoDePartida.id);
     setProgramadoPartida((pagos || []).reduce((s, p) => s + Number(p.monto), 0));
   };
 

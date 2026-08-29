@@ -45,6 +45,7 @@ import {
   calcularProyectadoPorPartida,
   calcularAvance,
   calcularDisponible,
+  calcularMontoPresupuestado,
   programacionPendienteDeAjustar,
   resolverFlujosEfectivos,
 } from "@/lib/project-utils";
@@ -196,6 +197,7 @@ export default function ProyectoDetalle() {
           cuenta:cuenta_id (codigo, nombre),
           responsable:terceros!presupuestos_responsable_tercero_id_fkey (razon_social)
         `)
+        .eq("empresa_id", proyectoData.empresa_id)
         .eq("centro_negocio_id", proyectoData.centro_negocio_id)
         .eq("activo", true)
         .order("partida");
@@ -204,14 +206,15 @@ export default function ProyectoDetalle() {
 
       const idsProject = (partidasData || []).filter((p: any) => p.es_project).map((p: any) => p.id);
 
-      // Programación financiera propia POR PARTIDA: si una partida tiene su
-      // propia programación, es la única fuente activa para ella (evita
-      // duplicar su flujo); las partidas sin programación propia siguen
-      // usando su flujos_programados normal (sin cambios).
+      // Programación financiera propia POR PARTIDA. En Proyectos no existe
+      // fallback a flujos_programados: si no hay programación propia válida,
+      // el proyectado de la partida es $0.
       if (idsProject.length > 0) {
         const { data: programacionesData } = await supabase
           .from("proyecto_programacion_financiera")
           .select("id, presupuesto_id")
+          .eq("proyecto_id", id)
+          .eq("empresa_id", proyectoData.empresa_id)
           .in("presupuesto_id", idsProject);
 
         const map = new Map<string, { programacionId: string; pagos: { fecha: string; monto: number }[] }>();
@@ -220,6 +223,7 @@ export default function ProyectoDetalle() {
           const { data: pagosData } = await supabase
             .from("proyecto_programacion_pagos")
             .select("programacion_id, fecha, monto")
+            .eq("proyecto_id", id)
             .in("programacion_id", programacionIds);
           programacionesData.forEach((prog) => {
             map.set(prog.presupuesto_id, {
@@ -236,15 +240,15 @@ export default function ProyectoDetalle() {
       }
 
       if (idsProject.length > 0) {
-        const [{ data: flujosData }, { data: movData }] = await Promise.all([
-          supabase.from("flujos_programados").select("*").in("presupuesto_id", idsProject),
-          supabase
-            .from("asiento_movimientos")
-            .select("*, asientos_contables:asiento_id(id, fecha, estado, tipo, empresa_id)")
-            .in("presupuesto_id", idsProject),
-        ]);
+        const { data: movData } = await supabase
+          .from("asiento_movimientos")
+          .select("*, asientos_contables:asiento_id(id, fecha, estado, tipo, empresa_id)")
+          .in("presupuesto_id", idsProject);
 
-        setFlujos(flujosData || []);
+        // Una partida de Project jamás toma flujos_programados legacy. Se
+        // conserva el estado vacío para que resolverFlujosEfectivos agregue
+        // únicamente los pagos propios válidos.
+        setFlujos([]);
 
         const movs: Movimiento[] = [];
         const asientosMap = new Map<string, AsientoContable>();
@@ -397,7 +401,7 @@ export default function ProyectoDetalle() {
         partida: p.partida,
         cuenta_codigo: p.cuenta?.codigo,
         cuenta_nombre: p.cuenta?.nombre,
-        presupuesto: p.cantidad * p.precio_unitario,
+        presupuesto: calcularMontoPresupuestado(p.cantidad, p.precio_unitario),
       })),
     [partidasProject]
   );
@@ -420,13 +424,15 @@ export default function ProyectoDetalle() {
 
   const ejercidoMap = useMemo(() => calcularEjercidoPorPartida(movimientos as any, asientos), [movimientos, asientos]);
 
-  // Si una partida tiene programación financiera propia, es la única fuente
-  // activa para ella (sus pagos, no sus flujos_programados); las partidas sin
-  // programación propia siguen usando su flujos_programados real, sin cambios.
+  // Las partidas de Project usan únicamente su programación financiera propia.
+  // Sin registro propio válido, el proyectado es $0 aunque existan filas legacy.
   // Misma regla que usa el Reporte de Flujo global (src/pages/Reportes.tsx).
   const flujosEfectivos = useMemo(
-    () => resolverFlujosEfectivos(flujos, programacionesPorPartida),
-    [programacionesPorPartida, flujos]
+    () => {
+      const idsVigentes = new Set(partidasProject.map((p) => p.id));
+      return resolverFlujosEfectivos(flujos, programacionesPorPartida, idsVigentes, idsVigentes);
+    },
+    [programacionesPorPartida, flujos, partidasProject]
   );
 
   const proyectadoMap = useMemo(() => calcularProyectadoPorPartida(flujosEfectivos), [flujosEfectivos]);
@@ -437,7 +443,7 @@ export default function ProyectoDetalle() {
     let proyectadoAcumulado = 0;
     let ejercido = 0;
     partidasFiltradas.forEach((p) => {
-      presupuesto += p.cantidad * p.precio_unitario;
+      presupuesto += calcularMontoPresupuestado(p.cantidad, p.precio_unitario);
       proyectadoAcumulado += proyectadoAcumuladoMap.get(p.id) || 0;
       ejercido += ejercidoMap.get(p.id) || 0;
     });
@@ -455,7 +461,7 @@ export default function ProyectoDetalle() {
     // Una partida no se considera vencida si ya está al 100% (avance manual
     // "Completada" o ejercido completo): se terminó, aunque la fecha ya pasó.
     const estaCompleta = (p: (typeof partidasProject)[number]) =>
-      (p.avance_manual ?? calcularAvance(ejercidoMap.get(p.id) || 0, p.cantidad * p.precio_unitario)) >= 100;
+      (p.avance_manual ?? calcularAvance(ejercidoMap.get(p.id) || 0, calcularMontoPresupuestado(p.cantidad, p.precio_unitario))) >= 100;
     return {
       total: partidasProject.length,
       sinResponsable: partidasProject.filter((p) => !p.responsable_tercero_id).length,
@@ -469,7 +475,7 @@ export default function ProyectoDetalle() {
   const seguimientoPorPartida = useMemo(() => {
     const map = new Map<string, SeguimientoPartida>();
     partidasFiltradas.forEach((p) => {
-      const presupuestoMonto = p.cantidad * p.precio_unitario;
+      const presupuestoMonto = calcularMontoPresupuestado(p.cantidad, p.precio_unitario);
       const ejercido = ejercidoMap.get(p.id) || 0;
       const totalProgramado = proyectadoMap.get(p.id) || 0;
       map.set(p.id, {
@@ -490,7 +496,7 @@ export default function ProyectoDetalle() {
 
   const filasResumen: FilaResumenPartida[] = useMemo(() => {
     return partidasFiltradas.map((p) => {
-      const presupuesto = p.cantidad * p.precio_unitario;
+      const presupuesto = calcularMontoPresupuestado(p.cantidad, p.precio_unitario);
       const ejercido = ejercidoMap.get(p.id) || 0;
       const proyectado = proyectadoAcumuladoMap.get(p.id) || 0;
       const totalProgramado = proyectadoMap.get(p.id) || 0;
@@ -851,7 +857,7 @@ export default function ProyectoDetalle() {
                         </TableCell>
                         <TableCell>{p.cuenta ? `${p.cuenta.codigo} ${p.cuenta.nombre}` : "-"}</TableCell>
                         <TableCell>{p.partida}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(p.cantidad * p.precio_unitario)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(calcularMontoPresupuestado(p.cantidad, p.precio_unitario))}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

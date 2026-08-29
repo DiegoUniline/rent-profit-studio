@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { PresupuestoDialog } from "@/components/dialogs/PresupuestoDialog";
 import { SortablePresupuestoRow } from "@/components/presupuestos/SortablePresupuestoRow";
+import { calcularMontoPresupuestado } from "@/lib/project-utils";
 import {
   DndContext,
   closestCenter,
@@ -470,7 +471,7 @@ export default function Presupuestos() {
   // Enrich presupuestos with calculated fields
   const presupuestosConEjercido = useMemo(() => {
     return presupuestos.map((p) => {
-      const presupuestado = p.cantidad * p.precio_unitario;
+      const presupuestado = calcularMontoPresupuestado(p.cantidad, p.precio_unitario);
       const ejercido = calcularEjercido(p.id, p.cuentas_contables?.codigo, movimientos);
       const porEjercer = presupuestado - ejercido;
       const porcentaje = presupuestado > 0 ? (ejercido / presupuestado) * 100 : 0;
@@ -655,7 +656,7 @@ export default function Presupuestos() {
       }
       groups[groupKey].presupuestos.push(p);
       if (p.activo) {
-        const presupuestado = p.cantidad * p.precio_unitario;
+        const presupuestado = calcularMontoPresupuestado(p.cantidad, p.precio_unitario);
         groups[groupKey].totalPresupuestado += presupuestado;
         groups[groupKey].totalEjercido += p.ejercido || 0;
         groups[groupKey].totalPorEjercer += p.porEjercer || 0;
@@ -759,7 +760,7 @@ export default function Presupuestos() {
     const activePresupuestos = filteredPresupuestos.filter(p => p.activo);
     let presIng = 0, presEgr = 0, ejerIng = 0, ejerEgr = 0;
     activePresupuestos.forEach((p: any) => {
-      const presupuestado = p.cantidad * p.precio_unitario;
+      const presupuestado = calcularMontoPresupuestado(p.cantidad, p.precio_unitario);
       const ejercido = p.ejercido || 0;
       // Only consider presupuestos that have a flujo programado (tipo defined)
       if (p.tipo === "ingreso") {
@@ -1039,7 +1040,7 @@ export default function Presupuestos() {
                   </TableHeader>
                   <TableBody>
                     {filteredPresupuestos.map((p) => {
-                      const presupuestado = p.cantidad * p.precio_unitario;
+                      const presupuestado = calcularMontoPresupuestado(p.cantidad, p.precio_unitario);
                       const ejercido = p.ejercido || 0;
                       const porEjercer = p.porEjercer || 0;
                       const porcentaje = p.porcentaje || 0;
@@ -1294,7 +1295,7 @@ export default function Presupuestos() {
                                 <div>
                                   <div className="font-medium">{activePresupuesto.partida}</div>
                                   <div className="text-xs text-muted-foreground">
-                                    {activePresupuesto.cuentas_contables?.codigo || "Sin cuenta"} • {formatCurrency(activePresupuesto.cantidad * activePresupuesto.precio_unitario)}
+                                    {activePresupuesto.cuentas_contables?.codigo || "Sin cuenta"} • {formatCurrency(calcularMontoPresupuestado(activePresupuesto.cantidad, activePresupuesto.precio_unitario))}
                                   </div>
                                 </div>
                               </div>

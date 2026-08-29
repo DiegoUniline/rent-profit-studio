@@ -105,6 +105,8 @@ export function ProgramacionPartidaDialog({ open, onOpenChange, proyectoId, empr
       .from("proyecto_programacion_financiera")
       .select("*")
       .eq("presupuesto_id", presupuestoId)
+      .eq("proyecto_id", proyectoId)
+      .eq("empresa_id", empresaId)
       .maybeSingle();
 
     if (programacion) {
@@ -119,6 +121,7 @@ export function ProgramacionPartidaDialog({ open, onOpenChange, proyectoId, empr
         .from("proyecto_programacion_pagos")
         .select("id, fecha, monto, concepto, es_anticipo")
         .eq("programacion_id", programacion.id)
+        .eq("proyecto_id", proyectoId)
         .order("orden");
       setFilas(
         (pagosData || [])
@@ -202,6 +205,8 @@ export function ProgramacionPartidaDialog({ open, onOpenChange, proyectoId, empr
         .from("proyecto_programacion_financiera")
         .select("id")
         .eq("presupuesto_id", partida.id)
+        .eq("proyecto_id", proyectoId)
+        .eq("empresa_id", empresaId)
         .maybeSingle();
 
       let programacionId: string;

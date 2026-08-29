@@ -38,7 +38,7 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
   useEffect(() => {
     if (canView && partidas.length > 0) fetchAll();
     else setLoading(false);
-  }, [canView, partidas.map((p) => p.id).join(",")]);
+  }, [canView, proyectoId, empresaId, partidas.map((p) => p.id).join(",")]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -46,6 +46,8 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
     const { data: programaciones } = await supabase
       .from("proyecto_programacion_financiera")
       .select("id, presupuesto_id")
+      .eq("proyecto_id", proyectoId)
+      .eq("empresa_id", empresaId)
       .in("presupuesto_id", ids);
 
     const map = new Map<string, { programacionId: string; pagos: PagoRow[] }>();
@@ -54,6 +56,7 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
       const { data: pagosData } = await supabase
         .from("proyecto_programacion_pagos")
         .select("id, programacion_id, fecha, monto, concepto, es_anticipo")
+        .eq("proyecto_id", proyectoId)
         .in("programacion_id", programacionIds)
         .order("fecha");
 

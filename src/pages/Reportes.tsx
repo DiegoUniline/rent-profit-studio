@@ -336,7 +336,7 @@ export default function Reportes() {
       // Get presupuesto IDs for the selected empresas
       let presQuery = supabase
         .from("presupuestos")
-        .select("id, es_project")
+        .select("id, es_project, empresa_id, centro_negocio_id")
         .eq("activo", true);
 
       if (empresaId !== "todas") {
@@ -354,6 +354,32 @@ export default function Reportes() {
 
       const ids = (presIds || []).map((p: any) => p.id);
       const idsProject = (presIds || []).filter((p: any) => p.es_project).map((p: any) => p.id);
+
+      // Alcance exacto presupuesto -> proyecto vigente, derivado por el centro
+      // único del proyecto. Sirve para rechazar relaciones históricas o cruzadas.
+      const proyectoEsperadoPorPresupuesto = new Map<string, string>();
+      if (idsProject.length > 0) {
+        const centrosProject = [...new Set(
+          (presIds || [])
+            .filter((p: any) => p.es_project && p.centro_negocio_id)
+            .map((p: any) => p.centro_negocio_id as string)
+        )];
+        if (centrosProject.length > 0) {
+          const { data: proyectosVigentes } = await supabase
+            .from("proyectos")
+            .select("id, empresa_id, centro_negocio_id")
+            .eq("activo", true)
+            .in("centro_negocio_id", centrosProject);
+          const proyectoPorCentro = new Map(
+            (proyectosVigentes || []).map((p: any) => [`${p.empresa_id}:${p.centro_negocio_id}`, p.id])
+          );
+          (presIds || []).forEach((p: any) => {
+            if (!p.es_project || !p.centro_negocio_id) return;
+            const proyectoId = proyectoPorCentro.get(`${p.empresa_id}:${p.centro_negocio_id}`);
+            if (proyectoId) proyectoEsperadoPorPresupuesto.set(p.id, proyectoId);
+          });
+        }
+      }
 
       let allFlujos: any[] = [];
       const PAGE_SIZE = 1000;
@@ -414,34 +440,44 @@ export default function Reportes() {
         }
       }
 
-      // Partidas convertidas en Proyecto (es_project=true) con programación
-      // financiera propia: esa es su única fuente de proyección (evita
-      // duplicar/desactualizar el flujo — misma regla que Project → Flujo
-      // mensual en ProyectoDetalle.tsx, ver resolverFlujosEfectivos).
+      // Toda partida convertida en Proyecto usa exclusivamente su programación
+      // propia. Si aún no existe, queda en $0 y no revive flujos legacy.
       const programacionesPorPartida = new Map<string, { pagos: { fecha: string; monto: number }[] }>();
       if (idsProject.length > 0) {
         const { data: programacionesData } = await supabase
           .from("proyecto_programacion_financiera")
-          .select("id, presupuesto_id")
+          .select("id, presupuesto_id, proyecto_id, empresa_id")
+          .in("empresa_id", empresaIds)
           .in("presupuesto_id", idsProject);
 
         if (programacionesData && programacionesData.length > 0) {
-          const programacionIds = programacionesData.map((p) => p.id);
+          const programacionesValidas = programacionesData.filter(
+            (p) => proyectoEsperadoPorPresupuesto.get(p.presupuesto_id) === p.proyecto_id
+          );
+          const programacionIds = programacionesValidas.map((p) => p.id);
+          if (programacionIds.length === 0) {
+            setFlujosProgramados(
+              resolverFlujosEfectivos(allFlujos, programacionesPorPartida, new Set(idsProject), new Set(ids))
+            );
+            return;
+          }
           const { data: pagosData } = await supabase
             .from("proyecto_programacion_pagos")
-            .select("programacion_id, fecha, monto")
+            .select("programacion_id, proyecto_id, fecha, monto")
             .in("programacion_id", programacionIds);
-          programacionesData.forEach((prog) => {
+          programacionesValidas.forEach((prog) => {
             programacionesPorPartida.set(prog.presupuesto_id, {
               pagos: (pagosData || [])
-                .filter((p) => p.programacion_id === prog.id)
+                .filter((p) => p.programacion_id === prog.id && p.proyecto_id === prog.proyecto_id)
                 .map((p) => ({ fecha: p.fecha, monto: Number(p.monto) })),
             });
           });
         }
       }
 
-      setFlujosProgramados(resolverFlujosEfectivos(allFlujos, programacionesPorPartida));
+      setFlujosProgramados(
+        resolverFlujosEfectivos(allFlujos, programacionesPorPartida, new Set(idsProject), new Set(ids))
+      );
     } catch (error: any) {
       console.error("Error loading flujos programados:", error);
     }
