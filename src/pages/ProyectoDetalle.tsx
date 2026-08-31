@@ -145,6 +145,7 @@ export default function ProyectoDetalle() {
   const [auditoria, setAuditoria] = useState<AuditoriaRow[]>([]);
 
   const [filtroResponsable, setFiltroResponsable] = useState<string>("todos");
+  const [filtroTipo, setFiltroTipo] = useState<FiltroTipoMovimiento>("todos");
   const [dialogPartida, setDialogPartida] = useState<PartidaSeguimiento | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [cronogramaDialogPartida, setCronogramaDialogPartida] = useState<CronogramaPartida | null>(null);
@@ -201,7 +202,7 @@ export default function ProyectoDetalle() {
       const { data: partidasData, error: partidasError } = await supabase
         .from("presupuestos")
         .select(`
-          id, partida, cantidad, precio_unitario, fecha_inicio, fecha_fin, avance_manual, es_project, responsable_tercero_id,
+          id, partida, cantidad, precio_unitario, fecha_inicio, fecha_fin, avance_manual, es_project, responsable_tercero_id, tipo_movimiento,
           cuenta:cuenta_id (codigo, nombre),
           responsable:terceros!presupuestos_responsable_tercero_id_fkey (razon_social)
         `)
