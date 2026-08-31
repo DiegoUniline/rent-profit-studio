@@ -41,6 +41,13 @@ import { useProyectoAcceso } from "@/lib/project-permissions";
 import { exportarCronogramaPDF, compartirCronogramaWhatsApp, compartirCronogramaCorreo } from "@/lib/cronograma-pdf";
 import { formatCurrency, Movimiento, AsientoContable } from "@/lib/accounting-utils";
 import {
+  FILTRO_TIPO_OPCIONES,
+  coincideFiltroTipo,
+  resumirPorTipoMovimiento,
+  type FiltroTipoMovimiento,
+  type TipoMovimientoValor,
+} from "@/lib/tipo-movimiento";
+import {
   calcularEjercidoPorPartida,
   calcularProyectadoPorPartida,
   calcularAvance,
@@ -78,6 +85,7 @@ interface PartidaRow {
   avance_manual: number | null;
   es_project: boolean;
   responsable_tercero_id: string | null;
+  tipo_movimiento: TipoMovimientoValor;
   cuenta: { codigo: string; nombre: string } | null;
   responsable: { razon_social: string } | null;
 }
