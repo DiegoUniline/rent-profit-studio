@@ -444,9 +444,9 @@ export default function Presupuestos() {
       const porEjercer = presupuestado - ejercido;
       const porcentaje = presupuestado > 0 ? (ejercido / presupuestado) * 100 : 0;
 
-      // Determine tipo ONLY from flujos_programados. If no flujo exists, tipo is undefined
-      // and the presupuesto is excluded from ingreso/egreso totals & grouping.
-      const tipo = tiposByPresupuesto[p.id];
+      // Fuente única de verdad: presupuestos.tipo_movimiento.
+      // null = pendiente de clasificar → no entra en los totales de flujo.
+      const tipo: TipoMovimientoValor = p.tipo_movimiento ?? null;
 
       return {
         ...p,
@@ -456,7 +456,7 @@ export default function Presupuestos() {
         tipo,
       };
     });
-  }, [presupuestos, movimientos, tiposByPresupuesto]);
+  }, [presupuestos, movimientos]);
 
   // Generate unique options for filters
   const filterOptions = useMemo(() => {
@@ -581,13 +581,16 @@ export default function Presupuestos() {
         case "tipo":
           if (!p.tipo) {
             groupKey = "sin-tipo";
-            groupLabel = "Sin clasificar (sin programación de flujo)";
+            groupLabel = PENDIENTE_LABEL;
           } else if (p.tipo === "ingreso") {
             groupKey = "tipo-ingreso";
             groupLabel = "Ingresos";
-          } else {
+          } else if (p.tipo === "egreso") {
             groupKey = "tipo-egreso";
             groupLabel = "Egresos";
+          } else {
+            groupKey = "tipo-no-afecta";
+            groupLabel = TIPO_MOVIMIENTO_LABELS.no_afecta;
           }
           break;
         case "partida":
