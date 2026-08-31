@@ -12,6 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  TIPO_MOVIMIENTO_OPCIONES,
+  type TipoMovimiento,
+} from "@/lib/tipo-movimiento";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -73,7 +77,9 @@ interface Presupuesto {
   fecha_fin: string | null;
   frecuencia: "semanal" | "mensual" | "bimestral" | "trimestral" | "semestral" | "anual" | null;
   es_project?: boolean;
+  tipo_movimiento?: TipoMovimiento | null;
 }
+
 
 interface PresupuestoDialogProps {
   open: boolean;
@@ -99,6 +105,7 @@ interface PresupuestoForm {
   cantidad: string;
   precio_unitario: string;
   notas: string;
+  tipo_movimiento: "" | TipoMovimiento;
 }
 
 interface FlujoRow {
@@ -119,7 +126,9 @@ const emptyForm: PresupuestoForm = {
   cantidad: "1",
   precio_unitario: "0",
   notas: "",
+  tipo_movimiento: "",
 };
+
 
 export function PresupuestoDialog({
   open,
