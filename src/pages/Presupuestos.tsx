@@ -634,10 +634,11 @@ export default function Presupuestos() {
       }
     });
     
-    // Sort presupuestos within each group: ingresos first, then egresos, then sin tipo; by orden within each
+    // Sort presupuestos within each group: ingresos, egresos, sin afectación y
+    // al final los pendientes de clasificar; por orden dentro de cada bloque.
     Object.values(groups).forEach(group => {
       group.presupuestos.sort((a: any, b: any) => {
-        const rank = (t: any) => (t === "ingreso" ? 0 : t === "egreso" ? 1 : 2);
+        const rank = (t: any) => (t === "ingreso" ? 0 : t === "egreso" ? 1 : t === "no_afecta" ? 2 : 3);
         const ra = rank(a.tipo);
         const rb = rank(b.tipo);
         if (ra !== rb) return ra - rb;
@@ -645,9 +646,9 @@ export default function Presupuestos() {
       });
     });
 
-    // Order groups: for "tipo" grouping, Ingresos > Egresos > Sin clasificar; otherwise alphabetical
+    // Order groups: for "tipo" grouping, Ingresos > Egresos > Sin afectación > Pendientes
     if (grouping === "tipo") {
-      const order = { "tipo-ingreso": 0, "tipo-egreso": 1, "sin-tipo": 2 } as Record<string, number>;
+      const order = { "tipo-ingreso": 0, "tipo-egreso": 1, "tipo-no-afecta": 2, "sin-tipo": 3 } as Record<string, number>;
       return Object.values(groups).sort((a, b) => (order[a.id] ?? 99) - (order[b.id] ?? 99));
     }
     return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label));
