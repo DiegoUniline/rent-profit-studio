@@ -122,7 +122,14 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
                 </TableRow>
                 {items.map((f) => (
                   <TableRow key={f.id}>
-                    <TableCell className="pl-8 text-sm">{f.partida}</TableCell>
+                    <TableCell className="pl-8 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span>{f.partida}</span>
+                        <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", claseTipoMovimiento(f.tipoMovimiento))}>
+                          {etiquetaTipoMovimiento(f.tipoMovimiento)}
+                        </Badge>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm">
                       {f.responsable || <span className="text-muted-foreground">Sin responsable</span>}
                     </TableCell>
