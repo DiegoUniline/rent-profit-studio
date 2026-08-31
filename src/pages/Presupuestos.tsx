@@ -128,11 +128,12 @@ interface Presupuesto {
   terceros?: Tercero;
   centros_negocio?: CentroNegocio;
   unidades_medida?: UnidadMedida;
+  tipo_movimiento: TipoMovimientoValor;
   // Calculated fields
   ejercido?: number;
   porEjercer?: number;
   porcentaje?: number;
-  tipo?: "ingreso" | "egreso";
+  tipo?: TipoMovimientoValor;
 }
 
 // Function to determine if account is "deudora" based on codigo
@@ -347,42 +348,8 @@ export default function Presupuestos() {
         }
       }
 
-      // Fetch flujos_programados to derive tipo (ingreso/egreso) per presupuesto
-      // Paginated to bypass the 1000-row Supabase limit
-      const flujosData: any[] = [];
-      {
-        const PAGE = 1000;
-        let f = 0;
-        let more = true;
-        while (more) {
-          const { data: batch } = await supabase
-            .from("flujos_programados")
-            .select("presupuesto_id, tipo, monto")
-            .not("presupuesto_id", "is", null)
-            .range(f, f + PAGE - 1);
-          if (batch && batch.length > 0) {
-            flujosData.push(...batch);
-            more = batch.length === PAGE;
-            f += PAGE;
-          } else {
-            more = false;
-          }
-        }
-      }
+      // El tipo de movimiento ya no se infiere: vive en presupuestos.tipo_movimiento.
 
-      const sumByPresupuesto: Record<string, { ingreso: number; egreso: number }> = {};
-      (flujosData || []).forEach((f: any) => {
-        if (!f.presupuesto_id) return;
-        if (!sumByPresupuesto[f.presupuesto_id]) sumByPresupuesto[f.presupuesto_id] = { ingreso: 0, egreso: 0 };
-        const monto = Number(f.monto) || 0;
-        if (f.tipo === "ingreso") sumByPresupuesto[f.presupuesto_id].ingreso += monto;
-        else sumByPresupuesto[f.presupuesto_id].egreso += monto;
-      });
-      const tipos: Record<string, "ingreso" | "egreso"> = {};
-      Object.entries(sumByPresupuesto).forEach(([id, s]) => {
-        tipos[id] = s.ingreso > s.egreso ? "ingreso" : "egreso";
-      });
-      setTiposByPresupuesto(tipos);
 
       setPresupuestos(presupuestosRes.data || []);
       setEmpresas(empresasRes.data || []);
