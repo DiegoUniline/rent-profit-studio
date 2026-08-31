@@ -468,6 +468,23 @@ export default function ProyectoDetalle() {
     };
   }, [partidasFiltradas, proyectadoAcumuladoMap, ejercidoMap]);
 
+  /**
+   * Flujo del Project por tipo de movimiento. La clasificación viene de
+   * presupuestos.tipo_movimiento (fuente única). Las partidas "No afecta el
+   * flujo" y las pendientes de clasificar no mueven el flujo neto.
+   */
+  const flujoPorTipo = useMemo(
+    () =>
+      resumirPorTipoMovimiento(
+        partidasFiltradas.map((p) => ({
+          tipoMovimiento: p.tipo_movimiento,
+          monto: calcularMontoPresupuestado(p.cantidad, p.precio_unitario),
+        }))
+      ),
+    [partidasFiltradas]
+  );
+
+
   const indicadores = useMemo(() => {
     const hoy = new Date();
     // Una partida no se considera vencida si ya está al 100% (avance manual
