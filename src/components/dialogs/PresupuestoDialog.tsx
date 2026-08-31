@@ -12,6 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  TIPO_MOVIMIENTO_OPCIONES,
+  type TipoMovimiento,
+} from "@/lib/tipo-movimiento";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -73,7 +77,9 @@ interface Presupuesto {
   fecha_fin: string | null;
   frecuencia: "semanal" | "mensual" | "bimestral" | "trimestral" | "semestral" | "anual" | null;
   es_project?: boolean;
+  tipo_movimiento?: TipoMovimiento | null;
 }
+
 
 interface PresupuestoDialogProps {
   open: boolean;
@@ -99,6 +105,7 @@ interface PresupuestoForm {
   cantidad: string;
   precio_unitario: string;
   notas: string;
+  tipo_movimiento: "" | TipoMovimiento;
 }
 
 interface FlujoRow {
@@ -119,7 +126,9 @@ const emptyForm: PresupuestoForm = {
   cantidad: "1",
   precio_unitario: "0",
   notas: "",
+  tipo_movimiento: "",
 };
+
 
 export function PresupuestoDialog({
   open,
@@ -181,6 +190,7 @@ export function PresupuestoDialog({
           cantidad: String(presupuesto.cantidad),
           precio_unitario: String(presupuesto.precio_unitario),
           notas: presupuesto.notas || "",
+          tipo_movimiento: presupuesto.tipo_movimiento ?? "",
         });
         if (presupuesto.id) {
           loadFlujoRows(presupuesto.id);
@@ -394,6 +404,16 @@ export function PresupuestoDialog({
       return;
     }
 
+    if (!form.tipo_movimiento) {
+      toast({
+        title: "Tipo de movimiento requerido",
+        description: "Indica si la partida es Ingreso, Egreso o No afecta el flujo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+
     setSaving(true);
     try {
       const data = {
@@ -405,6 +425,7 @@ export function PresupuestoDialog({
         cantidad,
         precio_unitario,
         notas: form.notas || null,
+        tipo_movimiento: form.tipo_movimiento || null,
         // fecha_inicio/fecha_fin/frecuencia no se tocan aquí: los administra
         // el módulo Project (seguimiento por partida). No pisar esos valores.
       };
@@ -596,6 +617,32 @@ export function PresupuestoDialog({
                 createLabel="Nuevo centro"
               />
             </div>
+
+            {/* Tipo de movimiento: fuente única de verdad del flujo */}
+            <div className="space-y-2">
+              <Label htmlFor="tipo_movimiento">Tipo de movimiento *</Label>
+              <Select
+                value={form.tipo_movimiento || undefined}
+                onValueChange={(value: TipoMovimiento) => setForm({ ...form, tipo_movimiento: value })}
+              >
+                <SelectTrigger id="tipo_movimiento">
+                  <SelectValue placeholder="Pendiente de clasificar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPO_MOVIMIENTO_OPCIONES.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Determina cómo afecta esta partida al flujo del proyecto: el ingreso suma, el egreso resta y
+                "No afecta el flujo" solo aparece en la operación.
+              </p>
+            </div>
+
+
 
             {/* Unidad de Medida + Cantidad + Precio */}
             <div className="grid grid-cols-3 gap-4">

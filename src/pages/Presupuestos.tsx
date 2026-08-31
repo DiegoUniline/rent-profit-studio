@@ -45,6 +45,7 @@ import {
 import { PresupuestoDialog } from "@/components/dialogs/PresupuestoDialog";
 import { SortablePresupuestoRow } from "@/components/presupuestos/SortablePresupuestoRow";
 import { calcularMontoPresupuestado } from "@/lib/project-utils";
+import { TIPO_MOVIMIENTO_LABELS, PENDIENTE_LABEL, type TipoMovimientoValor } from "@/lib/tipo-movimiento";
 import {
   DndContext,
   closestCenter,
@@ -128,11 +129,12 @@ interface Presupuesto {
   terceros?: Tercero;
   centros_negocio?: CentroNegocio;
   unidades_medida?: UnidadMedida;
+  tipo_movimiento: TipoMovimientoValor;
   // Calculated fields
   ejercido?: number;
   porEjercer?: number;
   porcentaje?: number;
-  tipo?: "ingreso" | "egreso";
+  tipo?: TipoMovimientoValor;
 }
 
 // Function to determine if account is "deudora" based on codigo
@@ -197,7 +199,7 @@ export default function Presupuestos() {
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [movimientos, setMovimientos] = useState<MovimientoConAsiento[]>([]);
-  const [tiposByPresupuesto, setTiposByPresupuesto] = useState<Record<string, "ingreso" | "egreso">>({});
+  
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(() => localStorage.getItem("presupuestos_filter_search") || "");
   const [filterCompany, setFilterCompany] = useState<string>(() => localStorage.getItem("presupuestos_filter_company") || "all");
@@ -347,42 +349,8 @@ export default function Presupuestos() {
         }
       }
 
-      // Fetch flujos_programados to derive tipo (ingreso/egreso) per presupuesto
-      // Paginated to bypass the 1000-row Supabase limit
-      const flujosData: any[] = [];
-      {
-        const PAGE = 1000;
-        let f = 0;
-        let more = true;
-        while (more) {
-          const { data: batch } = await supabase
-            .from("flujos_programados")
-            .select("presupuesto_id, tipo, monto")
-            .not("presupuesto_id", "is", null)
-            .range(f, f + PAGE - 1);
-          if (batch && batch.length > 0) {
-            flujosData.push(...batch);
-            more = batch.length === PAGE;
-            f += PAGE;
-          } else {
-            more = false;
-          }
-        }
-      }
+      // El tipo de movimiento ya no se infiere: vive en presupuestos.tipo_movimiento.
 
-      const sumByPresupuesto: Record<string, { ingreso: number; egreso: number }> = {};
-      (flujosData || []).forEach((f: any) => {
-        if (!f.presupuesto_id) return;
-        if (!sumByPresupuesto[f.presupuesto_id]) sumByPresupuesto[f.presupuesto_id] = { ingreso: 0, egreso: 0 };
-        const monto = Number(f.monto) || 0;
-        if (f.tipo === "ingreso") sumByPresupuesto[f.presupuesto_id].ingreso += monto;
-        else sumByPresupuesto[f.presupuesto_id].egreso += monto;
-      });
-      const tipos: Record<string, "ingreso" | "egreso"> = {};
-      Object.entries(sumByPresupuesto).forEach(([id, s]) => {
-        tipos[id] = s.ingreso > s.egreso ? "ingreso" : "egreso";
-      });
-      setTiposByPresupuesto(tipos);
 
       setPresupuestos(presupuestosRes.data || []);
       setEmpresas(empresasRes.data || []);
@@ -476,9 +444,9 @@ export default function Presupuestos() {
       const porEjercer = presupuestado - ejercido;
       const porcentaje = presupuestado > 0 ? (ejercido / presupuestado) * 100 : 0;
 
-      // Determine tipo ONLY from flujos_programados. If no flujo exists, tipo is undefined
-      // and the presupuesto is excluded from ingreso/egreso totals & grouping.
-      const tipo = tiposByPresupuesto[p.id];
+      // Fuente única de verdad: presupuestos.tipo_movimiento.
+      // null = pendiente de clasificar → no entra en los totales de flujo.
+      const tipo: TipoMovimientoValor = p.tipo_movimiento ?? null;
 
       return {
         ...p,
@@ -488,7 +456,7 @@ export default function Presupuestos() {
         tipo,
       };
     });
-  }, [presupuestos, movimientos, tiposByPresupuesto]);
+  }, [presupuestos, movimientos]);
 
   // Generate unique options for filters
   const filterOptions = useMemo(() => {
@@ -613,13 +581,16 @@ export default function Presupuestos() {
         case "tipo":
           if (!p.tipo) {
             groupKey = "sin-tipo";
-            groupLabel = "Sin clasificar (sin programación de flujo)";
+            groupLabel = PENDIENTE_LABEL;
           } else if (p.tipo === "ingreso") {
             groupKey = "tipo-ingreso";
             groupLabel = "Ingresos";
-          } else {
+          } else if (p.tipo === "egreso") {
             groupKey = "tipo-egreso";
             groupLabel = "Egresos";
+          } else {
+            groupKey = "tipo-no-afecta";
+            groupLabel = TIPO_MOVIMIENTO_LABELS.no_afecta;
           }
           break;
         case "partida":
@@ -663,10 +634,11 @@ export default function Presupuestos() {
       }
     });
     
-    // Sort presupuestos within each group: ingresos first, then egresos, then sin tipo; by orden within each
+    // Sort presupuestos within each group: ingresos, egresos, sin afectación y
+    // al final los pendientes de clasificar; por orden dentro de cada bloque.
     Object.values(groups).forEach(group => {
       group.presupuestos.sort((a: any, b: any) => {
-        const rank = (t: any) => (t === "ingreso" ? 0 : t === "egreso" ? 1 : 2);
+        const rank = (t: any) => (t === "ingreso" ? 0 : t === "egreso" ? 1 : t === "no_afecta" ? 2 : 3);
         const ra = rank(a.tipo);
         const rb = rank(b.tipo);
         if (ra !== rb) return ra - rb;
@@ -674,9 +646,9 @@ export default function Presupuestos() {
       });
     });
 
-    // Order groups: for "tipo" grouping, Ingresos > Egresos > Sin clasificar; otherwise alphabetical
+    // Order groups: for "tipo" grouping, Ingresos > Egresos > Sin afectación > Pendientes
     if (grouping === "tipo") {
-      const order = { "tipo-ingreso": 0, "tipo-egreso": 1, "sin-tipo": 2 } as Record<string, number>;
+      const order = { "tipo-ingreso": 0, "tipo-egreso": 1, "tipo-no-afecta": 2, "sin-tipo": 3 } as Record<string, number>;
       return Object.values(groups).sort((a, b) => (order[a.id] ?? 99) - (order[b.id] ?? 99));
     }
     return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label));

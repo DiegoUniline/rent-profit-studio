@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -413,6 +413,9 @@ export type Database = {
           precio_unitario: number
           responsable_tercero_id: string | null
           tercero_id: string | null
+          tipo_movimiento:
+            | Database["public"]["Enums"]["tipo_movimiento_flujo"]
+            | null
           unidad_medida_id: string | null
           updated_at: string
         }
@@ -437,6 +440,9 @@ export type Database = {
           precio_unitario?: number
           responsable_tercero_id?: string | null
           tercero_id?: string | null
+          tipo_movimiento?:
+            | Database["public"]["Enums"]["tipo_movimiento_flujo"]
+            | null
           unidad_medida_id?: string | null
           updated_at?: string
         }
@@ -461,6 +467,9 @@ export type Database = {
           precio_unitario?: number
           responsable_tercero_id?: string | null
           tercero_id?: string | null
+          tipo_movimiento?:
+            | Database["public"]["Enums"]["tipo_movimiento_flujo"]
+            | null
           unidad_medida_id?: string | null
           updated_at?: string
         }
@@ -641,7 +650,8 @@ export type Database = {
           created_at: string
           entidad_id: string | null
           id: string
-          proyecto_id: string
+          presupuesto_id: string | null
+          proyecto_id: string | null
           user_id: string
           valor_anterior: string | null
           valor_nuevo: string | null
@@ -651,7 +661,8 @@ export type Database = {
           created_at?: string
           entidad_id?: string | null
           id?: string
-          proyecto_id: string
+          presupuesto_id?: string | null
+          proyecto_id?: string | null
           user_id: string
           valor_anterior?: string | null
           valor_nuevo?: string | null
@@ -661,12 +672,20 @@ export type Database = {
           created_at?: string
           entidad_id?: string | null
           id?: string
-          proyecto_id?: string
+          presupuesto_id?: string | null
+          proyecto_id?: string | null
           user_id?: string
           valor_anterior?: string | null
           valor_nuevo?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "proyecto_auditoria_presupuesto_id_fkey"
+            columns: ["presupuesto_id"]
+            isOneToOne: false
+            referencedRelation: "presupuestos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "proyecto_auditoria_proyecto_id_fkey"
             columns: ["proyecto_id"]
@@ -1249,6 +1268,7 @@ export type Database = {
       programacion_proyecto_modo: "automatica" | "manual"
       tarea_estado: "pendiente" | "en_progreso" | "bloqueada" | "hecho"
       tipo_asiento: "ingreso" | "egreso" | "diario"
+      tipo_movimiento_flujo: "ingreso" | "egreso" | "no_afecta"
       tipo_persona: "fisica" | "moral"
       tipo_programacion: "ingreso" | "egreso"
     }
@@ -1403,6 +1423,7 @@ export const Constants = {
       programacion_proyecto_modo: ["automatica", "manual"],
       tarea_estado: ["pendiente", "en_progreso", "bloqueada", "hecho"],
       tipo_asiento: ["ingreso", "egreso", "diario"],
+      tipo_movimiento_flujo: ["ingreso", "egreso", "no_afecta"],
       tipo_persona: ["fisica", "moral"],
       tipo_programacion: ["ingreso", "egreso"],
     },

@@ -41,6 +41,13 @@ import { useProyectoAcceso } from "@/lib/project-permissions";
 import { exportarCronogramaPDF, compartirCronogramaWhatsApp, compartirCronogramaCorreo } from "@/lib/cronograma-pdf";
 import { formatCurrency, Movimiento, AsientoContable } from "@/lib/accounting-utils";
 import {
+  FILTRO_TIPO_OPCIONES,
+  coincideFiltroTipo,
+  resumirPorTipoMovimiento,
+  type FiltroTipoMovimiento,
+  type TipoMovimientoValor,
+} from "@/lib/tipo-movimiento";
+import {
   calcularEjercidoPorPartida,
   calcularProyectadoPorPartida,
   calcularAvance,
@@ -66,6 +73,10 @@ import {
   Settings2,
   Wand2,
   History,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  Scale,
+  AlertTriangle,
 } from "lucide-react";
 
 interface PartidaRow {
@@ -78,6 +89,7 @@ interface PartidaRow {
   avance_manual: number | null;
   es_project: boolean;
   responsable_tercero_id: string | null;
+  tipo_movimiento: TipoMovimientoValor;
   cuenta: { codigo: string; nombre: string } | null;
   responsable: { razon_social: string } | null;
 }
@@ -137,6 +149,7 @@ export default function ProyectoDetalle() {
   const [auditoria, setAuditoria] = useState<AuditoriaRow[]>([]);
 
   const [filtroResponsable, setFiltroResponsable] = useState<string>("todos");
+  const [filtroTipo, setFiltroTipo] = useState<FiltroTipoMovimiento>("todos");
   const [dialogPartida, setDialogPartida] = useState<PartidaSeguimiento | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [cronogramaDialogPartida, setCronogramaDialogPartida] = useState<CronogramaPartida | null>(null);
@@ -193,7 +206,7 @@ export default function ProyectoDetalle() {
       const { data: partidasData, error: partidasError } = await supabase
         .from("presupuestos")
         .select(`
-          id, partida, cantidad, precio_unitario, fecha_inicio, fecha_fin, avance_manual, es_project, responsable_tercero_id,
+          id, partida, cantidad, precio_unitario, fecha_inicio, fecha_fin, avance_manual, es_project, responsable_tercero_id, tipo_movimiento,
           cuenta:cuenta_id (codigo, nombre),
           responsable:terceros!presupuestos_responsable_tercero_id_fkey (razon_social)
         `)
@@ -417,10 +430,13 @@ export default function ProyectoDetalle() {
   }, [partidasProject]);
 
   const partidasFiltradas = useMemo(() => {
-    if (filtroResponsable === "todos") return partidasProject;
-    if (filtroResponsable === "sin_responsable") return partidasProject.filter((p) => !p.responsable_tercero_id);
-    return partidasProject.filter((p) => p.responsable_tercero_id === filtroResponsable);
-  }, [partidasProject, filtroResponsable]);
+    return partidasProject.filter((p) => {
+      if (!coincideFiltroTipo(p.tipo_movimiento, filtroTipo)) return false;
+      if (filtroResponsable === "todos") return true;
+      if (filtroResponsable === "sin_responsable") return !p.responsable_tercero_id;
+      return p.responsable_tercero_id === filtroResponsable;
+    });
+  }, [partidasProject, filtroResponsable, filtroTipo]);
 
   const ejercidoMap = useMemo(() => calcularEjercidoPorPartida(movimientos as any, asientos), [movimientos, asientos]);
 
@@ -455,6 +471,23 @@ export default function ProyectoDetalle() {
       avance: calcularAvance(ejercido, presupuesto),
     };
   }, [partidasFiltradas, proyectadoAcumuladoMap, ejercidoMap]);
+
+  /**
+   * Flujo del Project por tipo de movimiento. La clasificación viene de
+   * presupuestos.tipo_movimiento (fuente única). Las partidas "No afecta el
+   * flujo" y las pendientes de clasificar no mueven el flujo neto.
+   */
+  const flujoPorTipo = useMemo(
+    () =>
+      resumirPorTipoMovimiento(
+        partidasFiltradas.map((p) => ({
+          tipoMovimiento: p.tipo_movimiento,
+          monto: calcularMontoPresupuestado(p.cantidad, p.precio_unitario),
+        }))
+      ),
+    [partidasFiltradas]
+  );
+
 
   const indicadores = useMemo(() => {
     const hoy = new Date();
@@ -503,6 +536,7 @@ export default function ProyectoDetalle() {
       return {
         id: p.id,
         partida: p.partida,
+        tipoMovimiento: p.tipo_movimiento,
         cuentaCodigo: p.cuenta?.codigo || "",
         cuentaNombre: p.cuenta?.nombre || "Sin cuenta",
         responsable: p.responsable?.razon_social || null,
@@ -695,6 +729,66 @@ export default function ProyectoDetalle() {
         </Card>
       </div>
 
+      {/* Flujo por tipo de movimiento (fuente: presupuestos.tipo_movimiento) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="overflow-hidden">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Ingresos</p>
+              <ArrowUpCircle className="h-4 w-4 text-green-500/70" />
+            </div>
+            <p className="text-lg font-bold tabular-nums text-green-600 dark:text-green-400">
+              {formatCurrency(flujoPorTipo.ingresos)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="overflow-hidden">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Egresos</p>
+              <ArrowDownCircle className="h-4 w-4 text-red-500/70" />
+            </div>
+            <p className="text-lg font-bold tabular-nums text-red-600 dark:text-red-400">
+              {formatCurrency(flujoPorTipo.egresos)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="overflow-hidden">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Flujo neto</p>
+              <Scale className={`h-4 w-4 ${flujoPorTipo.flujoNeto >= 0 ? "text-green-500/70" : "text-red-500/70"}`} />
+            </div>
+            <p
+              className={`text-lg font-bold tabular-nums ${flujoPorTipo.flujoNeto >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+            >
+              {formatCurrency(flujoPorTipo.flujoNeto)}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Sin afectación: {formatCurrency(flujoPorTipo.sinAfectacion)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card
+          className={`overflow-hidden ${flujoPorTipo.pendientesCount > 0 ? "border-amber-300 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/20" : ""}`}
+        >
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Pendientes de clasificar</p>
+              <AlertTriangle
+                className={`h-4 w-4 ${flujoPorTipo.pendientesCount > 0 ? "text-amber-500" : "text-muted-foreground/60"}`}
+              />
+            </div>
+            <p className="text-lg font-bold tabular-nums">{flujoPorTipo.pendientesCount}</p>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              {formatCurrency(flujoPorTipo.pendientesMonto)} sin afectar el flujo
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+
+
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="resumen" className="gap-1.5">
@@ -733,7 +827,21 @@ export default function ProyectoDetalle() {
             <Badge variant="outline" className={indicadores.vencidas > 0 ? "text-red-600 border-red-300" : ""}>
               {indicadores.vencidas} vencidas
             </Badge>
-            <div className="ml-auto w-full sm:w-64">
+            <div className="ml-auto w-full sm:w-52">
+              <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as FiltroTipoMovimiento)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo de movimiento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FILTRO_TIPO_OPCIONES.map((op) => (
+                    <SelectItem key={op.value} value={op.value}>
+                      {op.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full sm:w-64">
               <Select value={filtroResponsable} onValueChange={setFiltroResponsable}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filtrar por responsable" />

@@ -15,6 +15,11 @@ import { formatCurrency } from "@/lib/accounting-utils";
 import { agregarFinanciero } from "@/lib/project-utils";
 import { cn } from "@/lib/utils";
 import { Pencil } from "lucide-react";
+import {
+  claseTipoMovimiento,
+  etiquetaTipoMovimiento,
+  type TipoMovimientoValor,
+} from "@/lib/tipo-movimiento";
 
 export interface FilaResumenPartida {
   id: string;
@@ -30,6 +35,7 @@ export interface FilaResumenPartida {
   avance: number;
   pendienteAjustar: boolean;
   vencida: boolean;
+  tipoMovimiento?: TipoMovimientoValor;
 }
 
 interface Props {
@@ -116,7 +122,14 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
                 </TableRow>
                 {items.map((f) => (
                   <TableRow key={f.id}>
-                    <TableCell className="pl-8 text-sm">{f.partida}</TableCell>
+                    <TableCell className="pl-8 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span>{f.partida}</span>
+                        <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", claseTipoMovimiento(f.tipoMovimiento))}>
+                          {etiquetaTipoMovimiento(f.tipoMovimiento)}
+                        </Badge>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm">
                       {f.responsable || <span className="text-muted-foreground">Sin responsable</span>}
                     </TableCell>
