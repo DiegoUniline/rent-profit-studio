@@ -618,6 +618,32 @@ export function PresupuestoDialog({
               />
             </div>
 
+            {/* Tipo de movimiento: fuente única de verdad del flujo */}
+            <div className="space-y-2">
+              <Label htmlFor="tipo_movimiento">Tipo de movimiento *</Label>
+              <Select
+                value={form.tipo_movimiento || undefined}
+                onValueChange={(value: TipoMovimiento) => setForm({ ...form, tipo_movimiento: value })}
+              >
+                <SelectTrigger id="tipo_movimiento">
+                  <SelectValue placeholder="Pendiente de clasificar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPO_MOVIMIENTO_OPCIONES.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Determina cómo afecta esta partida al flujo del proyecto: el ingreso suma, el egreso resta y
+                "No afecta el flujo" solo aparece en la operación.
+              </p>
+            </div>
+
+
+
             {/* Unidad de Medida + Cantidad + Precio */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
