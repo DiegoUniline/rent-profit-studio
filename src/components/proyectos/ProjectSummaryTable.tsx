@@ -15,6 +15,11 @@ import { formatCurrency } from "@/lib/accounting-utils";
 import { agregarFinanciero } from "@/lib/project-utils";
 import { cn } from "@/lib/utils";
 import { Pencil } from "lucide-react";
+import {
+  claseTipoMovimiento,
+  etiquetaTipoMovimiento,
+  type TipoMovimientoValor,
+} from "@/lib/tipo-movimiento";
 
 export interface FilaResumenPartida {
   id: string;
@@ -30,6 +35,7 @@ export interface FilaResumenPartida {
   avance: number;
   pendienteAjustar: boolean;
   vencida: boolean;
+  tipoMovimiento?: TipoMovimientoValor;
 }
 
 interface Props {
