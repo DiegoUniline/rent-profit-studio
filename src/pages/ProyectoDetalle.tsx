@@ -826,7 +826,21 @@ export default function ProyectoDetalle() {
             <Badge variant="outline" className={indicadores.vencidas > 0 ? "text-red-600 border-red-300" : ""}>
               {indicadores.vencidas} vencidas
             </Badge>
-            <div className="ml-auto w-full sm:w-64">
+            <div className="ml-auto w-full sm:w-52">
+              <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as FiltroTipoMovimiento)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo de movimiento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FILTRO_TIPO_OPCIONES.map((op) => (
+                    <SelectItem key={op.value} value={op.value}>
+                      {op.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full sm:w-64">
               <Select value={filtroResponsable} onValueChange={setFiltroResponsable}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filtrar por responsable" />
