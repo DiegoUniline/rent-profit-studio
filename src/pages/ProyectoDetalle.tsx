@@ -536,6 +536,7 @@ export default function ProyectoDetalle() {
       return {
         id: p.id,
         partida: p.partida,
+        tipoMovimiento: p.tipo_movimiento,
         cuentaCodigo: p.cuenta?.codigo || "",
         cuentaNombre: p.cuenta?.nombre || "Sin cuenta",
         responsable: p.responsable?.razon_social || null,
