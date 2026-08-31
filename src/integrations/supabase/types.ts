@@ -413,6 +413,9 @@ export type Database = {
           precio_unitario: number
           responsable_tercero_id: string | null
           tercero_id: string | null
+          tipo_movimiento:
+            | Database["public"]["Enums"]["tipo_movimiento_flujo"]
+            | null
           unidad_medida_id: string | null
           updated_at: string
         }
@@ -437,6 +440,9 @@ export type Database = {
           precio_unitario?: number
           responsable_tercero_id?: string | null
           tercero_id?: string | null
+          tipo_movimiento?:
+            | Database["public"]["Enums"]["tipo_movimiento_flujo"]
+            | null
           unidad_medida_id?: string | null
           updated_at?: string
         }
@@ -461,6 +467,9 @@ export type Database = {
           precio_unitario?: number
           responsable_tercero_id?: string | null
           tercero_id?: string | null
+          tipo_movimiento?:
+            | Database["public"]["Enums"]["tipo_movimiento_flujo"]
+            | null
           unidad_medida_id?: string | null
           updated_at?: string
         }
@@ -1259,6 +1268,7 @@ export type Database = {
       programacion_proyecto_modo: "automatica" | "manual"
       tarea_estado: "pendiente" | "en_progreso" | "bloqueada" | "hecho"
       tipo_asiento: "ingreso" | "egreso" | "diario"
+      tipo_movimiento_flujo: "ingreso" | "egreso" | "no_afecta"
       tipo_persona: "fisica" | "moral"
       tipo_programacion: "ingreso" | "egreso"
     }
@@ -1413,6 +1423,7 @@ export const Constants = {
       programacion_proyecto_modo: ["automatica", "manual"],
       tarea_estado: ["pendiente", "en_progreso", "bloqueada", "hecho"],
       tipo_asiento: ["ingreso", "egreso", "diario"],
+      tipo_movimiento_flujo: ["ingreso", "egreso", "no_afecta"],
       tipo_persona: ["fisica", "moral"],
       tipo_programacion: ["ingreso", "egreso"],
     },
