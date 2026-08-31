@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -641,7 +641,8 @@ export type Database = {
           created_at: string
           entidad_id: string | null
           id: string
-          proyecto_id: string
+          presupuesto_id: string | null
+          proyecto_id: string | null
           user_id: string
           valor_anterior: string | null
           valor_nuevo: string | null
@@ -651,7 +652,8 @@ export type Database = {
           created_at?: string
           entidad_id?: string | null
           id?: string
-          proyecto_id: string
+          presupuesto_id?: string | null
+          proyecto_id?: string | null
           user_id: string
           valor_anterior?: string | null
           valor_nuevo?: string | null
@@ -661,12 +663,20 @@ export type Database = {
           created_at?: string
           entidad_id?: string | null
           id?: string
-          proyecto_id?: string
+          presupuesto_id?: string | null
+          proyecto_id?: string | null
           user_id?: string
           valor_anterior?: string | null
           valor_nuevo?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "proyecto_auditoria_presupuesto_id_fkey"
+            columns: ["presupuesto_id"]
+            isOneToOne: false
+            referencedRelation: "presupuestos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "proyecto_auditoria_proyecto_id_fkey"
             columns: ["proyecto_id"]
