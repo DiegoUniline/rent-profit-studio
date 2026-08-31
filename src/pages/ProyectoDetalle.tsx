@@ -426,10 +426,13 @@ export default function ProyectoDetalle() {
   }, [partidasProject]);
 
   const partidasFiltradas = useMemo(() => {
-    if (filtroResponsable === "todos") return partidasProject;
-    if (filtroResponsable === "sin_responsable") return partidasProject.filter((p) => !p.responsable_tercero_id);
-    return partidasProject.filter((p) => p.responsable_tercero_id === filtroResponsable);
-  }, [partidasProject, filtroResponsable]);
+    return partidasProject.filter((p) => {
+      if (!coincideFiltroTipo(p.tipo_movimiento, filtroTipo)) return false;
+      if (filtroResponsable === "todos") return true;
+      if (filtroResponsable === "sin_responsable") return !p.responsable_tercero_id;
+      return p.responsable_tercero_id === filtroResponsable;
+    });
+  }, [partidasProject, filtroResponsable, filtroTipo]);
 
   const ejercidoMap = useMemo(() => calcularEjercidoPorPartida(movimientos as any, asientos), [movimientos, asientos]);
 
