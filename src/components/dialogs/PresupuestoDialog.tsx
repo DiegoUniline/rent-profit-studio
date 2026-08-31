@@ -190,6 +190,7 @@ export function PresupuestoDialog({
           cantidad: String(presupuesto.cantidad),
           precio_unitario: String(presupuesto.precio_unitario),
           notas: presupuesto.notas || "",
+          tipo_movimiento: presupuesto.tipo_movimiento ?? "",
         });
         if (presupuesto.id) {
           loadFlujoRows(presupuesto.id);
@@ -414,6 +415,7 @@ export function PresupuestoDialog({
         cantidad,
         precio_unitario,
         notas: form.notas || null,
+        tipo_movimiento: form.tipo_movimiento || null,
         // fecha_inicio/fecha_fin/frecuencia no se tocan aquí: los administra
         // el módulo Project (seguimiento por partida). No pisar esos valores.
       };
