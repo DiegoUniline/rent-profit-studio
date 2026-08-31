@@ -404,6 +404,16 @@ export function PresupuestoDialog({
       return;
     }
 
+    if (!form.tipo_movimiento) {
+      toast({
+        title: "Tipo de movimiento requerido",
+        description: "Indica si la partida es Ingreso, Egreso o No afecta el flujo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+
     setSaving(true);
     try {
       const data = {
