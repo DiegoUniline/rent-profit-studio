@@ -73,6 +73,10 @@ import {
   Settings2,
   Wand2,
   History,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  Scale,
+  AlertTriangle,
 } from "lucide-react";
 
 interface PartidaRow {
@@ -723,6 +727,66 @@ export default function ProyectoDetalle() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Flujo por tipo de movimiento (fuente: presupuestos.tipo_movimiento) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="overflow-hidden">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Ingresos</p>
+              <ArrowUpCircle className="h-4 w-4 text-green-500/70" />
+            </div>
+            <p className="text-lg font-bold tabular-nums text-green-600 dark:text-green-400">
+              {formatCurrency(flujoPorTipo.ingresos)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="overflow-hidden">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Egresos</p>
+              <ArrowDownCircle className="h-4 w-4 text-red-500/70" />
+            </div>
+            <p className="text-lg font-bold tabular-nums text-red-600 dark:text-red-400">
+              {formatCurrency(flujoPorTipo.egresos)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="overflow-hidden">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Flujo neto</p>
+              <Scale className={`h-4 w-4 ${flujoPorTipo.flujoNeto >= 0 ? "text-green-500/70" : "text-red-500/70"}`} />
+            </div>
+            <p
+              className={`text-lg font-bold tabular-nums ${flujoPorTipo.flujoNeto >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+            >
+              {formatCurrency(flujoPorTipo.flujoNeto)}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Sin afectación: {formatCurrency(flujoPorTipo.sinAfectacion)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card
+          className={`overflow-hidden ${flujoPorTipo.pendientesCount > 0 ? "border-amber-300 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/20" : ""}`}
+        >
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">Pendientes de clasificar</p>
+              <AlertTriangle
+                className={`h-4 w-4 ${flujoPorTipo.pendientesCount > 0 ? "text-amber-500" : "text-muted-foreground/60"}`}
+              />
+            </div>
+            <p className="text-lg font-bold tabular-nums">{flujoPorTipo.pendientesCount}</p>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              {formatCurrency(flujoPorTipo.pendientesMonto)} sin afectar el flujo
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
         <TabsList className="flex-wrap h-auto">
