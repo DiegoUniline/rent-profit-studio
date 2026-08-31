@@ -45,6 +45,7 @@ import {
 import { PresupuestoDialog } from "@/components/dialogs/PresupuestoDialog";
 import { SortablePresupuestoRow } from "@/components/presupuestos/SortablePresupuestoRow";
 import { calcularMontoPresupuestado } from "@/lib/project-utils";
+import { TIPO_MOVIMIENTO_LABELS, PENDIENTE_LABEL, type TipoMovimientoValor } from "@/lib/tipo-movimiento";
 import {
   DndContext,
   closestCenter,
@@ -198,7 +199,7 @@ export default function Presupuestos() {
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [movimientos, setMovimientos] = useState<MovimientoConAsiento[]>([]);
-  const [tiposByPresupuesto, setTiposByPresupuesto] = useState<Record<string, "ingreso" | "egreso">>({});
+  
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(() => localStorage.getItem("presupuestos_filter_search") || "");
   const [filterCompany, setFilterCompany] = useState<string>(() => localStorage.getItem("presupuestos_filter_company") || "all");
