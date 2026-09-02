@@ -131,6 +131,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
           fecha_inicio: fechaInicio ? format(fechaInicio, "yyyy-MM-dd") : null,
           fecha_fin: fechaFin ? format(fechaFin, "yyyy-MM-dd") : null,
           avance_manual: avanceValor.trim() === "" ? null : Math.min(100, Math.max(0, parseFloat(avanceValor) || 0)),
+          tipo_movimiento: tipoMovimiento,
         })
         .eq("id", partida.id);
       if (updateError) throw updateError;
