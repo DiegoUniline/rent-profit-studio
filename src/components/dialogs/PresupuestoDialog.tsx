@@ -12,8 +12,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   TIPO_MOVIMIENTO_OPCIONES,
+  claseTipoMovimiento,
   type TipoMovimiento,
 } from "@/lib/tipo-movimiento";
 import { Textarea } from "@/components/ui/textarea";
@@ -620,22 +622,27 @@ export function PresupuestoDialog({
 
             {/* Tipo de movimiento: fuente única de verdad del flujo */}
             <div className="space-y-2">
-              <Label htmlFor="tipo_movimiento">Tipo de movimiento *</Label>
-              <Select
-                value={form.tipo_movimiento || undefined}
-                onValueChange={(value: TipoMovimiento) => setForm({ ...form, tipo_movimiento: value })}
-              >
-                <SelectTrigger id="tipo_movimiento">
-                  <SelectValue placeholder="Pendiente de clasificar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIPO_MOVIMIENTO_OPCIONES.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
+              <Label>Tipo de movimiento *</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {TIPO_MOVIMIENTO_OPCIONES.map((o) => {
+                  const selected = form.tipo_movimiento === o.value;
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, tipo_movimiento: o.value })}
+                      className={cn(
+                        "px-3 py-2 text-sm font-medium rounded-md border transition-colors text-center",
+                        selected
+                          ? claseTipoMovimiento(o.value)
+                          : "bg-background border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                    >
                       {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </button>
+                  );
+                })}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Determina cómo afecta esta partida al flujo del proyecto: el ingreso suma, el egreso resta y
                 "No afecta el flujo" solo aparece en la operación.
