@@ -603,6 +603,7 @@ export default function ProyectoDetalle() {
       cuenta_codigo: p.cuenta?.codigo,
       cuenta_nombre: p.cuenta?.nombre,
       responsable_tercero_id: p.responsable_tercero_id,
+      tipo_movimiento: p.tipo_movimiento,
       fecha_inicio: p.fecha_inicio,
       fecha_fin: p.fecha_fin,
       avance_manual: p.avance_manual,

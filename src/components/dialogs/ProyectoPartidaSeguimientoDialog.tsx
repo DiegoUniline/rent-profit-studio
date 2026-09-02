@@ -18,6 +18,13 @@ import { formatCurrency } from "@/lib/accounting-utils";
 import { format } from "date-fns";
 import { Wand2, CheckCircle2 } from "lucide-react";
 import { ProgramacionPartidaDialog } from "./ProgramacionPartidaDialog";
+import {
+  TIPO_MOVIMIENTO_OPCIONES,
+  TipoMovimiento,
+  TipoMovimientoValor,
+  claseTipoMovimiento,
+} from "@/lib/tipo-movimiento";
+import { cn } from "@/lib/utils";
 
 interface Tercero {
   id: string;
@@ -36,6 +43,7 @@ export interface PartidaSeguimiento {
   fecha_inicio: string | null;
   fecha_fin: string | null;
   avance_manual?: number | null;
+  tipo_movimiento?: TipoMovimientoValor;
 }
 
 interface Props {
@@ -54,6 +62,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
   const [fechaInicio, setFechaInicio] = useState<Date | undefined>();
   const [fechaFin, setFechaFin] = useState<Date | undefined>();
   const [avanceManual, setAvanceManual] = useState("");
+  const [tipoMovimiento, setTipoMovimiento] = useState<TipoMovimientoValor>(null);
   const [programado, setProgramado] = useState(0);
   const [programacionDialogOpen, setProgramacionDialogOpen] = useState(false);
 
@@ -69,6 +78,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
       setFechaInicio(partida.fecha_inicio ? new Date(partida.fecha_inicio + "T00:00:00") : undefined);
       setFechaFin(partida.fecha_fin ? new Date(partida.fecha_fin + "T00:00:00") : undefined);
       setAvanceManual(partida.avance_manual != null ? String(partida.avance_manual) : "");
+      setTipoMovimiento(partida.tipo_movimiento ?? null);
       refrescarProgramado(partida.id);
     }
   }, [open, partida]);
@@ -121,6 +131,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
           fecha_inicio: fechaInicio ? format(fechaInicio, "yyyy-MM-dd") : null,
           fecha_fin: fechaFin ? format(fechaFin, "yyyy-MM-dd") : null,
           avance_manual: avanceValor.trim() === "" ? null : Math.min(100, Math.max(0, parseFloat(avanceValor) || 0)),
+          tipo_movimiento: tipoMovimiento,
         })
         .eq("id", partida.id);
       if (updateError) throw updateError;
@@ -164,6 +175,34 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
               <span className="text-sm text-muted-foreground">Presupuesto (fijo, no editable aquí)</span>
               <span className="font-bold text-primary">{formatCurrency(presupuestoMonto)}</span>
             </div>
+
+            <div className="space-y-2">
+              <Label>Tipo de movimiento</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {TIPO_MOVIMIENTO_OPCIONES.map((opt) => {
+                  const activo = tipoMovimiento === opt.value;
+                  return (
+                    <Button
+                      key={opt.value}
+                      type="button"
+                      variant="outline"
+                      className={cn(
+                        "h-9 text-xs sm:text-sm",
+                        activo && claseTipoMovimiento(opt.value as TipoMovimiento),
+                        activo && "border-2 font-semibold"
+                      )}
+                      onClick={() => setTipoMovimiento(opt.value)}
+                    >
+                      {opt.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              {!tipoMovimiento && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">Pendiente de clasificar</p>
+              )}
+            </div>
+
 
             <div className="space-y-2">
               <Label>Responsable</Label>
