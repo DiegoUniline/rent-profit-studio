@@ -177,6 +177,34 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
             </div>
 
             <div className="space-y-2">
+              <Label>Tipo de movimiento</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {TIPO_MOVIMIENTO_OPCIONES.map((opt) => {
+                  const activo = tipoMovimiento === opt.value;
+                  return (
+                    <Button
+                      key={opt.value}
+                      type="button"
+                      variant="outline"
+                      className={cn(
+                        "h-9 text-xs sm:text-sm",
+                        activo && claseTipoMovimiento(opt.value as TipoMovimiento),
+                        activo && "border-2 font-semibold"
+                      )}
+                      onClick={() => setTipoMovimiento(opt.value)}
+                    >
+                      {opt.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              {!tipoMovimiento && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">Pendiente de clasificar</p>
+              )}
+            </div>
+
+
+            <div className="space-y-2">
               <Label>Responsable</Label>
               <SearchableSelect
                 value={responsableId}
