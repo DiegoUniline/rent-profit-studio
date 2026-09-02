@@ -81,12 +81,16 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
 
   const totalGeneral = agregarFinanciero(filas.map((f) => ({ presupuesto: f.presupuesto, proyectado: f.proyectado, ejercido: f.ejercido })));
 
+  const labelSpan = readOnly ? 5 : 6;
+  const headerSpan = readOnly ? 10 : 11;
+
   return (
     <ScrollArea className="w-full whitespace-nowrap">
     <div className="min-w-max">
     <Table>
       <TableHeader>
         <TableRow>
+          {!readOnly && <TableHead className="w-16 text-center">Editar</TableHead>}
           <TableHead>Cuenta / Partida</TableHead>
           <TableHead className="w-32">Tipo</TableHead>
           <TableHead>Responsable</TableHead>
@@ -97,7 +101,6 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
           <TableHead className="text-right">Ejercido</TableHead>
           <TableHead className="text-right">Disponible</TableHead>
           <TableHead className="text-right">Avance</TableHead>
-          {!readOnly && <TableHead className="text-right">Acciones</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -111,7 +114,7 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
             return (
               <Fragment key={`tipo-${tipo ?? "pendiente"}`}>
                 <TableRow className="bg-emerald-50/50 dark:bg-emerald-950/20 font-semibold border-y-2 border-emerald-100 dark:border-emerald-900/40">
-                  <TableCell colSpan={readOnly ? 9 : 10}>
+                  <TableCell colSpan={headerSpan}>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className={cn("text-xs px-2 py-0.5", claseTipoMovimiento(tipo))}>
                         {etiquetaTipoMovimiento(tipo)}
@@ -131,7 +134,7 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
                     return (
                       <Fragment key={`cuenta-${codigo}-${tipo ?? "pendiente"}`}>
                         <TableRow className="bg-muted/40 font-medium">
-                          <TableCell colSpan={4}>
+                          <TableCell colSpan={labelSpan}>
                             {codigo !== "sin-cuenta" ? `${codigo} ${items[0].cuentaNombre}` : "Sin cuenta"}
                           </TableCell>
                           <TableCell className="text-right">{formatCurrency(agregadoCuenta.presupuesto)}</TableCell>
@@ -150,10 +153,24 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
                               {avancePonderado(items).toFixed(1)}%
                             </Badge>
                           </TableCell>
-                          {!readOnly && <TableCell />}
                         </TableRow>
                         {items.map((f) => (
-                          <TableRow key={f.id}>
+                          <TableRow key={f.id} className="group hover:bg-muted/30 border-b border-border/40">
+                            {!readOnly && (
+                              <TableCell className="text-center">
+                                {onEdit && (
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    title="Editar partida"
+                                    className="h-8 w-8"
+                                    onClick={() => onEdit(f.id)}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </TableCell>
+                            )}
                             <TableCell className="pl-8 text-sm">{f.partida}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className={cn("text-xs px-1.5 py-0", claseTipoMovimiento(f.tipoMovimiento))}>
@@ -196,22 +213,13 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
                                 )}
                               </div>
                             </TableCell>
-                            {!readOnly && (
-                              <TableCell className="text-right">
-                                {onEdit && (
-                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(f.id)}>
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                )}
-                              </TableCell>
-                            )}
                           </TableRow>
                         ))}
                       </Fragment>
                     );
                   })}
                 <TableRow className="bg-emerald-50/30 dark:bg-emerald-950/10 font-medium border-t border-emerald-100 dark:border-emerald-900/30">
-                  <TableCell colSpan={4}>Total {etiquetaTipoMovimiento(tipo)}</TableCell>
+                  <TableCell colSpan={labelSpan}>Total {etiquetaTipoMovimiento(tipo)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(totalTipo.presupuesto)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(totalTipo.proyectado)}</TableCell>
                   <TableCell className="text-right">{formatCurrency(totalTipo.ejercido)}</TableCell>
@@ -225,13 +233,12 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
                       {avancePonderado(itemsTipo).toFixed(1)}%
                     </Badge>
                   </TableCell>
-                  {!readOnly && <TableCell />}
                 </TableRow>
               </Fragment>
             );
           })}
         <TableRow className="bg-primary/5 font-semibold border-t-2 border-primary/20">
-          <TableCell colSpan={readOnly ? 9 : 10}>Total del Project</TableCell>
+          <TableCell colSpan={headerSpan}>Total del Project</TableCell>
           <TableCell className="text-right">{formatCurrency(totalGeneral.presupuesto)}</TableCell>
           <TableCell className="text-right">{formatCurrency(totalGeneral.proyectado)}</TableCell>
           <TableCell className="text-right">{formatCurrency(totalGeneral.ejercido)}</TableCell>
@@ -243,7 +250,6 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
               {avancePonderado(filas).toFixed(1)}%
             </Badge>
           </TableCell>
-          {!readOnly && <TableCell />}
         </TableRow>
       </TableBody>
     </Table>
