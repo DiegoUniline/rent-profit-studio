@@ -62,6 +62,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
   const [fechaInicio, setFechaInicio] = useState<Date | undefined>();
   const [fechaFin, setFechaFin] = useState<Date | undefined>();
   const [avanceManual, setAvanceManual] = useState("");
+  const [tipoMovimiento, setTipoMovimiento] = useState<TipoMovimientoValor>(null);
   const [programado, setProgramado] = useState(0);
   const [programacionDialogOpen, setProgramacionDialogOpen] = useState(false);
 
