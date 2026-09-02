@@ -163,7 +163,7 @@ export function ProjectSummaryTable({ filas, onEdit, readOnly }: Props) {
                                     variant="outline"
                                     size="icon"
                                     title="Editar partida"
-                                    className="h-8 w-8"
+                                    className="h-8 w-8 bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-500 hover:border-emerald-600"
                                     onClick={() => onEdit(f.id)}
                                   >
                                     <Pencil className="h-4 w-4" />
