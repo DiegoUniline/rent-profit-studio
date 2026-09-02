@@ -18,6 +18,13 @@ import { formatCurrency } from "@/lib/accounting-utils";
 import { format } from "date-fns";
 import { Wand2, CheckCircle2 } from "lucide-react";
 import { ProgramacionPartidaDialog } from "./ProgramacionPartidaDialog";
+import {
+  TIPO_MOVIMIENTO_OPCIONES,
+  TipoMovimiento,
+  TipoMovimientoValor,
+  claseTipoMovimiento,
+} from "@/lib/tipo-movimiento";
+import { cn } from "@/lib/utils";
 
 interface Tercero {
   id: string;
