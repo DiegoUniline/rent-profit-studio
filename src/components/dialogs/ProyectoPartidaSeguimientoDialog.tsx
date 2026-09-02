@@ -36,6 +36,7 @@ export interface PartidaSeguimiento {
   fecha_inicio: string | null;
   fecha_fin: string | null;
   avance_manual?: number | null;
+  tipo_movimiento?: TipoMovimientoValor;
 }
 
 interface Props {
