@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   TIPO_MOVIMIENTO_OPCIONES,
+  claseTipoMovimiento,
   type TipoMovimiento,
 } from "@/lib/tipo-movimiento";
 import { Textarea } from "@/components/ui/textarea";
