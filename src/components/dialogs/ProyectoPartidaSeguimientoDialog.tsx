@@ -78,6 +78,7 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
       setFechaInicio(partida.fecha_inicio ? new Date(partida.fecha_inicio + "T00:00:00") : undefined);
       setFechaFin(partida.fecha_fin ? new Date(partida.fecha_fin + "T00:00:00") : undefined);
       setAvanceManual(partida.avance_manual != null ? String(partida.avance_manual) : "");
+      setTipoMovimiento(partida.tipo_movimiento ?? null);
       refrescarProgramado(partida.id);
     }
   }, [open, partida]);
