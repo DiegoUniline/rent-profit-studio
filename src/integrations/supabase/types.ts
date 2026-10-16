@@ -1038,6 +1038,180 @@ export type Database = {
           },
         ]
       }
+      rafa_acciones: {
+        Row: {
+          confirmada_at: string | null
+          conversacion_id: string | null
+          created_at: string
+          descripcion: string
+          entrada: Json
+          error: string | null
+          estado: string
+          expira_at: string
+          finalizada_at: string | null
+          herramienta: string
+          huella: string
+          id: string
+          reemplazada_por: string | null
+          registros_afectados: Json
+          requiere_confirmacion: boolean
+          resultado: Json | null
+          updated_at: string
+          user_id: string
+          version_conocimiento: string | null
+          vista_previa: Json
+        }
+        Insert: {
+          confirmada_at?: string | null
+          conversacion_id?: string | null
+          created_at?: string
+          descripcion: string
+          entrada?: Json
+          error?: string | null
+          estado?: string
+          expira_at?: string
+          finalizada_at?: string | null
+          herramienta: string
+          huella: string
+          id?: string
+          reemplazada_por?: string | null
+          registros_afectados?: Json
+          requiere_confirmacion?: boolean
+          resultado?: Json | null
+          updated_at?: string
+          user_id: string
+          version_conocimiento?: string | null
+          vista_previa?: Json
+        }
+        Update: {
+          confirmada_at?: string | null
+          conversacion_id?: string | null
+          created_at?: string
+          descripcion?: string
+          entrada?: Json
+          error?: string | null
+          estado?: string
+          expira_at?: string
+          finalizada_at?: string | null
+          herramienta?: string
+          huella?: string
+          id?: string
+          reemplazada_por?: string | null
+          registros_afectados?: Json
+          requiere_confirmacion?: boolean
+          resultado?: Json | null
+          updated_at?: string
+          user_id?: string
+          version_conocimiento?: string | null
+          vista_previa?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rafa_acciones_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "rafa_conversaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rafa_conversaciones: {
+        Row: {
+          contexto: Json
+          created_at: string
+          id: string
+          titulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contexto?: Json
+          created_at?: string
+          id?: string
+          titulo?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contexto?: Json
+          created_at?: string
+          id?: string
+          titulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      rafa_ejecuciones: {
+        Row: {
+          accion_id: string
+          created_at: string
+          resultado: Json
+          user_id: string
+        }
+        Insert: {
+          accion_id: string
+          created_at?: string
+          resultado?: Json
+          user_id?: string
+        }
+        Update: {
+          accion_id?: string
+          created_at?: string
+          resultado?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rafa_ejecuciones_accion_id_fkey"
+            columns: ["accion_id"]
+            isOneToOne: true
+            referencedRelation: "rafa_acciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rafa_mensajes: {
+        Row: {
+          contenido: string
+          conversacion_id: string
+          created_at: string
+          datos: Json
+          id: string
+          rol: string
+          user_id: string
+          version_conocimiento: string | null
+        }
+        Insert: {
+          contenido?: string
+          conversacion_id: string
+          created_at?: string
+          datos?: Json
+          id?: string
+          rol: string
+          user_id: string
+          version_conocimiento?: string | null
+        }
+        Update: {
+          contenido?: string
+          conversacion_id?: string
+          created_at?: string
+          datos?: Json
+          id?: string
+          rol?: string
+          user_id?: string
+          version_conocimiento?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rafa_mensajes_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "rafa_conversaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rafa_sesiones: {
         Row: {
           created_at: string
@@ -1242,6 +1416,34 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      rafa_ajustar_presupuestos: {
+        Args: { p_accion_id: string; p_cambios: Json }
+        Returns: Json
+      }
+      rafa_aplicar_asientos: {
+        Args: { p_accion_id: string; p_asientos: Json }
+        Returns: Json
+      }
+      rafa_cambiar_estado_programaciones: {
+        Args: { p_accion_id: string; p_cambios: Json }
+        Returns: Json
+      }
+      rafa_crear_asientos_borrador: {
+        Args: { p_accion_id: string; p_asientos: Json }
+        Returns: Json
+      }
+      rafa_crear_programaciones: {
+        Args: { p_accion_id: string; p_items: Json }
+        Returns: Json
+      }
+      rafa_crear_tarea: {
+        Args: { p_accion_id: string; p_tarea: Json }
+        Returns: Json
+      }
+      rafa_registrar_ejecucion: {
+        Args: { p_accion_id: string; p_resultado: Json }
+        Returns: undefined
       }
     }
     Enums: {
