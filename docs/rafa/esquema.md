@@ -1,6 +1,6 @@
 # Esquema de la base (SQL local)
 
-ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-5b45a8823285). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `506d60b2ca7e2d35`.
+ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-0eb5c9306116). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `8d24732ca3eb995a`.
 
 El significado de negocio de cada tabla y campo está en `docs/rafa/modulos/`.
 
@@ -724,6 +724,29 @@ Triggers:
 Políticas:
 - Cada usuario gestiona sus conversaciones con Rafa (ALL, authenticated) USING `(user_id = auth.uid())` CHECK `(user_id = auth.uid())`
 
+## presupuesto_guardados
+
+RLS: activado.
+
+| Columna | Tipo | Obligatorio | Predeterminado |
+|---|---|---|---|
+| operacion_id | uuid | Sí |  |
+| presupuesto_id | uuid | Sí |  |
+| user_id | uuid | Sí | `auth.uid()` |
+| resultado | jsonb | Sí | `'{}'::jsonb` |
+| created_at | timestamp with time zone | Sí | `now()` |
+
+Restricciones e índices:
+- FK `presupuesto_guardados_presupuesto_id_fkey`: `FOREIGN KEY (presupuesto_id) REFERENCES presupuestos(id) ON DELETE CASCADE`
+- PK `presupuesto_guardados_pkey`: `PRIMARY KEY (operacion_id)`
+
+Triggers:
+- ninguno
+
+Políticas:
+- Leer guardados propios (SELECT, authenticated) USING `(user_id = auth.uid())` CHECK `—`
+- Registrar guardados propios (INSERT, authenticated) USING `—` CHECK `(user_id = auth.uid())`
+
 ## proyecto_cronograma_shares
 
 RLS: activado.
@@ -843,6 +866,7 @@ Políticas:
 - `cleanup_flujos_legacy_al_crear_programacion_propia()` — SECURITY DEFINER
 - `get_cronograma_publico(_token text)` — SECURITY DEFINER
 - `get_user_role(_user_id uuid)` — SECURITY DEFINER
+- `guardar_presupuesto(p_operacion uuid, p_id uuid, p_datos jsonb, p_flujos jsonb, p_version timestamp with time zone)` — SECURITY INVOKER
 - `handle_new_user()` — SECURITY DEFINER
 - `has_role(_user_id uuid, _role app_role)` — SECURITY DEFINER
 - `rafa_ajustar_presupuestos(p_accion_id uuid, p_cambios jsonb)` — SECURITY INVOKER

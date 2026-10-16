@@ -1,6 +1,6 @@
 # Presupuestos y unidades de medida
 
-Evidencia: código y SQL local. Fuentes: `src/pages/Presupuestos.tsx`, `src/components/dialogs/PresupuestoDialog.tsx`, `src/pages/EjercidoDetalle.tsx`, `src/lib/tipo-movimiento.ts`, `supabase/functions/_shared/negocio/calculos.ts`, migraciones `20260807151136_modulo_project.sql`, `20260809120000_proyecto_programacion_financiera.sql`, `20260828120000_fuente_unica_programacion_proyecto.sql`, `20260831195734_*.sql`.
+Evidencia: código y SQL local. Fuentes: `src/pages/Presupuestos.tsx`, `src/components/dialogs/PresupuestoDialog.tsx`, `src/lib/presupuesto-guardado.ts`, `src/pages/EjercidoDetalle.tsx`, `src/lib/tipo-movimiento.ts`, `supabase/functions/_shared/negocio/calculos.ts`, migraciones `20260807151136_modulo_project.sql`, `20260809120000_proyecto_programacion_financiera.sql`, `20260828120000_fuente_unica_programacion_proyecto.sql`, `20260831195734_*.sql`, `20261017000000_presupuestos_guardado_atomico.sql`.
 
 ## Partida presupuestal: significado del registro
 
@@ -24,7 +24,7 @@ Por ejercer = presupuestado − ejercido. Porcentaje = ejercido / presupuestado 
 
 ## Acciones sobre partidas
 
-- **Crear/editar** (`PresupuestoDialog.handleSave`): INSERT solo admin (RLS); UPDATE admin/contador. Guarda cabecera y luego, si la partida NO pertenece a un proyecto activo de su centro, borra y reinserta sus `flujos_programados` (no es atómico: un fallo intermedio puede dejar la partida sin flujos). Si pertenece a un proyecto, no toca flujos: su programación vive en Proyectos.
+- **Crear/editar** (`PresupuestoDialog.handleSave` → RPC `guardar_presupuesto`, migración `20261017000000`): INSERT solo admin (RLS); UPDATE admin/contador. Una sola transacción, SECURITY INVOKER. Sin id crea una partida (también "Copiar"); con id la actualiza en sitio (solo los campos del formulario; fechas, frecuencia, `es_project`, avance, activo y orden se conservan) y renueva `updated_at`. Pagos (`flujos_programados`) si la partida NO pertenece a un proyecto activo de su centro: los que traen id se actualizan (solo si cambiaron), los nuevos se insertan y solo los quitados se eliminan; si el usuario no puede eliminar (contador) falla todo, sin cambios. Si pertenece a un proyecto, no toca pagos (`p_flujos = null`): su programación vive en Proyectos. Idempotente por `p_operacion` (tabla `presupuesto_guardados`; el cliente reutiliza la clave en un reintento idéntico) y con control de versión (`p_version` = `updated_at` leído al abrir → `PRESUPUESTO_DESACTUALIZADO`). Pruebas: `supabase/tests/presupuestos/`. Antes de esta corrección se borraban y reinsertaban todos los pagos en llamadas separadas; para un contador el borrado no afectaba filas (RLS) y cada guardado duplicaba los pagos. Diagnóstico de solo lectura de lo afectado: `supabase/diagnosticos/presupuestos_duplicados.sql`.
 - **Copiar**: abre el formulario con los datos y "Copia de …" como nuevo registro.
 - **Activar/Desactivar** (`handleToggleActivo`): baja lógica; las partidas inactivas no se ofrecen en asientos/programaciones y no suman en totales activos.
 - **Reordenar**: actualiza `orden`.

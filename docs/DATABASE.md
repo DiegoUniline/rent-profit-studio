@@ -170,6 +170,17 @@ Flujos de efectivo programados de una partida presupuestal; también los generad
 | 9 | asiento_movimiento_id | uuid | SÍ | — | **FK** → `asiento_movimientos.id` |
 | 10 | empresa_id | uuid | SÍ | — | **FK** → `empresas.id` |
 
+#### `presupuesto_guardados`
+Registro de idempotencia de `guardar_presupuesto` (guardado atómico de partida + flujos desde el formulario de Presupuestos): una fila por clave de operación; un reintento con la misma clave devuelve `resultado` sin repetir efectos. RLS: cada usuario lee/inserta las suyas; sin UPDATE/DELETE.
+
+| # | Columna | Tipo | Nullable | Default | Claves |
+|---|---|---|---|---|---|
+| 1 | operacion_id | uuid | NO | — | **PK** |
+| 2 | presupuesto_id | uuid | NO | — | **FK** → `presupuestos.id` (CASCADE) |
+| 3 | user_id | uuid | NO | auth.uid() | |
+| 4 | resultado | jsonb | NO | '{}' | |
+| 5 | created_at | timestamptz | NO | now() | |
+
 #### `asientos_contables`
 Encabezado de póliza contable (partida doble).
 
