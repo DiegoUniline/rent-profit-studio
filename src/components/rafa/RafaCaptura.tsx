@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Mic, Square, Paperclip, Sparkles, X, Loader2 } from "lucide-react";
+import { toBase64 } from "@/lib/archivos";
 
 export interface CapturaPayload {
   texto: string;
@@ -14,15 +15,6 @@ export interface CapturaPayload {
 interface Props {
   loading: boolean;
   onEnviar: (payload: CapturaPayload) => void;
-}
-
-function toBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
 }
 
 export function RafaCaptura({ loading, onEnviar }: Props) {

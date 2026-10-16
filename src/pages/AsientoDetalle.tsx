@@ -23,13 +23,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { z } from "zod";
 import { ArrowLeft, Plus, Trash2, AlertCircle, CheckCircle2, Copy, Save } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmpresaDialog } from "@/components/dialogs/EmpresaDialog";
 import { CuentaDialog } from "@/components/dialogs/CuentaDialog";
 import { TerceroDialog } from "@/components/dialogs/TerceroDialog";
 import { CentroNegocioDialog } from "@/components/dialogs/CentroNegocioDialog";
+import { validarAsiento } from "../../supabase/functions/_shared/negocio/asientos";
 
 interface Empresa {
   id: string;
@@ -97,12 +97,6 @@ const emptyForm: AsientoForm = {
   centro_negocio_id: "",
   observaciones: "",
 };
-
-const asientoSchema = z.object({
-  empresa_id: z.string().min(1, "La empresa es requerida"),
-  fecha: z.string().min(1, "La fecha es requerida"),
-  tipo: z.enum(["ingreso", "egreso", "diario"]),
-});
 
 export default function AsientoDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -341,58 +335,16 @@ export default function AsientoDetalle() {
   };
 
   const handleSave = async () => {
-    const result = asientoSchema.safeParse(form);
-    if (!result.success) {
-      toast({
-        title: "Error de validación",
-        description: result.error.errors[0].message,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate movimientos
-    if (movimientos.length === 0) {
+    const errorValidacion = validarAsiento(form, movimientos, presupuestos, {
+      validarAlcancePartidas: false,
+    });
+    if (errorValidacion) {
       toast({
         title: "Error",
-        description: "Debe agregar al menos un movimiento",
+        description: errorValidacion,
         variant: "destructive",
       });
       return;
-    }
-
-    const invalidMovimientos = movimientos.filter(
-      (m) => !m.cuenta_id || (m.debe === 0 && m.haber === 0)
-    );
-    if (invalidMovimientos.length > 0) {
-      toast({
-        title: "Error",
-        description: "Todos los movimientos deben tener cuenta y un monto en Debe o Haber",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!totals.balanced) {
-      toast({
-        title: "Error",
-        description: "El asiento no está cuadrado. Total Debe debe ser igual a Total Haber",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // For "diario" type, at least one movimiento must have a presupuesto assigned
-    if (form.tipo === "diario") {
-      const hasPresupuesto = movimientos.some((m) => m.presupuesto_id && m.presupuesto_id !== "");
-      if (!hasPresupuesto) {
-        toast({
-          title: "Error",
-          description: "Las pólizas de diario requieren al menos un movimiento con presupuesto asignado",
-          variant: "destructive",
-        });
-        return;
-      }
     }
 
     setSaving(true);

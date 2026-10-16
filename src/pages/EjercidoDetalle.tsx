@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ArrowLeft } from "lucide-react";
+import { ladoEjercidoPorCodigo } from "@/lib/project-utils";
 
 interface EjercidoMovimiento {
   id: string;
@@ -111,16 +112,10 @@ export default function EjercidoDetalle() {
       });
   }, [movimientos]);
 
+  // Regla compartida (supabase/functions/_shared/negocio/calculos.ts).
   const getEjercidoAmount = (m: EjercidoMovimiento): number => {
     const codigo = cuentaCodigo || m.cuentas_contables?.codigo || "";
-    const esActivo = codigo.startsWith("1");
-    const esPasivoCapital = codigo.startsWith("2") || codigo.startsWith("3");
-    const esCostoGasto = codigo.startsWith("5") || codigo.startsWith("6");
-
-    if (esActivo) return Number(m.haber);
-    if (esPasivoCapital) return Number(m.debe);
-    if (esCostoGasto) return Number(m.debe);
-    return Number(m.haber);
+    return Number(ladoEjercidoPorCodigo(codigo) === "debe" ? m.debe : m.haber);
   };
 
   const totalEjercido = movimientosAplicados.reduce(

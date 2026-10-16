@@ -1,92 +1,22 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import type { Contexto, Rol } from "../_shared/rafa/tipos.ts";
+import { VERSION_CONOCIMIENTO } from "../_shared/rafa/conocimiento.ts";
+import { crearLlamadaGateway, ErrorModelo } from "../_shared/rafa/llm.ts";
+import { procesarTurno } from "../_shared/rafa/motor.ts";
+import { cancelarAccion, confirmarAccion } from "../_shared/rafa/acciones.ts";
+import { PLAN_PARAMETROS, PROMPT_PLAN } from "../_shared/rafa/plan.ts";
+import { esUuid } from "../_shared/rafa/validacion.ts";
 
-const MODEL = "google/gemini-3.6-flash";
+const MODELO = Deno.env.get("RAFA_MODELO") || "google/gemini-3.6-flash";
+const URL_IA = Deno.env.get("RAFA_AI_URL") || "https://ai.gateway.lovable.dev/v1/chat/completions";
+const ZONA = Deno.env.get("RAFA_ZONA_HORARIA") || "America/Mexico_City";
 
 interface ArchivoEntrada {
   filename: string;
   mime: string;
   data: string; // base64 sin prefijo
 }
-
-const PLAN_TOOL = {
-  type: "function",
-  function: {
-    name: "proponer_plan",
-    description:
-      "Devuelve el plan estructurado que Rafa propone al usuario a partir de su instrucción y de los archivos adjuntos.",
-    parameters: {
-      type: "object",
-      properties: {
-        transcripcion: { type: "string", description: "Transcripción literal del audio, vacío si no hubo audio." },
-        resumen: { type: "string", description: "Resumen en español de lo que se va a hacer, en 1-3 frases." },
-        empresa_detectada: { type: "string", description: "Nombre de la empresa mencionada; vacío si no se menciona." },
-        centro_negocio: {
-          type: "object",
-          properties: {
-            nombre: { type: "string" },
-            tipo_actividad: { type: "string" },
-          },
-          required: ["nombre"],
-        },
-        tercero: {
-          type: "object",
-          properties: {
-            nombre: { type: "string", description: "Nombre del contratista/tercero; vacío si no se menciona." },
-            rol: { type: "string" },
-          },
-          required: ["nombre"],
-        },
-        iva: {
-          type: "object",
-          properties: {
-            incluir: { type: "boolean", description: "true si el importe de cada partida debe incluir IVA." },
-            tasa: { type: "number", description: "Tasa de IVA en porcentaje, normalmente 16." },
-          },
-          required: ["incluir", "tasa"],
-        },
-        total_objetivo: {
-          type: "number",
-          description: "Total del presupuesto mencionado por el usuario o del archivo. 0 si no aplica.",
-        },
-        partidas: {
-          type: "array",
-          description: "Una entrada por concepto del archivo, en el mismo orden.",
-          items: {
-            type: "object",
-            properties: {
-              clave: { type: "string" },
-              descripcion: { type: "string" },
-              unidad: { type: "string" },
-              cantidad: { type: "number" },
-              precio_unitario: { type: "number", description: "Precio unitario SIN IVA, tal como viene en el archivo." },
-              importe: { type: "number", description: "Importe SIN IVA (cantidad x precio unitario)." },
-              cuenta_codigo: {
-                type: "string",
-                description: "Código de la cuenta contable sugerida del catálogo proporcionado. Vacío si ninguna aplica.",
-              },
-            },
-            required: ["descripcion", "cantidad", "precio_unitario", "importe"],
-          },
-        },
-        programacion: {
-          type: "object",
-          properties: {
-            tipo: { type: "string", enum: ["ingreso", "egreso"] },
-            frecuencia: {
-              type: "string",
-              enum: ["semanal", "quincenal", "mensual", "trimestral", "semestral", "anual"],
-            },
-            numero_pagos: { type: "number" },
-            fecha_inicio: { type: "string", description: "Fecha ISO yyyy-mm-dd del primer pago." },
-            notas: { type: "string" },
-          },
-          required: ["tipo", "frecuencia", "numero_pagos", "fecha_inicio"],
-        },
-      },
-      required: ["resumen", "centro_negocio", "tercero", "iva", "partidas", "programacion"],
-    },
-  },
-};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -98,84 +28,188 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const texto: string = (body.texto ?? "").toString().slice(0, 20000);
-    const audio = body.audio as { data: string; format: string } | undefined;
-    const archivos: ArchivoEntrada[] = Array.isArray(body.archivos) ? body.archivos.slice(0, 5) : [];
-    const cuentas: { codigo: string; nombre: string }[] = Array.isArray(body.cuentas) ? body.cuentas.slice(0, 400) : [];
-    const hoy: string = body.hoy || new Date().toISOString().slice(0, 10);
+    const modo: string = body.modo || "plan";
 
-    if (!texto && !audio && archivos.length === 0) {
-      return json({ error: "Envía una instrucción por texto o audio." }, 400);
-    }
+    const ctx = await contextoDeUsuario(req);
+    if (!ctx) return json({ error: "Sesión inválida. Vuelve a iniciar sesión." }, 401);
 
-    const content: unknown[] = [
-      {
-        type: "text",
-        text:
-          `Fecha de hoy: ${hoy}.\n` +
-          (texto ? `Instrucción escrita del usuario:\n${texto}\n\n` : "") +
-          (audio ? "El usuario adjunta un audio con la instrucción: transcríbelo y úsalo como instrucción principal.\n\n" : "") +
-          (archivos.length
-            ? "Se adjuntan archivos con el catálogo de conceptos: extrae TODAS las partidas con su clave, descripción, unidad, cantidad, precio unitario e importe.\n\n"
-            : "") +
-          "Catálogo de cuentas contables disponibles (código — nombre):\n" +
-          cuentas.map((c) => `${c.codigo} — ${c.nombre}`).join("\n"),
-      },
-    ];
-
-    if (audio) content.push({ type: "input_audio", input_audio: { data: audio.data, format: audio.format } });
-    for (const a of archivos) {
-      if (a.mime?.startsWith("image/")) {
-        content.push({ type: "image_url", image_url: { url: `data:${a.mime};base64,${a.data}` } });
-      } else {
-        content.push({
-          type: "file",
-          file: { filename: a.filename, file_data: `data:${a.mime || "application/pdf"};base64,${a.data}` },
-        });
+    if (modo === "chat") {
+      const llamar = crearLlamadaGateway({ url: URL_IA, apiKey, modelo: MODELO });
+      try {
+        const salida = await procesarTurno(
+          ctx,
+          {
+            conversacion_id: body.conversacion_id || undefined,
+            mensaje: String(body.mensaje ?? ""),
+            contexto_pantalla: body.contexto_pantalla || undefined,
+            archivos: Array.isArray(body.archivos) ? body.archivos.slice(0, 5) : [],
+            audio: body.audio || undefined,
+          },
+          llamar
+        );
+        return json(salida);
+      } catch (e) {
+        if (e instanceof ErrorModelo) return json({ error: e.message }, e.status === 429 || e.status === 402 ? e.status : 502);
+        throw e;
       }
     }
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Eres Rafa, asistente contable de una empresa mexicana. Interpretas instrucciones habladas o escritas junto con catálogos de conceptos (presupuestos de obra) y devuelves SIEMPRE un plan estructurado con la herramienta proponer_plan. Nunca inventes partidas: usa exactamente las del archivo. Los precios unitarios van SIN IVA; si el usuario pide sumar IVA, marca iva.incluir = true con la tasa indicada (16 por defecto). Sugiere para cada partida la cuenta contable más parecida del catálogo recibido. Responde en español.",
+    if (modo === "confirmar" || modo === "cancelar") {
+      if (!esUuid(body.accion_id)) return json({ error: "Acción inválida." }, 400);
+      const resultado =
+        modo === "confirmar" ? await confirmarAccion(ctx, body.accion_id, String(body.huella || "")) : await cancelarAccion(ctx, body.accion_id);
+      // Deja constancia en la conversación para que el historial refleje el estado real.
+      const conversacionId = resultado.accion ? await conversacionDeAccion(ctx, resultado.accion.id) : null;
+      if (conversacionId) {
+        await ctx.servicio.from("rafa_mensajes").insert({
+          conversacion_id: conversacionId,
+          user_id: ctx.usuario.id,
+          rol: "asistente",
+          contenido: resultado.resumen,
+          datos: {
+            herramientas: [
+              {
+                nombre: modo === "confirmar" ? "confirmacion_usuario" : "cancelacion_usuario",
+                argumentos: { accion_id: body.accion_id },
+                ok: resultado.ok,
+                tipo: resultado.tipo,
+                resumen: resultado.resumen,
+                tablas: resultado.tablas ?? [],
+                referencias: resultado.referencias ?? [],
+                accion: resultado.accion ?? null,
+                advertencias: resultado.advertencias ?? [],
+                error: resultado.error ?? null,
+              },
+            ],
+            memoria: `${modo}(${body.accion_id}) → ${resultado.accion?.estado ?? "error"}: ${resultado.resumen}`,
           },
-          { role: "user", content },
-        ],
-        tools: [PLAN_TOOL],
-        tool_choice: { type: "function", function: { name: "proponer_plan" } },
-      }),
-    });
-
-    if (!res.ok) {
-      const detalle = await res.text();
-      const msg =
-        res.status === 429
-          ? "Demasiadas solicitudes a la IA. Intenta de nuevo en unos segundos."
-          : res.status === 402
-          ? "Se agotaron los créditos de IA del espacio de trabajo."
-          : `Error de la IA (${res.status}): ${detalle.slice(0, 300)}`;
-      return json({ error: msg }, res.status === 429 || res.status === 402 ? res.status : 500);
+          version_conocimiento: VERSION_CONOCIMIENTO,
+        });
+      }
+      return json(resultado);
     }
 
-    const data = await res.json();
-    const call = data?.choices?.[0]?.message?.tool_calls?.[0];
-    if (!call?.function?.arguments) {
-      return json({ error: "La IA no pudo estructurar la instrucción. Intenta describirla con más detalle." }, 502);
+    if (ctx.usuario.roles.every((r) => r !== "admin" && r !== "contador")) {
+      return json({ error: "Tu rol no permite preparar planes de presupuesto." }, 403);
     }
-
-    return json({ plan: JSON.parse(call.function.arguments) });
+    return await interpretarPlan(body, apiKey);
   } catch (e) {
     console.error("rafa-asistente error", e);
     return json({ error: e instanceof Error ? e.message : "Error inesperado" }, 500);
   }
 });
+
+async function contextoDeUsuario(req: Request): Promise<Contexto | null> {
+  const autorizacion = req.headers.get("Authorization") || "";
+  if (!autorizacion.startsWith("Bearer ")) return null;
+  const url = Deno.env.get("SUPABASE_URL")!;
+  const db = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    global: { headers: { Authorization: autorizacion } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await db.auth.getUser(autorizacion.slice(7));
+  if (error || !data?.user) return null;
+  // Roles leídos en el servidor (RLS: cada usuario ve los suyos). Nunca del navegador.
+  const { data: roles } = await db.from("user_roles").select("role").eq("user_id", data.user.id);
+  const servicio = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return {
+    db,
+    servicio,
+    usuario: { id: data.user.id, email: data.user.email ?? null, roles: (roles || []).map((r: { role: Rol }) => r.role) },
+    hoy: new Intl.DateTimeFormat("en-CA", { timeZone: ZONA }).format(new Date()),
+    conversacionId: null,
+    versionConocimiento: VERSION_CONOCIMIENTO,
+  };
+}
+
+async function conversacionDeAccion(ctx: Contexto, accionId: string): Promise<string | null> {
+  const { data } = await ctx.servicio.from("rafa_acciones").select("conversacion_id").eq("id", accionId).eq("user_id", ctx.usuario.id).maybeSingle();
+  return data?.conversacion_id ?? null;
+}
+
+// Modo "plan" (comportamiento original): instrucción + archivos → plan editable.
+async function interpretarPlan(body: Record<string, unknown>, apiKey: string) {
+  const texto: string = String(body.texto ?? "").slice(0, 20000);
+  const audio = body.audio as { data: string; format: string } | undefined;
+  const archivos: ArchivoEntrada[] = Array.isArray(body.archivos) ? (body.archivos as ArchivoEntrada[]).slice(0, 5) : [];
+  const cuentas: { codigo: string; nombre: string }[] = Array.isArray(body.cuentas) ? (body.cuentas as { codigo: string; nombre: string }[]).slice(0, 400) : [];
+  const hoy: string = (body.hoy as string) || new Date().toISOString().slice(0, 10);
+
+  if (!texto && !audio && archivos.length === 0) {
+    return json({ error: "Envía una instrucción por texto o audio." }, 400);
+  }
+
+  const content: unknown[] = [
+    {
+      type: "text",
+      text:
+        `Fecha de hoy: ${hoy}.\n` +
+        (texto ? `Instrucción escrita del usuario:\n${texto}\n\n` : "") +
+        (audio ? "El usuario adjunta un audio con la instrucción: transcríbelo y úsalo como instrucción principal.\n\n" : "") +
+        (archivos.length
+          ? "Se adjuntan archivos con el catálogo de conceptos: extrae TODAS las partidas con su clave, descripción, unidad, cantidad, precio unitario e importe.\n\n"
+          : "") +
+        "Catálogo de cuentas contables disponibles (código — nombre):\n" +
+        cuentas.map((c) => `${c.codigo} — ${c.nombre}`).join("\n"),
+    },
+  ];
+
+  if (audio) content.push({ type: "input_audio", input_audio: { data: audio.data, format: audio.format } });
+  for (const a of archivos) {
+    if (a.mime?.startsWith("image/")) {
+      content.push({ type: "image_url", image_url: { url: `data:${a.mime};base64,${a.data}` } });
+    } else {
+      content.push({
+        type: "file",
+        file: { filename: a.filename, file_data: `data:${a.mime || "application/pdf"};base64,${a.data}` },
+      });
+    }
+  }
+
+  const res = await fetch(URL_IA, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: MODELO,
+      messages: [
+        { role: "system", content: PROMPT_PLAN },
+        { role: "user", content },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "proponer_plan",
+            description: "Devuelve el plan estructurado que Rafa propone al usuario a partir de su instrucción y de los archivos adjuntos.",
+            parameters: PLAN_PARAMETROS,
+          },
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "proponer_plan" } },
+    }),
+  });
+
+  if (!res.ok) {
+    const detalle = await res.text();
+    const msg =
+      res.status === 429
+        ? "Demasiadas solicitudes a la IA. Intenta de nuevo en unos segundos."
+        : res.status === 402
+        ? "Se agotaron los créditos de IA del espacio de trabajo."
+        : `Error de la IA (${res.status}): ${detalle.slice(0, 300)}`;
+    return json({ error: msg }, res.status === 429 || res.status === 402 ? res.status : 500);
+  }
+
+  const data = await res.json();
+  const call = data?.choices?.[0]?.message?.tool_calls?.[0];
+  if (!call?.function?.arguments) {
+    return json({ error: "La IA no pudo estructurar la instrucción. Intenta describirla con más detalle." }, 502);
+  }
+
+  return json({ plan: JSON.parse(call.function.arguments) });
+}
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {

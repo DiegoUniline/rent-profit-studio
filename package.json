@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "rafa:conocimiento": "node scripts/rafa-herramientas.mjs && node scripts/rafa-conocimiento.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

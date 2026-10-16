@@ -6,6 +6,8 @@ import rafaAvatar from "@/assets/rafa-avatar.png";
 import { RafaCaptura, type CapturaPayload } from "@/components/rafa/RafaCaptura";
 import { RafaPropuesta } from "@/components/rafa/RafaPropuesta";
 import { RafaSesiones, type SesionRafa } from "@/components/rafa/RafaSesiones";
+import { RafaChat } from "@/components/rafa/RafaChat";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { aplicarPlanRafa } from "@/lib/rafa-apply";
 import {
   aplicarFormatoTexto,
@@ -50,6 +52,7 @@ export default function Rafa() {
   const [sesiones, setSesiones] = useState<SesionRafa[]>([]);
   const [sesionId, setSesionId] = useState<string | null>(null);
   const [reinstruir, setReinstruir] = useState(false);
+  const [pestana, setPestana] = useState<"chat" | "plan">("chat");
   const [porEliminar, setPorEliminar] = useState<{ id: string; ids: string[] } | null>(null);
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosavePromiseRef = useRef<Promise<unknown> | null>(null);
@@ -85,7 +88,9 @@ export default function Rafa() {
   }, []);
 
   const construirPropuesta = (p: PlanRafa, previa?: PropuestaEditable | null): PropuestaEditable => {
-    const empresa = mejorCoincidencia(p.empresa_detectada || "", empresas) || empresas[0];
+    // Nunca se elige "la primera" empresa: solo la detectada o, si existe una
+    // sola empresa activa, esa. Si hay ambigüedad el usuario la selecciona.
+    const empresa = mejorCoincidencia(p.empresa_detectada || "", empresas) || (empresas.length === 1 ? empresas[0] : undefined);
     const empresaId = previa?.empresaId || empresa?.id || "";
     const centroMatch = mejorCoincidencia(p.centro_negocio?.nombre || "", centros.filter((c) => c.empresa_id === empresaId), 0.6);
     const terceroMatch = mejorCoincidencia(p.tercero?.nombre || "", terceros.filter((t) => t.empresa_id === empresaId), 0.5);
@@ -133,6 +138,42 @@ export default function Rafa() {
     };
   };
 
+  const crearSesion = async (nuevoPlan: PlanRafa, nuevaPropuesta: PropuestaEditable) => {
+    const { data: user } = await supabase.auth.getUser();
+    if (!user?.user) return;
+    const titulo =
+      nuevoPlan.centro_negocio?.nombre?.trim() ||
+      nuevoPlan.resumen?.slice(0, 60) ||
+      "Interpretación de Rafa";
+    const { data: fila, error: errSesion } = await supabase
+      .from("rafa_sesiones")
+      .insert({
+        user_id: user.user.id,
+        titulo,
+        resumen: nuevoPlan.resumen || null,
+        transcripcion: nuevoPlan.transcripcion || null,
+        plan: nuevoPlan as unknown as never,
+        propuesta: nuevaPropuesta as unknown as never,
+        estado: "borrador",
+      })
+      .select("id")
+      .single();
+    if (!errSesion && fila) setSesionId(fila.id);
+    cargarSesiones();
+  };
+
+  // Plan generado desde la conversación: se abre en el mismo editor de
+  // propuestas (nada se guarda en presupuestos hasta pulsar Guardar).
+  const abrirPlanDesdeChat = async (nuevoPlan: PlanRafa) => {
+    const nuevaPropuesta = construirPropuesta(nuevoPlan, null);
+    setPlan(nuevoPlan);
+    setPropuesta(nuevaPropuesta);
+    setSesionId(null);
+    setReinstruir(false);
+    setPestana("plan");
+    await crearSesion(nuevoPlan, nuevaPropuesta);
+  };
+
   const interpretar = async (payload: CapturaPayload) => {
     setLoading(true);
     try {
@@ -166,28 +207,7 @@ export default function Rafa() {
         return;
       }
 
-      const { data: user } = await supabase.auth.getUser();
-      if (user?.user) {
-        const titulo =
-          nuevoPlan.centro_negocio?.nombre?.trim() ||
-          nuevoPlan.resumen?.slice(0, 60) ||
-          "Interpretación de Rafa";
-        const { data: fila, error: errSesion } = await supabase
-          .from("rafa_sesiones")
-          .insert({
-            user_id: user.user.id,
-            titulo,
-            resumen: nuevoPlan.resumen || null,
-            transcripcion: nuevoPlan.transcripcion || null,
-            plan: nuevoPlan as unknown as never,
-            propuesta: nuevaPropuesta as unknown as never,
-            estado: "borrador",
-          })
-          .select("id")
-          .single();
-        if (!errSesion && fila) setSesionId(fila.id);
-        cargarSesiones();
-      }
+      await crearSesion(nuevoPlan, nuevaPropuesta);
     } catch (e) {
       toast({
         variant: "destructive",
@@ -371,68 +391,79 @@ export default function Rafa() {
         <div className="space-y-1.5">
           <h1 className="text-2xl font-bold">Rafa · Asistente de proyectos</h1>
           <div className="relative rounded-2xl rounded-tl-sm border bg-muted/50 px-4 py-2.5 text-sm max-w-2xl">
-            ¡Hola! Soy Rafa. Dime por voz o por escrito qué necesitas y adjunta el presupuesto o catálogo de
-            conceptos: yo te propongo el centro de negocio, el contratista, las partidas y el flujo de pagos.
-            Tú nada más revisas y confirmas.
+            ¡Hola! Soy Rafa. Pregúntame cómo funciona el sistema o qué está pasando con tus presupuestos,
+            programación, asientos y proyectos; puedo preparar propuestas, simulaciones y borradores. Todo cambio
+            definitivo te lo muestro antes y solo se ejecuta cuando lo confirmas.
           </div>
         </div>
       </div>
 
 
-      {!propuesta ? (
-        <>
-          <RafaCaptura loading={loading} onEnviar={interpretar} />
-          <RafaSesiones
-            sesiones={sesiones}
-            activaId={sesionId}
-            onAbrir={abrirSesion}
-            onEliminar={eliminarSesion}
-          />
-          <Card>
-            <CardContent className="pt-6 text-sm text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground">Qué puede hacer Rafa</p>
-              <p>· Crear o enlazar un centro de negocio y un tercero (contratista).</p>
-              <p>· Cargar las partidas del archivo con cantidad, precio unitario e IVA.</p>
-              <p>· Sugerir la cuenta contable de cada partida.</p>
-              <p>· Programar los flujos de efectivo por semana, quincena o mes.</p>
-              <p>· Guardar cada interpretación para retomarla y corregirla después.</p>
-            </CardContent>
-          </Card>
-        </>
-      ) : (
-        <>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setReinstruir((v) => !v)}>
-              <Pencil className="h-3.5 w-3.5" />
-              {reinstruir ? "Ocultar instrucción" : "Cambiar instrucción"}
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              Al cambiar la instrucción se corrige esta misma interpretación; no se crea otra.
-            </span>
-          </div>
-          {reinstruir && <RafaCaptura loading={loading} onEnviar={interpretar} />}
-          <RafaPropuesta
-          resumen={plan?.resumen || ""}
-          transcripcion={plan?.transcripcion}
-          propuesta={propuesta}
-          empresas={empresas}
-          centros={centros}
-          terceros={terceros}
-          cuentas={cuentas}
-          guardando={guardando}
-          onChange={setPropuesta}
-          onAplicar={aplicar}
-          soloLectura={!puedeEditarPresupuestos}
-          yaGuardado={Boolean(propuesta.aplicado?.presupuestoIds?.length)}
-          onReiniciar={() => {
-            setPlan(null);
-            setPropuesta(null);
-            setSesionId(null);
-            setReinstruir(false);
-          }}
-          />
-        </>
-      )}
+      <Tabs value={pestana} onValueChange={(v) => setPestana(v as "chat" | "plan")}>
+        <TabsList>
+          <TabsTrigger value="chat">Conversación</TabsTrigger>
+          <TabsTrigger value="plan">Cargar presupuesto</TabsTrigger>
+        </TabsList>
+        <TabsContent value="chat" className="mt-4">
+          <RafaChat onAbrirPlan={puedeEditarPresupuestos ? abrirPlanDesdeChat : undefined} />
+        </TabsContent>
+        <TabsContent value="plan" className="mt-4 space-y-6">
+          {!propuesta ? (
+            <>
+              <RafaCaptura loading={loading} onEnviar={interpretar} />
+              <RafaSesiones
+                sesiones={sesiones}
+                activaId={sesionId}
+                onAbrir={abrirSesion}
+                onEliminar={eliminarSesion}
+              />
+              <Card>
+                <CardContent className="pt-6 text-sm text-muted-foreground space-y-1">
+                  <p className="font-medium text-foreground">Qué puede hacer Rafa</p>
+                  <p>· Crear o enlazar un centro de negocio y un tercero (contratista).</p>
+                  <p>· Cargar las partidas del archivo con cantidad, precio unitario e IVA.</p>
+                  <p>· Sugerir la cuenta contable de cada partida.</p>
+                  <p>· Programar los flujos de efectivo por semana, quincena o mes.</p>
+                  <p>· Guardar cada interpretación para retomarla y corregirla después.</p>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setReinstruir((v) => !v)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                  {reinstruir ? "Ocultar instrucción" : "Cambiar instrucción"}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Al cambiar la instrucción se corrige esta misma interpretación; no se crea otra.
+                </span>
+              </div>
+              {reinstruir && <RafaCaptura loading={loading} onEnviar={interpretar} />}
+              <RafaPropuesta
+              resumen={plan?.resumen || ""}
+              transcripcion={plan?.transcripcion}
+              propuesta={propuesta}
+              empresas={empresas}
+              centros={centros}
+              terceros={terceros}
+              cuentas={cuentas}
+              guardando={guardando}
+              onChange={setPropuesta}
+              onAplicar={aplicar}
+              soloLectura={!puedeEditarPresupuestos}
+              yaGuardado={Boolean(propuesta.aplicado?.presupuestoIds?.length)}
+              onReiniciar={() => {
+                setPlan(null);
+                setPropuesta(null);
+                setSesionId(null);
+                setReinstruir(false);
+              }}
+              />
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <AlertDialog open={Boolean(porEliminar)} onOpenChange={(o) => !o && setPorEliminar(null)}>
         <AlertDialogContent>

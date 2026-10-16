@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ladoEjercidoPorCodigo } from "@/lib/project-utils";
 
 interface EjercidoMovimiento {
   id: string;
@@ -114,17 +115,10 @@ export function EjercidoViewDialog({
   }, [movimientos]);
 
   // Calculate which column represents the "ejercido" based on account code
+  // Regla compartida (supabase/functions/_shared/negocio/calculos.ts).
   const getEjercidoAmount = (m: EjercidoMovimiento): number => {
     const codigo = cuentaCodigo || m.cuentas_contables?.codigo || "";
-    const esActivo = codigo.startsWith("1");
-    const esPasivoCapital = codigo.startsWith("2") || codigo.startsWith("3");
-    const esCostoGasto = codigo.startsWith("5") || codigo.startsWith("6");
-
-    if (esActivo) return Number(m.haber);
-    if (esPasivoCapital) return Number(m.debe);
-    if (esCostoGasto) return Number(m.debe);
-    // Ingresos (4xx)
-    return Number(m.haber);
+    return Number(ladoEjercidoPorCodigo(codigo) === "debe" ? m.debe : m.haber);
   };
 
   const totalEjercido = movimientosAplicados.reduce(

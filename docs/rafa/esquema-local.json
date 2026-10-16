@@ -1,0 +1,3254 @@
+{
+    "enums": {
+        "app_role": [
+            "admin",
+            "contador",
+            "usuario",
+            "arquitecto"
+        ],
+        "tarea_estado": [
+            "pendiente",
+            "en_progreso",
+            "bloqueada",
+            "hecho"
+        ],
+        "tipo_asiento": [
+            "ingreso",
+            "egreso",
+            "diario"
+        ],
+        "tipo_persona": [
+            "fisica",
+            "moral"
+        ],
+        "estado_asiento": [
+            "borrador",
+            "aplicado",
+            "cancelado"
+        ],
+        "naturaleza_cuenta": [
+            "deudora",
+            "acreedora"
+        ],
+        "tipo_programacion": [
+            "ingreso",
+            "egreso"
+        ],
+        "estado_programacion": [
+            "pendiente",
+            "ejecutado",
+            "cancelado"
+        ],
+        "clasificacion_cuenta": [
+            "titulo",
+            "saldo"
+        ],
+        "tipo_movimiento_flujo": [
+            "ingreso",
+            "egreso",
+            "no_afecta"
+        ],
+        "frecuencia_presupuesto": [
+            "semanal",
+            "mensual",
+            "bimestral",
+            "trimestral",
+            "semestral",
+            "anual"
+        ],
+        "programacion_proyecto_modo": [
+            "automatica",
+            "manual"
+        ],
+        "programacion_proyecto_frecuencia": [
+            "semanal",
+            "quincenal",
+            "mensual",
+            "trimestral",
+            "semestral",
+            "anual",
+            "personalizada"
+        ]
+    },
+    "origen": "Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real)",
+    "tablas": {
+        "empresas": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "tipo_persona",
+                    "nombre": "tipo_persona",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "rfc",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "razon_social",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "nombre_comercial",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "regimen_fiscal",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "uso_cfdi",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "calle",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "numero_exterior",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "numero_interior",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "colonia",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "codigo_postal",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "ciudad",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "estado",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "pais",
+                    "defecto": "'México'::text"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "telefono_principal",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "email_fiscal",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "representante_legal",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "banco",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "numero_cuenta",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "clabe",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "activa",
+                    "defecto": "true"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "created_by",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "update_empresas_updated_at",
+                    "definicion": "CREATE TRIGGER update_empresas_updated_at BEFORE UPDATE ON public.empresas FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "roles": "authenticated",
+                    "using": null,
+                    "nombre": "Admins and contadores can insert empresas",
+                    "comando": "INSERT"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins and contadores can update empresas",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins can delete empresas",
+                    "comando": "DELETE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "true",
+                    "nombre": "Authenticated users can view empresas",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "empresas_created_by_fkey",
+                    "definicion": "FOREIGN KEY (created_by) REFERENCES auth.users(id)"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "empresas_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "UNIQUE",
+                    "nombre": "empresas_rfc_key",
+                    "definicion": "UNIQUE (rfc)"
+                }
+            ]
+        },
+        "profiles": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "nombre_completo",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "nombre_usuario",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "avatar_url",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "telefono",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "codigo_acceso",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "puesto",
+                    "defecto": null
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "update_profiles_updated_at",
+                    "definicion": "CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins can update all profiles",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins can view all profiles",
+                    "comando": "SELECT"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(auth.uid() = user_id)",
+                    "nombre": "Users can update their own profile",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(auth.uid() = user_id)",
+                    "nombre": "Users can view their own profile",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "profiles_user_id_fkey",
+                    "definicion": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "profiles_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "UNIQUE",
+                    "nombre": "profiles_nombre_usuario_key",
+                    "definicion": "UNIQUE (nombre_usuario)"
+                },
+                {
+                    "tipo": "UNIQUE",
+                    "nombre": "profiles_user_id_key",
+                    "definicion": "UNIQUE (user_id)"
+                }
+            ]
+        },
+        "terceros": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "tipo",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "rfc",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "razon_social",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "nombre_comercial",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "calle",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "numero_exterior",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "numero_interior",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "colonia",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "codigo_postal",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "ciudad",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "estado",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "telefono",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "email",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "contacto_nombre",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "banco",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "numero_cuenta",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "clabe",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "activo",
+                    "defecto": "true"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "update_terceros_updated_at",
+                    "definicion": "CREATE TRIGGER update_terceros_updated_at BEFORE UPDATE ON public.terceros FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "roles": "public",
+                    "using": null,
+                    "nombre": "Admins and contadores can insert terceros",
+                    "comando": "INSERT"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins and contadores can update terceros",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins can delete terceros",
+                    "comando": "DELETE"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "true",
+                    "nombre": "Authenticated users can view terceros",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "CHECK",
+                    "nombre": "terceros_tipo_check",
+                    "definicion": "CHECK ((tipo = ANY (ARRAY['cliente'::text, 'proveedor'::text, 'ambos'::text])))"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "terceros_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "terceros_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "UNIQUE",
+                    "nombre": "terceros_empresa_id_rfc_key",
+                    "definicion": "UNIQUE (empresa_id, rfc)"
+                }
+            ]
+        },
+        "proyectos": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "centro_negocio_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "nombre",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "activo",
+                    "defecto": "true"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "created_by",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "updated_by",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "update_proyectos_updated_at",
+                    "definicion": "CREATE TRIGGER update_proyectos_updated_at BEFORE UPDATE ON public.proyectos FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins pueden eliminar proyectos",
+                    "comando": "DELETE"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins y contadores pueden actualizar proyectos",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "roles": "public",
+                    "using": null,
+                    "nombre": "Admins y contadores pueden crear proyectos",
+                    "comando": "INSERT"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR has_role(auth.uid(), 'arquitecto'::app_role) OR (EXISTS ( SELECT 1\n   FROM proyecto_usuarios pu\n  WHERE ((pu.proyecto_id = proyectos.id) AND (pu.user_id = auth.uid())))))",
+                    "nombre": "Admins, contadores, arquitectos y usuarios asignados pueden ver",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "proyectos_centro_negocio_id_fkey",
+                    "definicion": "FOREIGN KEY (centro_negocio_id) REFERENCES centros_negocio(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "proyectos_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "proyectos_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "UNIQUE",
+                    "nombre": "proyectos_centro_negocio_id_key",
+                    "definicion": "UNIQUE (centro_negocio_id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_proyectos_empresa",
+                    "definicion": "CREATE INDEX idx_proyectos_empresa ON public.proyectos USING btree (empresa_id)"
+                }
+            ]
+        },
+        "user_roles": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "app_role",
+                    "nombre": "role",
+                    "defecto": "'usuario'::app_role"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins can manage roles",
+                    "comando": "ALL"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins can view all roles",
+                    "comando": "SELECT"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(auth.uid() = user_id)",
+                    "nombre": "Users can view their own role",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "user_roles_user_id_fkey",
+                    "definicion": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "user_roles_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "UNIQUE",
+                    "nombre": "user_roles_user_id_role_key",
+                    "definicion": "UNIQUE (user_id, role)"
+                }
+            ]
+        },
+        "presupuestos": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "cuenta_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "tercero_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "centro_negocio_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "unidad_medida_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "partida",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "numeric(15,4)",
+                    "nombre": "cantidad",
+                    "defecto": "1"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "numeric(15,4)",
+                    "nombre": "precio_unitario",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "notas",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "activo",
+                    "defecto": "true"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "date",
+                    "nombre": "fecha_inicio",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "date",
+                    "nombre": "fecha_fin",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "frecuencia_presupuesto",
+                    "nombre": "frecuencia",
+                    "defecto": "'mensual'::frecuencia_presupuesto"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "integer",
+                    "nombre": "orden",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "es_project",
+                    "defecto": "false"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "responsable_tercero_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "numeric",
+                    "nombre": "avance_manual",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "tipo_movimiento_flujo",
+                    "nombre": "tipo_movimiento",
+                    "defecto": null
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "trg_audit_presupuesto_change",
+                    "definicion": "CREATE TRIGGER trg_audit_presupuesto_change AFTER UPDATE ON public.presupuestos FOR EACH ROW EXECUTE FUNCTION audit_presupuesto_change()"
+                },
+                {
+                    "nombre": "update_presupuestos_updated_at",
+                    "definicion": "CREATE TRIGGER update_presupuestos_updated_at BEFORE UPDATE ON public.presupuestos FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins and contadores can update presupuestos",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins can delete presupuestos",
+                    "comando": "DELETE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "true",
+                    "nombre": "Authenticated users can view presupuestos",
+                    "comando": "SELECT"
+                },
+                {
+                    "check": "has_role(auth.uid(), 'admin'::app_role)",
+                    "roles": "public",
+                    "using": null,
+                    "nombre": "Only admins can insert presupuestos",
+                    "comando": "INSERT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "CHECK",
+                    "nombre": "presupuestos_avance_manual_check",
+                    "definicion": "CHECK (((avance_manual IS NULL) OR ((avance_manual >= (0)::numeric) AND (avance_manual <= (100)::numeric))))"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "presupuestos_centro_negocio_id_fkey",
+                    "definicion": "FOREIGN KEY (centro_negocio_id) REFERENCES centros_negocio(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "presupuestos_cuenta_id_fkey",
+                    "definicion": "FOREIGN KEY (cuenta_id) REFERENCES cuentas_contables(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "presupuestos_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "presupuestos_responsable_tercero_id_fkey",
+                    "definicion": "FOREIGN KEY (responsable_tercero_id) REFERENCES terceros(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "presupuestos_tercero_id_fkey",
+                    "definicion": "FOREIGN KEY (tercero_id) REFERENCES terceros(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "presupuestos_unidad_medida_id_fkey",
+                    "definicion": "FOREIGN KEY (unidad_medida_id) REFERENCES unidades_medida(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "presupuestos_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_presupuestos_es_project",
+                    "definicion": "CREATE INDEX idx_presupuestos_es_project ON public.presupuestos USING btree (centro_negocio_id) WHERE (es_project = true)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_presupuestos_fechas",
+                    "definicion": "CREATE INDEX idx_presupuestos_fechas ON public.presupuestos USING btree (fecha_inicio, fecha_fin)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_presupuestos_tipo_movimiento",
+                    "definicion": "CREATE INDEX idx_presupuestos_tipo_movimiento ON public.presupuestos USING btree (tipo_movimiento)"
+                }
+            ]
+        },
+        "rafa_acciones": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "conversacion_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "herramienta",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "descripcion",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "estado",
+                    "defecto": "'propuesta'::text"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "requiere_confirmacion",
+                    "defecto": "true"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "jsonb",
+                    "nombre": "entrada",
+                    "defecto": "'{}'::jsonb"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "jsonb",
+                    "nombre": "vista_previa",
+                    "defecto": "'{}'::jsonb"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "huella",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "jsonb",
+                    "nombre": "registros_afectados",
+                    "defecto": "'[]'::jsonb"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "jsonb",
+                    "nombre": "resultado",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "error",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "version_conocimiento",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "reemplazada_por",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "expira_at",
+                    "defecto": "(now() + '00:30:00'::interval)"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "confirmada_at",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "finalizada_at",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "update_rafa_acciones_updated_at",
+                    "definicion": "CREATE TRIGGER update_rafa_acciones_updated_at BEFORE UPDATE ON public.rafa_acciones FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "((user_id = auth.uid()) OR has_role(auth.uid(), 'admin'::app_role))",
+                    "nombre": "Cada usuario lee sus acciones de Rafa; admin audita todas",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "CHECK",
+                    "nombre": "rafa_acciones_estado_check",
+                    "definicion": "CHECK ((estado = ANY (ARRAY['propuesta'::text, 'ejecutando'::text, 'ejecutada'::text, 'fallida'::text, 'parcial'::text, 'cancelada'::text, 'desactualizada'::text, 'expirada'::text])))"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_acciones_conversacion_id_fkey",
+                    "definicion": "FOREIGN KEY (conversacion_id) REFERENCES rafa_conversaciones(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_acciones_reemplazada_por_fkey",
+                    "definicion": "FOREIGN KEY (reemplazada_por) REFERENCES rafa_acciones(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_acciones_user_id_fkey",
+                    "definicion": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "rafa_acciones_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_rafa_acciones_conversacion",
+                    "definicion": "CREATE INDEX idx_rafa_acciones_conversacion ON public.rafa_acciones USING btree (conversacion_id, created_at DESC)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_rafa_acciones_user",
+                    "definicion": "CREATE INDEX idx_rafa_acciones_user ON public.rafa_acciones USING btree (user_id, created_at DESC)"
+                }
+            ]
+        },
+        "rafa_mensajes": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "conversacion_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "rol",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "contenido",
+                    "defecto": "''::text"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "jsonb",
+                    "nombre": "datos",
+                    "defecto": "'{}'::jsonb"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "version_conocimiento",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(user_id = auth.uid())",
+                    "nombre": "Cada usuario lee sus mensajes con Rafa",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "CHECK",
+                    "nombre": "rafa_mensajes_rol_check",
+                    "definicion": "CHECK ((rol = ANY (ARRAY['usuario'::text, 'asistente'::text])))"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_mensajes_conversacion_id_fkey",
+                    "definicion": "FOREIGN KEY (conversacion_id) REFERENCES rafa_conversaciones(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_mensajes_user_id_fkey",
+                    "definicion": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "rafa_mensajes_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_rafa_mensajes_conversacion",
+                    "definicion": "CREATE INDEX idx_rafa_mensajes_conversacion ON public.rafa_mensajes USING btree (conversacion_id, created_at)"
+                }
+            ]
+        },
+        "rafa_sesiones": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "titulo",
+                    "defecto": "'Interpretación de Rafa'::text"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "resumen",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "transcripcion",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "jsonb",
+                    "nombre": "plan",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "jsonb",
+                    "nombre": "propuesta",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "estado",
+                    "defecto": "'borrador'::text"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "update_rafa_sesiones_updated_at",
+                    "definicion": "CREATE TRIGGER update_rafa_sesiones_updated_at BEFORE UPDATE ON public.rafa_sesiones FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": "(user_id = auth.uid())",
+                    "roles": "authenticated",
+                    "using": "((user_id = auth.uid()) OR has_role(auth.uid(), 'admin'::app_role))",
+                    "nombre": "Usuarios gestionan sus sesiones de Rafa",
+                    "comando": "ALL"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_sesiones_user_id_fkey",
+                    "definicion": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "rafa_sesiones_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_rafa_sesiones_user",
+                    "definicion": "CREATE INDEX idx_rafa_sesiones_user ON public.rafa_sesiones USING btree (user_id, updated_at DESC)"
+                }
+            ]
+        },
+        "programaciones": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "tipo_programacion",
+                    "nombre": "tipo",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "centro_negocio_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "date",
+                    "nombre": "fecha_programada",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "tercero_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "numeric",
+                    "nombre": "monto",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "observaciones",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "estado_programacion",
+                    "nombre": "estado",
+                    "defecto": "'pendiente'::estado_programacion"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "asiento_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "created_by",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "presupuesto_id",
+                    "defecto": null
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "update_programaciones_updated_at",
+                    "definicion": "CREATE TRIGGER update_programaciones_updated_at BEFORE UPDATE ON public.programaciones FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "roles": "public",
+                    "using": null,
+                    "nombre": "Admins and contadores can insert programaciones",
+                    "comando": "INSERT"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins and contadores can update programaciones",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins can delete programaciones",
+                    "comando": "DELETE"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "true",
+                    "nombre": "Authenticated users can view programaciones",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "programaciones_asiento_id_fkey",
+                    "definicion": "FOREIGN KEY (asiento_id) REFERENCES asientos_contables(id)"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "programaciones_centro_negocio_id_fkey",
+                    "definicion": "FOREIGN KEY (centro_negocio_id) REFERENCES centros_negocio(id)"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "programaciones_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id)"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "programaciones_presupuesto_id_fkey",
+                    "definicion": "FOREIGN KEY (presupuesto_id) REFERENCES presupuestos(id)"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "programaciones_tercero_id_fkey",
+                    "definicion": "FOREIGN KEY (tercero_id) REFERENCES terceros(id)"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "programaciones_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_programaciones_presupuesto",
+                    "definicion": "CREATE INDEX idx_programaciones_presupuesto ON public.programaciones USING btree (presupuesto_id)"
+                }
+            ]
+        },
+        "centros_negocio": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "codigo",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "nombre",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "tipo_actividad",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "responsable",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "activo",
+                    "defecto": "true"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "update_centros_negocio_updated_at",
+                    "definicion": "CREATE TRIGGER update_centros_negocio_updated_at BEFORE UPDATE ON public.centros_negocio FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "roles": "public",
+                    "using": null,
+                    "nombre": "Admins and contadores can insert centros_negocio",
+                    "comando": "INSERT"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins and contadores can update centros_negocio",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins can delete centros_negocio",
+                    "comando": "DELETE"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "true",
+                    "nombre": "Authenticated users can view centros_negocio",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "centros_negocio_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "centros_negocio_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "centros_negocio_empresa_codigo_activo_idx",
+                    "definicion": "CREATE UNIQUE INDEX centros_negocio_empresa_codigo_activo_idx ON public.centros_negocio USING btree (empresa_id, codigo) WHERE (activo = true)"
+                }
+            ]
+        },
+        "proyecto_tareas": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "proyecto_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "titulo",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "notas",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "responsable_tercero_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "date",
+                    "nombre": "fecha_vencimiento",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "tarea_estado",
+                    "nombre": "estado",
+                    "defecto": "'pendiente'::tarea_estado"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "color",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "integer",
+                    "nombre": "orden",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "created_by",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "updated_by",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "update_proyecto_tareas_updated_at",
+                    "definicion": "CREATE TRIGGER update_proyecto_tareas_updated_at BEFORE UPDATE ON public.proyecto_tareas FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins y contadores pueden actualizar tareas",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "roles": "public",
+                    "using": null,
+                    "nombre": "Admins y contadores pueden crear tareas",
+                    "comando": "INSERT"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins y contadores pueden eliminar tareas",
+                    "comando": "DELETE"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR has_role(auth.uid(), 'arquitecto'::app_role) OR (EXISTS ( SELECT 1\n   FROM proyecto_usuarios pu\n  WHERE ((pu.proyecto_id = proyecto_tareas.proyecto_id) AND (pu.user_id = auth.uid())))))",
+                    "nombre": "Admins, contadores, arquitectos y usuarios asignados pueden ver",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_tareas_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_tareas_proyecto_id_fkey",
+                    "definicion": "FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_tareas_responsable_tercero_id_fkey",
+                    "definicion": "FOREIGN KEY (responsable_tercero_id) REFERENCES terceros(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "proyecto_tareas_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_proyecto_tareas_estado",
+                    "definicion": "CREATE INDEX idx_proyecto_tareas_estado ON public.proyecto_tareas USING btree (proyecto_id, estado)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_proyecto_tareas_proyecto",
+                    "definicion": "CREATE INDEX idx_proyecto_tareas_proyecto ON public.proyecto_tareas USING btree (proyecto_id)"
+                }
+            ]
+        },
+        "unidades_medida": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "codigo",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "nombre",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "activa",
+                    "defecto": "true"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "roles": "authenticated",
+                    "using": null,
+                    "nombre": "Admins and contadores can insert unidades_medida",
+                    "comando": "INSERT"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins and contadores can update unidades_medida",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "true",
+                    "nombre": "Authenticated users can view unidades_medida",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "PK",
+                    "nombre": "unidades_medida_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "UNIQUE",
+                    "nombre": "unidades_medida_codigo_key",
+                    "definicion": "UNIQUE (codigo)"
+                }
+            ]
+        },
+        "rafa_ejecuciones": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "accion_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": "auth.uid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "jsonb",
+                    "nombre": "resultado",
+                    "defecto": "'{}'::jsonb"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(user_id = auth.uid())",
+                    "nombre": "Leer ejecuciones propias",
+                    "comando": "SELECT"
+                },
+                {
+                    "check": "((user_id = auth.uid()) AND (EXISTS ( SELECT 1\n   FROM rafa_acciones a\n  WHERE ((a.id = rafa_ejecuciones.accion_id) AND (a.user_id = auth.uid()) AND (a.estado = ANY (ARRAY['ejecutando'::text, 'ejecutada'::text]))))))",
+                    "roles": "authenticated",
+                    "using": null,
+                    "nombre": "Registrar ejecución de acción confirmada",
+                    "comando": "INSERT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_ejecuciones_accion_id_fkey",
+                    "definicion": "FOREIGN KEY (accion_id) REFERENCES rafa_acciones(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "rafa_ejecuciones_pkey",
+                    "definicion": "PRIMARY KEY (accion_id)"
+                }
+            ]
+        },
+        "cuentas_contables": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "codigo",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "nombre",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "naturaleza_cuenta",
+                    "nombre": "naturaleza",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "clasificacion_cuenta",
+                    "nombre": "clasificacion",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "cuenta_padre_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "integer",
+                    "nombre": "nivel",
+                    "defecto": "1"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "activa",
+                    "defecto": "true"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "update_cuentas_updated_at",
+                    "definicion": "CREATE TRIGGER update_cuentas_updated_at BEFORE UPDATE ON public.cuentas_contables FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "roles": "authenticated",
+                    "using": null,
+                    "nombre": "Admins and contadores can insert cuentas",
+                    "comando": "INSERT"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins and contadores can update cuentas",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins can delete cuentas",
+                    "comando": "DELETE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "true",
+                    "nombre": "Authenticated users can view cuentas",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "cuentas_contables_cuenta_padre_id_fkey",
+                    "definicion": "FOREIGN KEY (cuenta_padre_id) REFERENCES cuentas_contables(id)"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "cuentas_contables_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "cuentas_contables_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "UNIQUE",
+                    "nombre": "cuentas_contables_empresa_id_codigo_key",
+                    "definicion": "UNIQUE (empresa_id, codigo)"
+                }
+            ]
+        },
+        "proyecto_usuarios": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "proyecto_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "created_by",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "editar_cronograma",
+                    "defecto": "false"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "ver_programacion_financiera",
+                    "defecto": "false"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "editar_programacion_financiera",
+                    "defecto": "false"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR (user_id = auth.uid()))",
+                    "nombre": "Admins ven todas las asignaciones, usuarios ven las propias",
+                    "comando": "SELECT"
+                },
+                {
+                    "check": "has_role(auth.uid(), 'admin'::app_role)",
+                    "roles": "public",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Solo admins gestionan accesos a proyectos",
+                    "comando": "ALL"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_usuarios_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_usuarios_proyecto_id_fkey",
+                    "definicion": "FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_usuarios_user_id_fkey",
+                    "definicion": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "proyecto_usuarios_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "UNIQUE",
+                    "nombre": "proyecto_usuarios_proyecto_id_user_id_key",
+                    "definicion": "UNIQUE (proyecto_id, user_id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_proyecto_usuarios_proyecto",
+                    "definicion": "CREATE INDEX idx_proyecto_usuarios_proyecto ON public.proyecto_usuarios USING btree (proyecto_id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_proyecto_usuarios_user",
+                    "definicion": "CREATE INDEX idx_proyecto_usuarios_user ON public.proyecto_usuarios USING btree (user_id)"
+                }
+            ]
+        },
+        "asientos_contables": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "date",
+                    "nombre": "fecha",
+                    "defecto": "CURRENT_DATE"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "tipo_asiento",
+                    "nombre": "tipo",
+                    "defecto": "'diario'::tipo_asiento"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "tercero_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "centro_negocio_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "integer",
+                    "nombre": "numero_asiento",
+                    "defecto": "nextval('asientos_contables_numero_asiento_seq'::regclass)"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "observaciones",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "estado_asiento",
+                    "nombre": "estado",
+                    "defecto": "'borrador'::estado_asiento"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "numeric(15,2)",
+                    "nombre": "total_debe",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "numeric(15,2)",
+                    "nombre": "total_haber",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "created_by",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "sync_iva_flujos_trigger",
+                    "definicion": "CREATE TRIGGER sync_iva_flujos_trigger AFTER INSERT OR UPDATE ON public.asientos_contables FOR EACH ROW EXECUTE FUNCTION sync_iva_flujos()"
+                },
+                {
+                    "nombre": "update_asientos_contables_updated_at",
+                    "definicion": "CREATE TRIGGER update_asientos_contables_updated_at BEFORE UPDATE ON public.asientos_contables FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "roles": "authenticated",
+                    "using": null,
+                    "nombre": "Admins and contadores can insert asientos",
+                    "comando": "INSERT"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins and contadores can update asientos",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins can delete asientos",
+                    "comando": "DELETE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "true",
+                    "nombre": "Authenticated users can view asientos",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "asientos_contables_centro_negocio_id_fkey",
+                    "definicion": "FOREIGN KEY (centro_negocio_id) REFERENCES centros_negocio(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "asientos_contables_created_by_fkey",
+                    "definicion": "FOREIGN KEY (created_by) REFERENCES auth.users(id)"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "asientos_contables_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "asientos_contables_tercero_id_fkey",
+                    "definicion": "FOREIGN KEY (tercero_id) REFERENCES terceros(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "asientos_contables_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_asientos_empresa",
+                    "definicion": "CREATE INDEX idx_asientos_empresa ON public.asientos_contables USING btree (empresa_id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_asientos_fecha",
+                    "definicion": "CREATE INDEX idx_asientos_fecha ON public.asientos_contables USING btree (fecha)"
+                }
+            ]
+        },
+        "flujos_programados": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "presupuesto_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "date",
+                    "nombre": "fecha",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "numeric",
+                    "nombre": "monto",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "tipo",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "descripcion",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "auto_generado",
+                    "defecto": "false"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "asiento_movimiento_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "trg_block_flujos_legacy_proyecto",
+                    "definicion": "CREATE TRIGGER trg_block_flujos_legacy_proyecto BEFORE INSERT OR UPDATE ON public.flujos_programados FOR EACH ROW EXECUTE FUNCTION block_flujos_legacy_si_es_project_con_programacion_propia()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "roles": "public",
+                    "using": null,
+                    "nombre": "Admins and contadores can insert flujos_programados",
+                    "comando": "INSERT"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins and contadores can update flujos_programados",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "has_role(auth.uid(), 'admin'::app_role)",
+                    "nombre": "Admins can delete flujos_programados",
+                    "comando": "DELETE"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "true",
+                    "nombre": "Authenticated users can view flujos_programados",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "CHECK",
+                    "nombre": "flujos_programados_tipo_check",
+                    "definicion": "CHECK ((tipo = ANY (ARRAY['ingreso'::text, 'egreso'::text])))"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "flujos_programados_asiento_movimiento_id_fkey",
+                    "definicion": "FOREIGN KEY (asiento_movimiento_id) REFERENCES asiento_movimientos(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "flujos_programados_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id)"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "flujos_programados_presupuesto_id_fkey",
+                    "definicion": "FOREIGN KEY (presupuesto_id) REFERENCES presupuestos(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "flujos_programados_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_flujos_asiento_mov",
+                    "definicion": "CREATE INDEX idx_flujos_asiento_mov ON public.flujos_programados USING btree (asiento_movimiento_id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_flujos_auto_generado",
+                    "definicion": "CREATE INDEX idx_flujos_auto_generado ON public.flujos_programados USING btree (auto_generado) WHERE (auto_generado = true)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_flujos_empresa_id",
+                    "definicion": "CREATE INDEX idx_flujos_empresa_id ON public.flujos_programados USING btree (empresa_id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_flujos_programados_fecha",
+                    "definicion": "CREATE INDEX idx_flujos_programados_fecha ON public.flujos_programados USING btree (fecha)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_flujos_programados_presupuesto",
+                    "definicion": "CREATE INDEX idx_flujos_programados_presupuesto ON public.flujos_programados USING btree (presupuesto_id)"
+                }
+            ]
+        },
+        "proyecto_auditoria": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "proyecto_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "accion",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "entidad_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "valor_anterior",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "valor_nuevo",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "presupuesto_id",
+                    "defecto": null
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": "((user_id = auth.uid()) AND (has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR (EXISTS ( SELECT 1\n   FROM proyecto_usuarios pu\n  WHERE ((pu.proyecto_id = proyecto_auditoria.proyecto_id) AND (pu.user_id = auth.uid()) AND (pu.editar_cronograma OR pu.editar_programacion_financiera))))))",
+                    "roles": "public",
+                    "using": null,
+                    "nombre": "Registrar auditoría del proyecto",
+                    "comando": "INSERT"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR (EXISTS ( SELECT 1\n   FROM proyecto_usuarios pu\n  WHERE ((pu.proyecto_id = proyecto_auditoria.proyecto_id) AND (pu.user_id = auth.uid())))))",
+                    "nombre": "Ver auditoría del proyecto",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_auditoria_presupuesto_id_fkey",
+                    "definicion": "FOREIGN KEY (presupuesto_id) REFERENCES presupuestos(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_auditoria_proyecto_id_fkey",
+                    "definicion": "FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "proyecto_auditoria_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_proyecto_auditoria_proyecto",
+                    "definicion": "CREATE INDEX idx_proyecto_auditoria_proyecto ON public.proyecto_auditoria USING btree (proyecto_id, created_at DESC)"
+                }
+            ]
+        },
+        "asiento_movimientos": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "asiento_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "cuenta_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "partida",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "numeric(15,2)",
+                    "nombre": "debe",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "numeric(15,2)",
+                    "nombre": "haber",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "integer",
+                    "nombre": "orden",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "presupuesto_id",
+                    "defecto": null
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins and contadores can delete movimientos",
+                    "comando": "DELETE"
+                },
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "roles": "authenticated",
+                    "using": null,
+                    "nombre": "Admins and contadores can insert movimientos",
+                    "comando": "INSERT"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Admins and contadores can update movimientos",
+                    "comando": "UPDATE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "true",
+                    "nombre": "Authenticated users can view movimientos",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "asiento_movimientos_asiento_id_fkey",
+                    "definicion": "FOREIGN KEY (asiento_id) REFERENCES asientos_contables(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "asiento_movimientos_cuenta_id_fkey",
+                    "definicion": "FOREIGN KEY (cuenta_id) REFERENCES cuentas_contables(id) ON DELETE RESTRICT"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "asiento_movimientos_presupuesto_id_fkey",
+                    "definicion": "FOREIGN KEY (presupuesto_id) REFERENCES presupuestos(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "asiento_movimientos_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_asiento_movimientos_presupuesto",
+                    "definicion": "CREATE INDEX idx_asiento_movimientos_presupuesto ON public.asiento_movimientos USING btree (presupuesto_id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_movimientos_asiento",
+                    "definicion": "CREATE INDEX idx_movimientos_asiento ON public.asiento_movimientos USING btree (asiento_id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_movimientos_cuenta",
+                    "definicion": "CREATE INDEX idx_movimientos_cuenta ON public.asiento_movimientos USING btree (cuenta_id)"
+                }
+            ]
+        },
+        "rafa_conversaciones": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "titulo",
+                    "defecto": "'Conversación con Rafa'::text"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "jsonb",
+                    "nombre": "contexto",
+                    "defecto": "'{}'::jsonb"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "update_rafa_conversaciones_updated_at",
+                    "definicion": "CREATE TRIGGER update_rafa_conversaciones_updated_at BEFORE UPDATE ON public.rafa_conversaciones FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": "(user_id = auth.uid())",
+                    "roles": "authenticated",
+                    "using": "(user_id = auth.uid())",
+                    "nombre": "Cada usuario gestiona sus conversaciones con Rafa",
+                    "comando": "ALL"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_conversaciones_user_id_fkey",
+                    "definicion": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "rafa_conversaciones_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_rafa_conversaciones_user",
+                    "definicion": "CREATE INDEX idx_rafa_conversaciones_user ON public.rafa_conversaciones USING btree (user_id, updated_at DESC)"
+                }
+            ]
+        },
+        "proyecto_cronograma_shares": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "proyecto_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "token",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "activo",
+                    "defecto": "true"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "created_by",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR (EXISTS ( SELECT 1\n   FROM proyecto_usuarios pu\n  WHERE ((pu.proyecto_id = proyecto_cronograma_shares.proyecto_id) AND (pu.user_id = auth.uid()) AND pu.editar_cronograma))))",
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR (EXISTS ( SELECT 1\n   FROM proyecto_usuarios pu\n  WHERE ((pu.proyecto_id = proyecto_cronograma_shares.proyecto_id) AND (pu.user_id = auth.uid()) AND pu.editar_cronograma))))",
+                    "nombre": "Gestionar links de cronograma",
+                    "comando": "ALL"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_cronograma_shares_proyecto_id_fkey",
+                    "definicion": "FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "proyecto_cronograma_shares_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "UNIQUE",
+                    "nombre": "proyecto_cronograma_shares_token_key",
+                    "definicion": "UNIQUE (token)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_proyecto_shares_proyecto",
+                    "definicion": "CREATE INDEX idx_proyecto_shares_proyecto ON public.proyecto_cronograma_shares USING btree (proyecto_id)"
+                }
+            ]
+        },
+        "proyecto_programacion_pagos": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "programacion_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "proyecto_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "date",
+                    "nombre": "fecha",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "numeric",
+                    "nombre": "monto",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "text",
+                    "nombre": "concepto",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "es_anticipo",
+                    "defecto": "false"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "integer",
+                    "nombre": "orden",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "trg_validar_pago_programacion_project",
+                    "definicion": "CREATE TRIGGER trg_validar_pago_programacion_project BEFORE INSERT OR UPDATE ON public.proyecto_programacion_pagos FOR EACH ROW EXECUTE FUNCTION validar_pago_programacion_project()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR (EXISTS ( SELECT 1\n   FROM proyecto_usuarios pu\n  WHERE ((pu.proyecto_id = proyecto_programacion_pagos.proyecto_id) AND (pu.user_id = auth.uid()) AND pu.editar_programacion_financiera))))",
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR (EXISTS ( SELECT 1\n   FROM proyecto_usuarios pu\n  WHERE ((pu.proyecto_id = proyecto_programacion_pagos.proyecto_id) AND (pu.user_id = auth.uid()) AND pu.editar_programacion_financiera))))",
+                    "nombre": "Editar pagos programados del proyecto",
+                    "comando": "ALL"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR has_role(auth.uid(), 'arquitecto'::app_role) OR (EXISTS ( SELECT 1\n   FROM proyecto_usuarios pu\n  WHERE ((pu.proyecto_id = proyecto_programacion_pagos.proyecto_id) AND (pu.user_id = auth.uid()) AND pu.ver_programacion_financiera))))",
+                    "nombre": "Ver pagos programados del proyecto",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "CHECK",
+                    "nombre": "proyecto_programacion_pagos_monto_check",
+                    "definicion": "CHECK ((monto > (0)::numeric))"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_programacion_pagos_programacion_id_fkey",
+                    "definicion": "FOREIGN KEY (programacion_id) REFERENCES proyecto_programacion_financiera(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_programacion_pagos_proyecto_id_fkey",
+                    "definicion": "FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "proyecto_programacion_pagos_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_ppp_programacion",
+                    "definicion": "CREATE INDEX idx_ppp_programacion ON public.proyecto_programacion_pagos USING btree (programacion_id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_ppp_proyecto",
+                    "definicion": "CREATE INDEX idx_ppp_proyecto ON public.proyecto_programacion_pagos USING btree (proyecto_id)"
+                }
+            ]
+        },
+        "proyecto_programacion_financiera": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "presupuesto_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "proyecto_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "programacion_proyecto_modo",
+                    "nombre": "modo",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "boolean",
+                    "nombre": "tiene_anticipo",
+                    "defecto": "false"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "numeric",
+                    "nombre": "anticipo_monto",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "date",
+                    "nombre": "anticipo_fecha",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "programacion_proyecto_frecuencia",
+                    "nombre": "frecuencia",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "date",
+                    "nombre": "fecha_inicio",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "integer",
+                    "nombre": "numero_pagos",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "created_by",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "updated_by",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "updated_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+                {
+                    "nombre": "trg_cleanup_flujos_legacy",
+                    "definicion": "CREATE TRIGGER trg_cleanup_flujos_legacy AFTER INSERT ON public.proyecto_programacion_financiera FOR EACH ROW EXECUTE FUNCTION cleanup_flujos_legacy_al_crear_programacion_propia()"
+                },
+                {
+                    "nombre": "trg_validar_programacion_partida_project",
+                    "definicion": "CREATE TRIGGER trg_validar_programacion_partida_project BEFORE INSERT OR UPDATE ON public.proyecto_programacion_financiera FOR EACH ROW EXECUTE FUNCTION validar_programacion_partida_project()"
+                },
+                {
+                    "nombre": "update_proyecto_programacion_financiera_updated_at",
+                    "definicion": "CREATE TRIGGER update_proyecto_programacion_financiera_updated_at BEFORE UPDATE ON public.proyecto_programacion_financiera FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+                }
+            ],
+            "politicas": [
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR (EXISTS ( SELECT 1\n   FROM proyecto_usuarios pu\n  WHERE ((pu.proyecto_id = proyecto_programacion_financiera.proyecto_id) AND (pu.user_id = auth.uid()) AND pu.editar_programacion_financiera))))",
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR (EXISTS ( SELECT 1\n   FROM proyecto_usuarios pu\n  WHERE ((pu.proyecto_id = proyecto_programacion_financiera.proyecto_id) AND (pu.user_id = auth.uid()) AND pu.editar_programacion_financiera))))",
+                    "nombre": "Editar programación financiera del proyecto",
+                    "comando": "ALL"
+                },
+                {
+                    "check": null,
+                    "roles": "public",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role) OR has_role(auth.uid(), 'arquitecto'::app_role) OR (EXISTS ( SELECT 1\n   FROM proyecto_usuarios pu\n  WHERE ((pu.proyecto_id = proyecto_programacion_financiera.proyecto_id) AND (pu.user_id = auth.uid()) AND pu.ver_programacion_financiera))))",
+                    "nombre": "Ver programación financiera del proyecto",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_programacion_financiera_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_programacion_financiera_presupuesto_id_fkey",
+                    "definicion": "FOREIGN KEY (presupuesto_id) REFERENCES presupuestos(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "proyecto_programacion_financiera_proyecto_id_fkey",
+                    "definicion": "FOREIGN KEY (proyecto_id) REFERENCES proyectos(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "proyecto_programacion_financiera_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "UNIQUE",
+                    "nombre": "proyecto_programacion_financiera_presupuesto_id_key",
+                    "definicion": "UNIQUE (presupuesto_id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_ppf_proyecto",
+                    "definicion": "CREATE INDEX idx_ppf_proyecto ON public.proyecto_programacion_financiera USING btree (proyecto_id)"
+                }
+            ]
+        }
+    },
+    "funciones": [
+        {
+            "nombre": "actualizar_cronograma_partida",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": "_presupuesto_id uuid, _fecha_inicio date, _fecha_fin date, _avance_manual numeric"
+        },
+        {
+            "nombre": "audit_presupuesto_change",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": ""
+        },
+        {
+            "nombre": "block_flujos_legacy_si_es_project_con_programacion_propia",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": ""
+        },
+        {
+            "nombre": "cleanup_flujos_legacy_al_crear_programacion_propia",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": ""
+        },
+        {
+            "nombre": "get_cronograma_publico",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": "_token text"
+        },
+        {
+            "nombre": "get_user_role",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": "_user_id uuid"
+        },
+        {
+            "nombre": "handle_new_user",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": ""
+        },
+        {
+            "nombre": "has_role",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": "_user_id uuid, _role app_role"
+        },
+        {
+            "nombre": "rafa_ajustar_presupuestos",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_cambios jsonb"
+        },
+        {
+            "nombre": "rafa_aplicar_asientos",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_asientos jsonb"
+        },
+        {
+            "nombre": "rafa_cambiar_estado_programaciones",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_cambios jsonb"
+        },
+        {
+            "nombre": "rafa_crear_asientos_borrador",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_asientos jsonb"
+        },
+        {
+            "nombre": "rafa_crear_programaciones",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_items jsonb"
+        },
+        {
+            "nombre": "rafa_crear_tarea",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_tarea jsonb"
+        },
+        {
+            "nombre": "rafa_registrar_ejecucion",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_resultado jsonb"
+        },
+        {
+            "nombre": "sync_iva_flujos",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": ""
+        },
+        {
+            "nombre": "update_updated_at_column",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": ""
+        },
+        {
+            "nombre": "validar_pago_programacion_project",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": ""
+        },
+        {
+            "nombre": "validar_programacion_partida_project",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": ""
+        }
+    ],
+    "migraciones_sha256": "506d60b2ca7e2d35e908e3f8dbb9213d4980f07109671bcf986484867e44bcde"
+}

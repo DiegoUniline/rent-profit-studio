@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import { PresupuestoDialog } from "@/components/dialogs/PresupuestoDialog";
 import { SortablePresupuestoRow } from "@/components/presupuestos/SortablePresupuestoRow";
-import { calcularMontoPresupuestado } from "@/lib/project-utils";
+import { calcularMontoPresupuestado, calcularEjercidoPorNaturaleza } from "@/lib/project-utils";
 import { TIPO_MOVIMIENTO_LABELS, PENDIENTE_LABEL, type TipoMovimientoValor } from "@/lib/tipo-movimiento";
 import {
   DndContext,
@@ -137,60 +137,26 @@ interface Presupuesto {
   tipo?: TipoMovimientoValor;
 }
 
-// Function to determine if account is "deudora" based on codigo
-const esNaturalezaDeudora = (codigo: string): boolean => {
-  if (!codigo) return true;
-  return (
-    codigo.startsWith("100") ||
-    codigo.startsWith("500") ||
-    codigo.startsWith("600") ||
-    codigo.startsWith("1") && !codigo.startsWith("1") // Activo general
-  );
-};
-
-// Calculate ejercido based on account nature
-// Cuentas de Balance: ejercido = cuando DISMINUYE la cuenta
-// Cuentas de Resultados: ejercido = cuando se registra el movimiento
+// Ejercido por naturaleza de la cuenta: regla compartida con Rafa y con la
+// vista de Ejercido (supabase/functions/_shared/negocio/calculos.ts).
 const calcularEjercido = (
   presupuestoId: string,
   cuentaCodigo: string | undefined,
   movimientos: MovimientoConAsiento[]
-): number => {
-  const movimientosMatch = movimientos.filter(
-    (m) => m.presupuesto_id === presupuestoId && m.asientos_contables?.estado === "aplicado"
+): number =>
+  calcularEjercidoPorNaturaleza(
+    movimientos
+      .filter((m) => m.presupuesto_id === presupuestoId)
+      .map((m) => ({
+        asiento_id: "",
+        presupuesto_id: m.presupuesto_id,
+        debe: m.debe,
+        haber: m.haber,
+        cuenta_codigo: m.cuentas_contables?.codigo ?? null,
+        estado_asiento: m.asientos_contables?.estado ?? null,
+      })),
+    cuentaCodigo
   );
-
-  if (movimientosMatch.length === 0) return 0;
-
-  const codigoCuenta = cuentaCodigo || movimientosMatch[0]?.cuentas_contables?.codigo || "";
-  
-  // Determinar tipo de cuenta por código
-  const esActivo = codigoCuenta.startsWith("1"); // 100, 1xx
-  const esPasivo = codigoCuenta.startsWith("2"); // 200, 2xx
-  const esCapital = codigoCuenta.startsWith("3"); // 300, 3xx
-
-  if (esActivo) {
-    // Activo disminuye con HABER (cobros, consumos de recursos)
-    return movimientosMatch.reduce((sum, m) => sum + Number(m.haber), 0);
-  } else if (esPasivo) {
-    // Pasivo disminuye con DEBE (pagos de deuda)
-    return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
-  } else if (esCapital) {
-    // Capital: para presupuestos, cuando disminuye (DEBE)
-    return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
-  } else {
-    // Cuentas de resultados (4 Ingresos, 5 Costos, 6 Gastos)
-    const esCostoGasto = codigoCuenta.startsWith("5") || codigoCuenta.startsWith("6");
-    
-    if (esCostoGasto) {
-      // Costos/Gastos -> suma debe (naturaleza deudora)
-      return movimientosMatch.reduce((sum, m) => sum + Number(m.debe), 0);
-    } else {
-      // Ingresos (4xx) -> suma haber (naturaleza acreedora)
-      return movimientosMatch.reduce((sum, m) => sum + Number(m.haber), 0);
-    }
-  }
-};
 
 export default function Presupuestos() {
   const { role } = useAuth();
