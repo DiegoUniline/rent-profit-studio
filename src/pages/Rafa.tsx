@@ -175,6 +175,12 @@ export default function Rafa() {
   };
 
   const interpretar = async (payload: CapturaPayload) => {
+    const tieneAudio = !!payload.audio?.data;
+    if (!payload.texto.trim() && !tieneAudio && payload.archivos.length === 0) {
+      toast({ variant: "destructive", title: "Falta la instrucción", description: "Escribe, graba un audio o adjunta un archivo." });
+      return;
+    }
+    if (!tieneAudio) payload = { ...payload, audio: undefined };
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("rafa-asistente", {
