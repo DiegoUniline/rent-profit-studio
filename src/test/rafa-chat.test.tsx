@@ -132,3 +132,71 @@ describe("chat de Rafa", () => {
     );
   });
 });
+
+describe("respuestas rápidas e hipervínculos", () => {
+  beforeEach(() => {
+    invoke.mockReset();
+    for (const k of Object.keys(tablas)) delete tablas[k];
+  });
+
+  it("convierte la elección de empresa en botones que envían el id y muestra enlaces internos", async () => {
+    const empresa = "e1000000-0000-0000-0000-000000000001";
+    let llamada = 0;
+    invoke.mockImplementation(async (_fn: string, { body }: { body: Record<string, unknown> }) => {
+      llamada++;
+      tablas.rafa_mensajes = [
+        { id: "u1", rol: "usuario", contenido: body.mensaje, datos: {}, version_conocimiento: "k", created_at: "2026-10-16T00:00:00Z" },
+        {
+          id: "a1",
+          rol: "asistente",
+          contenido: "¿De qué empresa? Revisa [Cimentación](/presupuestos/p1/ejercido).\n[[opciones: Maq Rentable | Concretec]]",
+          datos: {
+            herramientas: [
+              {
+                nombre: "comparar_programacion_presupuesto",
+                argumentos: {},
+                ok: false,
+                tipo: "error",
+                resumen: "Falta indicar la empresa",
+                alcance: null,
+                tablas: [],
+                referencias: [],
+                accion: null,
+                advertencias: [],
+                faltantes: ["empresa_id"],
+                opciones: [
+                  { id: empresa, nombre: "Maq Rentable" },
+                  { id: "e2000000-0000-0000-0000-000000000002", nombre: "Concretec" },
+                ],
+                error: "falta",
+              },
+            ],
+          },
+          version_conocimiento: "k",
+          created_at: "2026-10-16T00:00:01Z",
+        },
+      ];
+      return { data: { conversacion_id: "c1", mensaje_id: `m${llamada}`, contenido: "", version_conocimiento: "k" }, error: null };
+    });
+
+    render(
+      <MemoryRouter>
+        <RafaChat compacto />
+      </MemoryRouter>
+    );
+    fireEvent.change(screen.getByPlaceholderText(/Escribe a Rafa/), { target: { value: "¿Pagos de la semana?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Maq Rentable" })).toBeInTheDocument());
+    expect(screen.queryByText(/\[\[opciones/)).toBeNull();
+    expect(screen.getByRole("link", { name: "Cimentación" })).toHaveAttribute("href", "/presupuestos/p1/ejercido");
+    expect(screen.queryByText("Falta indicar la empresa")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Maq Rentable" }));
+    await waitFor(() =>
+      expect(invoke).toHaveBeenLastCalledWith("rafa-asistente", {
+        body: expect.objectContaining({ modo: "chat", mensaje: "Maq Rentable", contexto_pantalla: { empresa_id: empresa } }),
+      })
+    );
+  });
+});

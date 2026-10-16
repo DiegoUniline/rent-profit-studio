@@ -7,7 +7,6 @@ import { RafaCaptura, type CapturaPayload } from "@/components/rafa/RafaCaptura"
 import { RafaPropuesta } from "@/components/rafa/RafaPropuesta";
 import { RafaSesiones, type SesionRafa } from "@/components/rafa/RafaSesiones";
 import { RafaChat } from "@/components/rafa/RafaChat";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { aplicarPlanRafa } from "@/lib/rafa-apply";
 import {
   aplicarFormatoTexto,
@@ -19,7 +18,7 @@ import {
 } from "@/lib/rafa-types";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Pencil } from "lucide-react";
+import { ArrowLeft, FileUp, Pencil } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -376,94 +375,89 @@ export default function Rafa() {
 
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start gap-4">
-        <div className="relative shrink-0">
-          <img
-            src={rafaAvatar}
-            alt="Rafa, asistente de proyectos"
-            width={816}
-            height={816}
-            className="h-20 w-20 rounded-full object-cover object-top bg-primary/10 ring-2 ring-primary/30"
-          />
-          <span className="absolute bottom-1 right-1 h-3.5 w-3.5 rounded-full bg-green-500 ring-2 ring-background" />
-        </div>
-        <div className="space-y-1.5">
-          <h1 className="text-2xl font-bold">Rafa · Asistente de proyectos</h1>
-          <div className="relative rounded-2xl rounded-tl-sm border bg-muted/50 px-4 py-2.5 text-sm max-w-2xl">
-            ¡Hola! Soy Rafa. Pregúntame cómo funciona el sistema o qué está pasando con tus presupuestos,
-            programación, asientos y proyectos; puedo preparar propuestas, simulaciones y borradores. Todo cambio
-            definitivo te lo muestro antes y solo se ejecuta cuando lo confirmas.
-          </div>
-        </div>
-      </div>
-
-
-      <Tabs value={pestana} onValueChange={(v) => setPestana(v as "chat" | "plan")}>
-        <TabsList>
-          <TabsTrigger value="chat">Conversación</TabsTrigger>
-          <TabsTrigger value="plan">Cargar presupuesto</TabsTrigger>
-        </TabsList>
-        <TabsContent value="chat" className="mt-4">
-          <RafaChat onAbrirPlan={puedeEditarPresupuestos ? abrirPlanDesdeChat : undefined} />
-        </TabsContent>
-        <TabsContent value="plan" className="mt-4 space-y-6">
-          {!propuesta ? (
-            <>
-              <RafaCaptura loading={loading} onEnviar={interpretar} />
-              <RafaSesiones
-                sesiones={sesiones}
-                activaId={sesionId}
-                onAbrir={abrirSesion}
-                onEliminar={eliminarSesion}
+    <div>
+      {pestana === "chat" ? (
+        <RafaChat
+          onAbrirPlan={puedeEditarPresupuestos ? abrirPlanDesdeChat : undefined}
+          lateral={
+            <div className="flex items-center gap-2 pb-1">
+              <img
+                src={rafaAvatar}
+                alt="Rafa"
+                width={816}
+                height={816}
+                className="h-9 w-9 shrink-0 rounded-full object-cover object-top bg-primary/10 ring-2 ring-primary/30"
               />
-              <Card>
-                <CardContent className="pt-6 text-sm text-muted-foreground space-y-1">
-                  <p className="font-medium text-foreground">Qué puede hacer Rafa</p>
-                  <p>· Crear o enlazar un centro de negocio y un tercero (contratista).</p>
-                  <p>· Cargar las partidas del archivo con cantidad, precio unitario e IVA.</p>
-                  <p>· Sugerir la cuenta contable de cada partida.</p>
-                  <p>· Programar los flujos de efectivo por semana, quincena o mes.</p>
-                  <p>· Guardar cada interpretación para retomarla y corregirla después.</p>
-                </CardContent>
-              </Card>
-            </>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setReinstruir((v) => !v)}>
-                  <Pencil className="h-3.5 w-3.5" />
-                  {reinstruir ? "Ocultar instrucción" : "Cambiar instrucción"}
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                  Al cambiar la instrucción se corrige esta misma interpretación; no se crea otra.
-                </span>
-              </div>
-              {reinstruir && <RafaCaptura loading={loading} onEnviar={interpretar} />}
-              <RafaPropuesta
-              resumen={plan?.resumen || ""}
-              transcripcion={plan?.transcripcion}
-              propuesta={propuesta}
-              empresas={empresas}
-              centros={centros}
-              terceros={terceros}
-              cuentas={cuentas}
-              guardando={guardando}
-              onChange={setPropuesta}
-              onAplicar={aplicar}
-              soloLectura={!puedeEditarPresupuestos}
-              yaGuardado={Boolean(propuesta.aplicado?.presupuestoIds?.length)}
-              onReiniciar={() => {
-                setPlan(null);
-                setPropuesta(null);
-                setSesionId(null);
-                setReinstruir(false);
-              }}
-              />
-            </>
-          )}
-        </TabsContent>
-      </Tabs>
+              <span className="flex-1 text-sm font-semibold">Rafa</span>
+              <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs" onClick={() => setPestana("plan")}>
+                <FileUp className="h-3.5 w-3.5" />
+                Cargar presupuesto
+              </Button>
+            </div>
+          }
+        />
+      ) : (
+        <div className="space-y-6">
+          <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => setPestana("chat")}>
+            <ArrowLeft className="h-4 w-4" />
+            Volver a la conversación
+          </Button>
+        {!propuesta ? (
+          <>
+            <RafaCaptura loading={loading} onEnviar={interpretar} />
+            <RafaSesiones
+              sesiones={sesiones}
+              activaId={sesionId}
+              onAbrir={abrirSesion}
+              onEliminar={eliminarSesion}
+            />
+            <Card>
+              <CardContent className="pt-6 text-sm text-muted-foreground space-y-1">
+                <p className="font-medium text-foreground">Qué puede hacer Rafa</p>
+                <p>· Crear o enlazar un centro de negocio y un tercero (contratista).</p>
+                <p>· Cargar las partidas del archivo con cantidad, precio unitario e IVA.</p>
+                <p>· Sugerir la cuenta contable de cada partida.</p>
+                <p>· Programar los flujos de efectivo por semana, quincena o mes.</p>
+                <p>· Guardar cada interpretación para retomarla y corregirla después.</p>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setReinstruir((v) => !v)}>
+                <Pencil className="h-3.5 w-3.5" />
+                {reinstruir ? "Ocultar instrucción" : "Cambiar instrucción"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Al cambiar la instrucción se corrige esta misma interpretación; no se crea otra.
+              </span>
+            </div>
+            {reinstruir && <RafaCaptura loading={loading} onEnviar={interpretar} />}
+            <RafaPropuesta
+            resumen={plan?.resumen || ""}
+            transcripcion={plan?.transcripcion}
+            propuesta={propuesta}
+            empresas={empresas}
+            centros={centros}
+            terceros={terceros}
+            cuentas={cuentas}
+            guardando={guardando}
+            onChange={setPropuesta}
+            onAplicar={aplicar}
+            soloLectura={!puedeEditarPresupuestos}
+            yaGuardado={Boolean(propuesta.aplicado?.presupuestoIds?.length)}
+            onReiniciar={() => {
+              setPlan(null);
+              setPropuesta(null);
+              setSesionId(null);
+              setReinstruir(false);
+            }}
+            />
+          </>
+        )}
+        </div>
+      )}
 
       <AlertDialog open={Boolean(porEliminar)} onOpenChange={(o) => !o && setPorEliminar(null)}>
         <AlertDialogContent>

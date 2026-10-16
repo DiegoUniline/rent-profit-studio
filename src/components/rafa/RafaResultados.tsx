@@ -205,7 +205,7 @@ export function ResultadosHerramientas({
     new Map(
       herramientas
         .flatMap((h) => h.referencias || [])
-        .filter((r) => r.enlace && r.entidad !== "documento")
+        .filter((r) => r.enlace && r.entidad !== "documento" && r.entidad !== "empresa")
         .map((r) => [`${r.entidad}:${r.id}`, r])
     ).values()
   ).slice(0, 12);
@@ -228,13 +228,13 @@ export function ResultadosHerramientas({
         </div>
       ))}
       {consultas
-        .filter((h) => h.ok && h.alcance)
+        .filter((h) => h.ok && h.alcance && (h.alcance.empresa || h.alcance.proyecto || h.alcance.periodo || h.alcance.truncado))
         .slice(0, 3)
         .map((h, i) => (
           <AlcanceTexto key={`a-${i}`} alcance={h.alcance} />
         ))}
       {consultas
-        .filter((h) => !h.ok && (h.faltantes?.length || h.error))
+        .filter((h) => !h.ok && !h.opciones?.length && (h.faltantes?.length || h.error))
         .map((h, i) => (
           <p key={`e-${i}`} className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-300">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />

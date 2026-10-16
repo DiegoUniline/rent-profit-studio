@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -27,9 +28,46 @@ interface Props {
   onAbrirPlan?: (plan: PlanRafa) => void;
   /** Panel lateral: oculta la lista de conversaciones. */
   compacto?: boolean;
+  /** Contenido extra al inicio de la barra lateral (p. ej. acceso a "Cargar presupuesto"). */
+  lateral?: ReactNode;
 }
 
-/** Formato mínimo de markdown: negritas, código en línea y viñetas. */
+const PATRON_OPCIONES = /\[\[\s*opciones\s*:([^\]]*)\]\]/i;
+
+/** Separa la línea [[opciones: A | B]] que Rafa usa para ofrecer botones. */
+function separarOpciones(texto: string): { texto: string; opciones: string[] } {
+  const m = texto.match(PATRON_OPCIONES);
+  if (!m) return { texto, opciones: [] };
+  const opciones = m[1]
+    .split("|")
+    .map((o) => o.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  return { texto: texto.replace(PATRON_OPCIONES, "").trim(), opciones };
+}
+
+/** Negritas, código y enlaces internos [texto](/ruta) como hipervínculos. */
+function enLinea(texto: string, clave: string): ReactNode[] {
+  return texto.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(\/[^)\s]*\))/g).map((p, j) => {
+    const k = `${clave}-${j}`;
+    if (p.startsWith("**") && p.endsWith("**") && p.length > 4) return <strong key={k}>{enLinea(p.slice(2, -2), k)}</strong>;
+    if (p.startsWith("`") && p.endsWith("`") && p.length > 2)
+      return (
+        <code key={k} className="rounded bg-muted px-1 text-xs">
+          {p.slice(1, -1)}
+        </code>
+      );
+    const enlace = p.match(/^\[([^\]]+)\]\((\/[^)\s]*)\)$/);
+    if (enlace)
+      return (
+        <Link key={k} to={enlace[2]} className="font-medium text-primary underline underline-offset-2 hover:opacity-80">
+          {enlace[1]}
+        </Link>
+      );
+    return <span key={k}>{p}</span>;
+  });
+}
+
 function TextoRafa({ texto }: { texto: string }) {
   const lineas = texto.split("\n");
   return (
@@ -37,17 +75,7 @@ function TextoRafa({ texto }: { texto: string }) {
       {lineas.map((linea, i) => {
         const vineta = /^\s*[-*]\s+/.test(linea);
         const contenido = linea.replace(/^\s*[-*]\s+/, "").replace(/^#+\s*/, "");
-        const partes = contenido.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p, j) =>
-          p.startsWith("**") ? (
-            <strong key={j}>{p.slice(2, -2)}</strong>
-          ) : p.startsWith("`") ? (
-            <code key={j} className="rounded bg-muted px-1 text-xs">
-              {p.slice(1, -1)}
-            </code>
-          ) : (
-            <span key={j}>{p}</span>
-          )
-        );
+        const partes = enLinea(contenido, String(i));
         if (!linea.trim()) return <div key={i} className="h-1" />;
         return vineta ? (
           <div key={i} className="flex gap-2 pl-2">
@@ -64,6 +92,36 @@ function TextoRafa({ texto }: { texto: string }) {
   );
 }
 
+const normalizar = (t: string) =>
+  t
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+interface Opcion {
+  etiqueta: string;
+  contexto?: Partial<ContextoPantalla>;
+}
+
+/** Botones de respuesta rápida de un mensaje: los que Rafa propone y los que exige una herramienta (p. ej. elegir empresa). */
+function opcionesDe(m: MensajeRafa): Opcion[] {
+  const { opciones } = separarOpciones(m.contenido || "");
+  const herramientas = m.datos?.herramientas || [];
+  const empresas = new Map<string, string>();
+  herramientas.forEach((h) => {
+    (h.opciones || []).forEach((o) => empresas.set(normalizar(o.nombre), o.id));
+    (h.referencias || []).filter((r) => r.entidad === "empresa").forEach((r) => empresas.set(normalizar(r.etiqueta), r.id));
+  });
+  const etiquetas = opciones.length
+    ? opciones
+    : herramientas.flatMap((h) => (h.faltantes?.includes("empresa_id") ? (h.opciones || []).map((o) => o.nombre) : []));
+  return Array.from(new Set(etiquetas)).map((etiqueta) => {
+    const empresaId = empresas.get(normalizar(etiqueta));
+    return { etiqueta, contexto: empresaId ? { empresa_id: empresaId } : undefined };
+  });
+}
+
 const SUGERENCIAS = [
   "¿Todos los pagos de esta semana están dentro del presupuesto?",
   "¿Cuánto llevamos ejercido por partida?",
@@ -71,7 +129,7 @@ const SUGERENCIAS = [
   "Programa 15 lotes por mes hasta completar 550",
 ];
 
-export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false }: Props) {
+export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, lateral }: Props) {
   const { toast } = useToast();
   const [conversaciones, setConversaciones] = useState<ConversacionRafa[]>([]);
   const [conversacionId, setConversacionId] = useState<string | null>(null);
@@ -144,7 +202,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false }: Pr
     setAcciones(new Map());
   };
 
-  const enviar = async (mensajeDirecto?: string) => {
+  const enviar = async (mensajeDirecto?: string, contextoExtra?: Partial<ContextoPantalla>) => {
     const mensaje = (mensajeDirecto ?? texto).trim();
     if ((!mensaje && !audioBlob && archivos.length === 0) || enviando) return;
     setEnviando(true);
@@ -167,8 +225,9 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false }: Pr
         : audioArchivo
         ? { data: await toBase64(audioArchivo), format: (audioArchivo.name.split(".").pop() || "mp3").toLowerCase() }
         : undefined;
-      const r = await enviarMensaje({ conversacion_id: conversacionId, mensaje, contexto_pantalla: contextoPantalla, archivos: adjuntos, audio });
-      setTexto("");
+      const contexto = contextoExtra ? { ...(contextoPantalla || {}), ...contextoExtra } : contextoPantalla;
+      const r = await enviarMensaje({ conversacion_id: conversacionId, mensaje, contexto_pantalla: contexto, archivos: adjuntos, audio });
+      if (mensajeDirecto === undefined) setTexto("");
       setArchivos([]);
       setAudioBlob(null);
       setConversacionId(r.conversacion_id);
@@ -242,6 +301,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false }: Pr
     >
       {!compacto && (
         <aside className="hidden w-60 shrink-0 flex-col gap-2 overflow-y-auto md:flex">
+          {lateral}
           <Button variant="outline" size="sm" className="gap-1.5" onClick={nueva}>
             <MessageSquarePlus className="h-4 w-4" />
             Nueva conversación
@@ -277,7 +337,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false }: Pr
               </div>
             </div>
           )}
-          {mensajes.map((m) =>
+          {mensajes.map((m, indice) =>
             m.rol === "usuario" ? (
               <div key={m.id} className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2 text-sm text-primary-foreground">
                 <p className="whitespace-pre-wrap">{m.contenido}</p>
@@ -286,8 +346,17 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false }: Pr
             ) : (
               <div key={m.id} className="max-w-full space-y-1">
                 <div className="rounded-2xl rounded-tl-sm bg-muted/60 px-4 py-2">
-                  <TextoRafa texto={m.contenido || ""} />
+                  <TextoRafa texto={separarOpciones(m.contenido || "").texto} />
                 </div>
+                {indice === mensajes.length - 1 && !enviando && opcionesDe(m).length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {opcionesDe(m).map((o) => (
+                      <Button key={o.etiqueta} size="sm" variant="outline" className="h-8 rounded-full" onClick={() => enviar(o.etiqueta, o.contexto)}>
+                        {o.etiqueta}
+                      </Button>
+                    ))}
+                  </div>
+                )}
                 <ResultadosHerramientas
                   herramientas={m.datos?.herramientas || []}
                   acciones={acciones}
@@ -296,7 +365,6 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false }: Pr
                   onCancelar={(a) => operar(a, "cancelar")}
                   onAbrirPlan={onAbrirPlan}
                 />
-                {m.version_conocimiento && <p className="text-[10px] text-muted-foreground">Conocimiento {m.version_conocimiento}</p>}
               </div>
             )
           )}
