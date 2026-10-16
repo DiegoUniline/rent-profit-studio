@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +27,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DateInput } from "@/components/ui/date-input";
-import { format } from "date-fns";
 import { z } from "zod";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmpresaDialog } from "./EmpresaDialog";
@@ -36,6 +35,7 @@ import { CentroNegocioDialog } from "./CentroNegocioDialog";
 import { UnidadMedidaDialog } from "./UnidadMedidaDialog";
 import { ProgramacionPartidaDialog } from "./ProgramacionPartidaDialog";
 import { Plus, Trash2, Copy, Wand2, ExternalLink } from "lucide-react";
+import { flujosParaGuardar, firmaSolicitud, guardarPresupuesto, type SolicitudGuardado } from "@/lib/presupuesto-guardado";
 
 interface Empresa {
   id: string;
@@ -80,6 +80,7 @@ interface Presupuesto {
   frecuencia: "semanal" | "mensual" | "bimestral" | "trimestral" | "semestral" | "anual" | null;
   es_project?: boolean;
   tipo_movimiento?: TipoMovimiento | null;
+  updated_at?: string;
 }
 
 
@@ -143,6 +144,14 @@ export function PresupuestoDialog({
   const navigate = useNavigate();
   const [form, setForm] = useState<PresupuestoForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  // Guardia síncrona contra doble clic (el estado de React llega tarde) y
+  // clave de operación: un reintento idéntico reutiliza la misma clave para
+  // que el servidor no repita el guardado.
+  const guardandoRef = useRef(false);
+  const intentoRef = useRef<{ firma: string; operacion: string } | null>(null);
+  // Al editar, no se guardan pagos hasta haberlos cargado: enviar una lista
+  // vacía los eliminaría.
+  const [flujosCargados, setFlujosCargados] = useState(false);
   const [flujoRows, setFlujoRows] = useState<FlujoRow[]>([]);
   const [programacionProyectoActiva, setProgramacionProyectoActiva] = useState(false);
   const [programadoPartida, setProgramadoPartida] = useState(0);
@@ -182,6 +191,8 @@ export function PresupuestoDialog({
   // Hydrate form when editing
   useEffect(() => {
     if (open) {
+      intentoRef.current = null;
+      setFlujosCargados(false);
       if (presupuesto) {
         setForm({
           empresa_id: presupuesto.empresa_id,
@@ -198,10 +209,12 @@ export function PresupuestoDialog({
           loadFlujoRows(presupuesto.id);
         } else {
           setFlujoRows([]);
+          setFlujosCargados(true);
         }
       } else {
         setForm(emptyForm);
         setFlujoRows([]);
+        setFlujosCargados(true);
       }
     }
   }, [open, presupuesto]);
@@ -212,15 +225,20 @@ export function PresupuestoDialog({
       .select("*")
       .eq("presupuesto_id", presupuestoId)
       .order("fecha", { ascending: true });
-    
+
+    if (error) {
+      toast({ title: "No se pudieron cargar los pagos programados", description: error.message, variant: "destructive" });
+      return;
+    }
     if (data) {
-      setFlujoRows(data.map((f: any) => ({
+      setFlujoRows(data.map((f) => ({
         id: f.id,
         fecha: new Date(f.fecha + "T00:00:00"),
         monto: String(f.monto),
         tipo: f.tipo as "ingreso" | "egreso",
         descripcion: f.descripcion || "",
       })));
+      setFlujosCargados(true);
     }
   };
 
@@ -387,6 +405,8 @@ export function PresupuestoDialog({
   };
 
   const handleSave = async () => {
+    if (guardandoRef.current) return;
+
     const cantidad = parseFloat(form.cantidad) || 0;
     const precio_unitario = parseFloat(form.precio_unitario) || 0;
 
@@ -415,10 +435,23 @@ export function PresupuestoDialog({
       return;
     }
 
+    if (!proyectoDePartida && !flujosCargados) {
+      toast({
+        title: "Pagos programados sin cargar",
+        description: "Espera a que carguen los pagos programados o vuelve a abrir el presupuesto.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    setSaving(true);
-    try {
-      const data = {
+    // Edición si trae id (conserva el registro); creación si no (incluye "Copiar").
+    // fecha_inicio/fecha_fin/frecuencia no se tocan aquí: los administra el
+    // módulo Project (seguimiento por partida). El servidor no pisa esos valores.
+    // Si la partida ya es de un Proyecto (proyectoDePartida), su programación
+    // temporal se administra EXCLUSIVAMENTE desde Proyectos: no se envían pagos.
+    const solicitud: SolicitudGuardado = {
+      id: presupuesto?.id ?? null,
+      datos: {
         empresa_id: form.empresa_id,
         cuenta_id: form.cuenta_id || null,
         centro_negocio_id: form.centro_negocio_id || null,
@@ -428,76 +461,33 @@ export function PresupuestoDialog({
         precio_unitario,
         notas: form.notas || null,
         tipo_movimiento: form.tipo_movimiento || null,
-        // fecha_inicio/fecha_fin/frecuencia no se tocan aquí: los administra
-        // el módulo Project (seguimiento por partida). No pisar esos valores.
-      };
+      },
+      flujos: proyectoDePartida ? null : flujosParaGuardar(flujoRows),
+      version: presupuesto?.id ? presupuesto.updated_at ?? null : null,
+    };
+    const firma = firmaSolicitud(solicitud);
+    if (!intentoRef.current || intentoRef.current.firma !== firma) {
+      intentoRef.current = { firma, operacion: crypto.randomUUID() };
+    }
 
-      let presupuestoId: string;
-
-      if (presupuesto?.id) {
-        const { error } = await supabase
-          .from("presupuestos")
-          .update(data)
-          .eq("id", presupuesto.id);
-        if (error) throw error;
-        presupuestoId = presupuesto.id;
-      } else {
-        const { data: maxData } = await supabase
-          .from("presupuestos")
-          .select("orden")
-          .eq("empresa_id", form.empresa_id)
-          .order("orden", { ascending: false })
-          .limit(1);
-
-        const nuevoOrden = maxData && maxData.length > 0 ? (maxData[0].orden || 0) + 1 : 1;
-
-        const { data: insertData, error } = await supabase
-          .from("presupuestos")
-          .insert({ ...data, orden: nuevoOrden })
-          .select("id")
-          .single();
-        if (error) throw error;
-        presupuestoId = insertData.id;
-      }
-
-      // Save flujos_programados: delete all existing and re-insert.
-      // Si la partida ya es de un Proyecto (proyectoDePartida), su programación
-      // temporal se administra EXCLUSIVAMENTE desde Proyectos — sin importar si
-      // ya tiene o no una programación propia creada todavía. No se toca la
-      // tabla aquí para no dejar (ni refrescar) flujos_programados huérfanos.
-      if (!proyectoDePartida) {
-        await supabase
-          .from("flujos_programados")
-          .delete()
-          .eq("presupuesto_id", presupuestoId);
-
-        const validFlujos = flujoRows.filter(r => r.fecha && parseFloat(r.monto) > 0);
-        if (validFlujos.length > 0) {
-          const flujosToInsert = validFlujos.map(r => ({
-            presupuesto_id: presupuestoId,
-            fecha: format(r.fecha!, "yyyy-MM-dd"),
-            monto: parseFloat(r.monto),
-            tipo: r.tipo,
-            descripcion: r.descripcion || null,
-          }));
-
-          const { error: flujoError } = await supabase
-            .from("flujos_programados")
-            .insert(flujosToInsert);
-          if (flujoError) throw flujoError;
-        }
-      }
-
-      toast({ title: presupuesto?.id ? "Presupuesto actualizado" : "Presupuesto creado" });
+    guardandoRef.current = true;
+    setSaving(true);
+    try {
+      // Una sola llamada transaccional: partida + pagos (actualiza por id,
+      // inserta solo los nuevos, elimina solo los quitados) o nada.
+      await guardarPresupuesto(intentoRef.current.operacion, solicitud);
+      intentoRef.current = null;
+      toast({ title: solicitud.id ? "Presupuesto actualizado" : "Presupuesto creado" });
       onOpenChange(false);
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : "No se pudo guardar",
         variant: "destructive",
       });
     } finally {
+      guardandoRef.current = false;
       setSaving(false);
     }
   };

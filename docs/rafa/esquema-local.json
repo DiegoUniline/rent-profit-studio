@@ -2808,6 +2808,71 @@
                 }
             ]
         },
+        "presupuesto_guardados": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "operacion_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "presupuesto_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": "auth.uid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "jsonb",
+                    "nombre": "resultado",
+                    "defecto": "'{}'::jsonb"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(user_id = auth.uid())",
+                    "nombre": "Leer guardados propios",
+                    "comando": "SELECT"
+                },
+                {
+                    "check": "(user_id = auth.uid())",
+                    "roles": "authenticated",
+                    "using": null,
+                    "nombre": "Registrar guardados propios",
+                    "comando": "INSERT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "presupuesto_guardados_presupuesto_id_fkey",
+                    "definicion": "FOREIGN KEY (presupuesto_id) REFERENCES presupuestos(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "presupuesto_guardados_pkey",
+                    "definicion": "PRIMARY KEY (operacion_id)"
+                }
+            ]
+        },
         "proyecto_cronograma_shares": {
             "rls": true,
             "columnas": [
@@ -3185,6 +3250,11 @@
             "argumentos": "_user_id uuid"
         },
         {
+            "nombre": "guardar_presupuesto",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_operacion uuid, p_id uuid, p_datos jsonb, p_flujos jsonb, p_version timestamp with time zone"
+        },
+        {
             "nombre": "handle_new_user",
             "seguridad": "SECURITY DEFINER",
             "argumentos": ""
@@ -3250,5 +3320,5 @@
             "argumentos": ""
         }
     ],
-    "migraciones_sha256": "506d60b2ca7e2d35e908e3f8dbb9213d4980f07109671bcf986484867e44bcde"
+    "migraciones_sha256": "8d24732ca3eb995ad5cead93a5e83b7699a16d85511adde86b03292cb1644d78"
 }

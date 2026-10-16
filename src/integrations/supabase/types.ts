@@ -391,6 +391,38 @@ export type Database = {
           },
         ]
       }
+      presupuesto_guardados: {
+        Row: {
+          created_at: string
+          operacion_id: string
+          presupuesto_id: string
+          resultado: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          operacion_id: string
+          presupuesto_id: string
+          resultado?: Json
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          operacion_id?: string
+          presupuesto_id?: string
+          resultado?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presupuesto_guardados_presupuesto_id_fkey"
+            columns: ["presupuesto_id"]
+            isOneToOne: false
+            referencedRelation: "presupuestos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       presupuestos: {
         Row: {
           activo: boolean
@@ -1416,6 +1448,16 @@ export type Database = {
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      guardar_presupuesto: {
+        Args: {
+          p_datos: Json
+          p_flujos: Json
+          p_id: string
+          p_operacion: string
+          p_version?: string
+        }
+        Returns: Json
       }
       has_role: {
         Args: {

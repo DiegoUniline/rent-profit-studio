@@ -17,7 +17,9 @@ No hubo acceso de lectura al proyecto de Lovable Cloud (`supabase/config.toml`):
 
 ## Riesgos técnicos
 
-- Escrituras no atómicas en la aplicación: guardar asiento, partida con flujos, programación financiera de proyecto, plan de Rafa y tablero de tareas.
+- Escrituras no atómicas en la aplicación: guardar asiento, programación financiera de proyecto, plan de Rafa y tablero de tareas. (Partida con flujos ya es atómica: `guardar_presupuesto`.)
+- `aplicarPlanRafa` borra y reinserta los flujos de las partidas vigentes sin verificar filas borradas: con rol contador (DELETE solo admin) duplicaría flujos, igual que el error corregido en Presupuestos.
+- Duplicados previos a `20261017000000`: revisar con `supabase/diagnosticos/presupuestos_duplicados.sql` (solo lectura). No se eliminaron automáticamente.
 - La migración `20260810223000_fix_proyecto_programacion_financiera_columns.sql` falla al reaplicarse en una base nueva (su bloque espera `duplicate_object` y PostgreSQL lanza `duplicate_table`). El arnés de pruebas la ejecuta tolerando ese error.
 - RLS de lectura sin segmentación por empresa ni por rol en tablas contables; no hay asignación usuario→empresa. Rafa compensa en el servidor con la matriz de la interfaz, pero un cliente con la llave pública puede leer directamente.
 - `AdminCodeDialog` valida el código de admin en el navegador leyendo `profiles.codigo_acceso`.
