@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -87,6 +87,24 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false }: Pr
   const chunksRef = useRef<BlobPart[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const finRef = useRef<HTMLDivElement>(null);
+  const contenedorRef = useRef<HTMLDivElement>(null);
+  const [alto, setAlto] = useState<number | null>(null);
+
+  // En página completa el chat ocupa exactamente el espacio visible restante:
+  // la página no hace scroll, solo la lista de mensajes, y el cuadro de texto
+  // siempre queda a la vista.
+  useLayoutEffect(() => {
+    if (compacto) return;
+    const medir = () => {
+      const el = contenedorRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      setAlto(Math.max(320, Math.floor(window.innerHeight - top - 24)));
+    };
+    medir();
+    window.addEventListener("resize", medir);
+    return () => window.removeEventListener("resize", medir);
+  }, [compacto]);
 
   const cargarConversaciones = useCallback(async () => {
     try {
@@ -217,7 +235,11 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false }: Pr
   }, [contextoPantalla]);
 
   return (
-    <div className={`flex gap-4 ${compacto ? "h-full" : "h-[calc(100vh-14rem)] min-h-[520px]"}`}>
+    <div
+      ref={contenedorRef}
+      className={`flex min-h-0 gap-4 ${compacto ? "h-full" : ""}`}
+      style={!compacto && alto ? { height: alto } : undefined}
+    >
       {!compacto && (
         <aside className="hidden w-60 shrink-0 flex-col gap-2 overflow-y-auto md:flex">
           <Button variant="outline" size="sm" className="gap-1.5" onClick={nueva}>
@@ -241,8 +263,8 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false }: Pr
         </aside>
       )}
 
-      <section className="flex min-w-0 flex-1 flex-col rounded-lg border bg-card">
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border bg-card">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           {mensajes.length === 0 && !enviando && (
             <div className="space-y-3 py-6 text-center text-sm text-muted-foreground">
               <p>Pregúntame por presupuestos, programación, asientos, proyectos o cómo funciona el sistema.</p>
@@ -287,7 +309,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false }: Pr
           <div ref={finRef} />
         </div>
 
-        <div className="space-y-2 border-t p-3">
+        <div className="shrink-0 space-y-2 border-t p-3">
           {(contextoTexto || audioBlob || archivos.length > 0) && (
             <div className="flex flex-wrap gap-1.5">
               {contextoTexto && <Badge variant="outline">{contextoTexto}</Badge>}
