@@ -59,6 +59,7 @@ export interface HerramientaUsada {
   accion: AccionRafa | null;
   advertencias: string[];
   faltantes?: string[];
+  opciones?: { id: string; nombre: string }[] | null;
   error: string | null;
   plan?: PlanRafa | null;
 }

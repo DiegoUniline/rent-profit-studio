@@ -64,7 +64,12 @@ function memoriaDe(llamadas: LlamadaRegistrada[]): string {
   return llamadas
     .map((l) => {
       const a = l.resultado.alcance;
-      return `${l.nombre}(${JSON.stringify(l.argumentos).slice(0, 300)}) → ${l.resultado.ok ? "ok" : "error"}: ${l.resultado.resumen.slice(0, 300)}${a ? ` [alcance: ${JSON.stringify({ empresa: a.empresa?.nombre, proyecto: a.proyecto?.nombre, periodo: a.periodo, registros: a.registros, truncado: a.truncado })}]` : ""}${l.resultado.accion ? ` [acción ${l.resultado.accion.id} ${l.resultado.accion.estado}]` : ""}`;
+      const refs = (l.resultado.referencias || [])
+        .filter((r) => r.entidad !== "documento")
+        .slice(0, 12)
+        .map((r) => `${r.entidad} "${r.etiqueta}"=${r.id}${r.enlace ? ` (${r.enlace})` : ""}`)
+        .join("; ");
+      return `${l.nombre}(${JSON.stringify(l.argumentos).slice(0, 300)}) → ${l.resultado.ok ? "ok" : "error"}: ${l.resultado.resumen.slice(0, 300)}${a ? ` [alcance: ${JSON.stringify({ empresa: a.empresa?.nombre, proyecto: a.proyecto?.nombre, periodo: a.periodo, registros: a.registros, truncado: a.truncado })}]` : ""}${l.resultado.accion ? ` [acción ${l.resultado.accion.id} ${l.resultado.accion.estado}]` : ""}${refs ? ` [referencias: ${refs}]` : ""}`;
     })
     .join("\n");
 }
@@ -214,6 +219,9 @@ export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamar
       accion: l.resultado.accion ?? null,
       advertencias: l.resultado.advertencias ?? [],
       faltantes: l.resultado.faltantes ?? [],
+      // Opciones para elegir (por ejemplo, empresas cuando falta empresa_id):
+      // la interfaz las muestra como botones.
+      opciones: Array.isArray((l.resultado.datos as any)?.opciones) ? (l.resultado.datos as any).opciones : null,
       error: l.resultado.error ?? null,
       plan: l.resultado.tipo === "plan" ? (l.resultado.datos as any)?.plan ?? null : null,
     })),
