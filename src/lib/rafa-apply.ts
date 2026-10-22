@@ -109,8 +109,6 @@ export async function aplicarPlanRafa(p: PropuestaEditable, operacion: string = 
       cantidad: partida.cantidad,
       precio_unitario: Number(precioUnitarioFinal(partida, p.ivaIncluir, p.ivaTasa).toFixed(4)),
       notas: partida.unidad ? `Unidad: ${partida.unidad}` : null,
-      // Sin esto la partida queda "Pendiente de clasificar" y no aparece en Ingresos/Egresos.
-      tipo_movimiento: p.programacion.tipo,
       flujos: fechas
         .map((fecha, j) => ({
           fecha: fecha.toISOString().slice(0, 10),
@@ -159,6 +157,16 @@ export async function aplicarPlanRafa(p: PropuestaEditable, operacion: string = 
     flujos: number;
     omitidas_proyecto: number;
   };
+
+  // Clasifica como Ingreso/Egreso las partidas aún sin tipo; sin esto quedan
+  // "Pendiente de clasificar" y no aparecen en los totales de Presupuestos.
+  for (let i = 0; i < r.presupuesto_ids.length; i += 200) {
+    await supabase
+      .from("presupuestos")
+      .update({ tipo_movimiento: p.programacion.tipo })
+      .in("id", r.presupuesto_ids.slice(i, i + 200))
+      .is("tipo_movimiento", null);
+  }
 
   const propuesta: PropuestaEditable = {
     ...p,
