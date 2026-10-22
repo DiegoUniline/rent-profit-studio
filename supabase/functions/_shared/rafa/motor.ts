@@ -9,7 +9,7 @@ import type { LlamadaModelo, MensajeModelo } from "./llm.ts";
 import { definicionesParaModelo, ejecutarHerramienta } from "./registro.ts";
 import { promptSistema } from "./prompt.ts";
 import { esUuid } from "./validacion.ts";
-import { completarPartidas, type Extractor } from "./extraccion.ts";
+import type { Extractor } from "./extraccion.ts";
 
 export const MAX_ITERACIONES = 8;
 export const MAX_HERRAMIENTAS_POR_TURNO = 16;
@@ -200,7 +200,7 @@ export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamar
         try {
           // Con archivos adjuntos, las partidas se extraen del archivo COMPLETO por bloques (sin límite de filas).
           if (extractor && tc.function.name === "proponer_plan_presupuesto" && argumentos && typeof argumentos === "object") {
-            argumentos = await completarPartidas(argumentos as Record<string, unknown>, extractor, mensaje);
+            argumentos = await extractor(argumentos as Record<string, unknown>, mensaje);
           }
           resultado = await ejecutarHerramienta(ctx, tc.function.name, argumentos);
         } catch (e) {

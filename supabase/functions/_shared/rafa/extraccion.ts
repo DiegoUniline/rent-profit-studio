@@ -21,7 +21,9 @@ export interface PartidaExtraida {
   cuenta_codigo?: string;
 }
 
-export type Extractor = (instruccion: string, cuentas?: { codigo: string; nombre: string }[]) => Promise<PartidaExtraida[] | null>;
+type Cuentas = { codigo: string; nombre: string }[];
+/** Recibe el plan del modelo y lo devuelve con TODAS las partidas del archivo. */
+export type Extractor = (plan: Record<string, unknown>, instruccion: string, cuentas?: Cuentas) => Promise<Record<string, unknown>>;
 
 const PAGINAS_POR_BLOQUE = 2;
 const PARALELO = 4;
@@ -143,7 +145,7 @@ export function crearExtractor(opts: { url: string; apiKey: string; modelo: stri
     throw new Error(`No pude leer ${b.filename} (${ultimoError}). Intenta de nuevo.`);
   };
 
-  return async (instruccion, cuentas) => {
+  const extraerTodo = async (instruccion: string, cuentas?: Cuentas): Promise<PartidaExtraida[]> => {
     const bloques = await dividirArchivos(adjuntos);
     const textoCuentas = (cuentas || []).slice(0, 400).map((c) => `${c.codigo} — ${c.nombre}`).join("\n");
     const resultados: PartidaExtraida[][] = new Array(bloques.length);
@@ -157,10 +159,11 @@ export function crearExtractor(opts: { url: string; apiKey: string; modelo: stri
     await Promise.all(Array.from({ length: Math.min(PARALELO, bloques.length) }, trabajador));
     return resultados.flat();
   };
+  return (plan, instruccion, cuentas) => completarPartidas(plan, extraerTodo, instruccion, cuentas);
 }
 
 /** Sustituye las partidas del plan por la extracción completa, conservando la cuenta sugerida por el modelo como respaldo. */
-export async function completarPartidas(plan: Record<string, unknown>, extractor: Extractor, instruccion: string, cuentas?: { codigo: string; nombre: string }[]) {
+async function completarPartidas(plan: Record<string, unknown>, extractor: (i: string, c?: Cuentas) => Promise<PartidaExtraida[]>, instruccion: string, cuentas?: Cuentas): Promise<Record<string, unknown>> {
   const previas = Array.isArray(plan.partidas) ? (plan.partidas as PartidaExtraida[]) : [];
   const completas = await extractor(instruccion, cuentas);
   if (!completas || !completas.length) return plan;
