@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { toBase64 } from "@/lib/archivos";
+import { toBase64, validarPesoAdjuntos } from "@/lib/archivos";
 import { formatDateObj } from "@/lib/date-utils";
 import {
   cancelarAccion,
@@ -222,6 +222,11 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
   const enviar = async (mensajeDirecto?: string, contextoExtra?: Partial<ContextoPantalla>) => {
     const mensaje = (mensajeDirecto ?? texto).trim();
     if ((!mensaje && !audioBlob && archivos.length === 0) || enviando) return;
+    const errorPeso = validarPesoAdjuntos(audioBlob ? [...archivos, audioBlob] : archivos);
+    if (errorPeso) {
+      toast({ variant: "destructive", title: "Archivo demasiado pesado", description: errorPeso });
+      return;
+    }
     setEnviando(true);
     const provisional: MensajeRafa = {
       id: `tmp-${Date.now()}`,
