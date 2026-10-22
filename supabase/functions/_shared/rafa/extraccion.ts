@@ -3,6 +3,7 @@
 // así que cada PDF se divide en bloques de pocas páginas, se extraen en paralelo
 // y se unen en el mismo orden del archivo.
 
+// @ts-expect-error -- especificador npm: de Deno; el chequeo de la app no lo resuelve.
 import { PDFDocument } from "npm:pdf-lib@1.17.1";
 
 export interface ArchivoAdjunto {
@@ -25,8 +26,8 @@ type Cuentas = { codigo: string; nombre: string }[];
 /** Recibe el plan del modelo y lo devuelve con TODAS las partidas del archivo. */
 export type Extractor = (plan: Record<string, unknown>, instruccion: string, cuentas?: Cuentas) => Promise<Record<string, unknown>>;
 
-const PAGINAS_POR_BLOQUE = 2;
-const PARALELO = 4;
+const PAGINAS_POR_BLOQUE = 1;
+const PARALELO = 6;
 const REINTENTOS = 2;
 
 const PARAMETROS = {
