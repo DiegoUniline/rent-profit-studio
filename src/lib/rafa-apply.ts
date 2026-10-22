@@ -78,6 +78,35 @@ export async function aplicarPlanRafa(p: PropuestaEditable, operacion: string = 
     const k = normalizar(r.partida);
     if (!porTexto.has(k)) porTexto.set(k, r.id);
   });
+  // Partidas activas que ya existen en el centro (de cualquier guardado):
+  // si el texto coincide se actualizan en vez de crear una copia.
+  if (centroId) {
+    for (let desde = 0; ; desde += 1000) {
+      const { data, error } = await supabase
+        .from("presupuestos")
+        .select("id, partida")
+        .eq("centro_negocio_id", centroId)
+        .eq("activo", true)
+        .range(desde, desde + 999);
+      if (error) throw new Error(`No se pudieron revisar los repetidos: ${error.message}`);
+      (data || []).forEach((r) => {
+        const k = normalizar(r.partida);
+        if (!porTexto.has(k)) porTexto.set(k, r.id);
+      });
+      if (!data || data.length < 1000) break;
+    }
+  }
+  // Repetidos dentro de la misma propuesta: no se permite guardar.
+  const vistos = new Set<string>();
+  const repetidas: string[] = [];
+  partidas.forEach((x) => {
+    const k = normalizar(x.descripcion);
+    if (vistos.has(k)) repetidas.push(x.descripcion.trim());
+    vistos.add(k);
+  });
+  if (repetidas.length > 0) {
+    throw new Error(`Hay partidas repetidas en la propuesta: ${repetidas.slice(0, 5).join(", ")}${repetidas.length > 5 ? "…" : ""}. Quítalas antes de guardar.`);
+  }
   const usados = new Set<string>();
 
   const fechas = calcularFechasPorFrecuencia(
