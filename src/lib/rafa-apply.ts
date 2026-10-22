@@ -158,6 +158,16 @@ export async function aplicarPlanRafa(p: PropuestaEditable, operacion: string = 
     omitidas_proyecto: number;
   };
 
+  // Clasifica como Ingreso/Egreso las partidas aún sin tipo; sin esto quedan
+  // "Pendiente de clasificar" y no aparecen en los totales de Presupuestos.
+  for (let i = 0; i < r.presupuesto_ids.length; i += 200) {
+    await supabase
+      .from("presupuestos")
+      .update({ tipo_movimiento: p.programacion.tipo })
+      .in("id", r.presupuesto_ids.slice(i, i + 200))
+      .is("tipo_movimiento", null);
+  }
+
   const propuesta: PropuestaEditable = {
     ...p,
     centro: { ...p.centro, id: r.centro_id },
