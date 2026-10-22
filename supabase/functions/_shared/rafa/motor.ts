@@ -9,6 +9,7 @@ import type { LlamadaModelo, MensajeModelo } from "./llm.ts";
 import { definicionesParaModelo, ejecutarHerramienta } from "./registro.ts";
 import { promptSistema } from "./prompt.ts";
 import { esUuid } from "./validacion.ts";
+import { completarPartidas, type Extractor } from "./extraccion.ts";
 
 export const MAX_ITERACIONES = 8;
 export const MAX_HERRAMIENTAS_POR_TURNO = 16;
@@ -109,7 +110,7 @@ function contenidoUsuario(entrada: EntradaTurno): unknown {
   return partes.length === 1 ? entrada.mensaje : partes;
 }
 
-export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamarModelo: LlamadaModelo): Promise<SalidaTurno> {
+export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamarModelo: LlamadaModelo, extractor?: Extractor | null): Promise<SalidaTurno> {
   const mensaje = (entrada.mensaje || "").slice(0, 8000);
   if (!mensaje && !entrada.audio && !(entrada.archivos || []).length) throw new Error("Escribe un mensaje para Rafa.");
 
@@ -167,6 +168,9 @@ export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamar
             }
       ),
     { role: "user", content: contenidoUsuario({ ...entrada, mensaje }) },
+    ...(extractor
+      ? [{ role: "system" as const, content: "Nota del sistema: si usas proponer_plan_presupuesto con estos archivos, el sistema extraerá automáticamente TODAS las partidas del archivo completo por bloques. Envía en partidas solo las primeras 3 como muestra (con su cuenta_codigo); no intentes listarlas todas." }]
+      : []),
   ];
 
   // 4. Bucle modelo ↔ herramientas.
@@ -193,7 +197,15 @@ export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamar
       if (llamadas.length >= MAX_HERRAMIENTAS_POR_TURNO) {
         resultado = { ok: false, tipo: "error", resumen: "Se alcanzó el máximo de consultas por mensaje; responde con lo obtenido e indica qué faltó.", error: "limite_herramientas" };
       } else {
-        resultado = await ejecutarHerramienta(ctx, tc.function.name, argumentos);
+        try {
+          // Con archivos adjuntos, las partidas se extraen del archivo COMPLETO por bloques (sin límite de filas).
+          if (extractor && tc.function.name === "proponer_plan_presupuesto" && argumentos && typeof argumentos === "object") {
+            argumentos = await completarPartidas(argumentos as Record<string, unknown>, extractor, mensaje);
+          }
+          resultado = await ejecutarHerramienta(ctx, tc.function.name, argumentos);
+        } catch (e) {
+          resultado = { ok: false, tipo: "error", resumen: e instanceof Error ? e.message : "No pude leer el archivo completo.", error: "extraccion" };
+        }
       }
       llamadas.push({ nombre: tc.function.name, argumentos, resultado });
       mensajes.push({ role: "tool", tool_call_id: tc.id, content: compactarParaModelo(resultado) });
