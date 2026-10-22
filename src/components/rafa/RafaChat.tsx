@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { toBase64 } from "@/lib/archivos";
 import { formatDateObj } from "@/lib/date-utils";
@@ -147,6 +148,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
   const finRef = useRef<HTMLDivElement>(null);
   const contenedorRef = useRef<HTMLDivElement>(null);
   const [alto, setAlto] = useState<number | null>(null);
+  const inicializadoRef = useRef(false);
 
   // En página completa el chat ocupa exactamente el espacio visible restante:
   // la página no hace scroll, solo la lista de mensajes, y el cuadro de texto
@@ -166,11 +168,14 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
 
   const cargarConversaciones = useCallback(async () => {
     try {
-      setConversaciones(await listarConversaciones());
-    } catch {
-      setConversaciones([]);
+      const lista = await listarConversaciones();
+      setConversaciones(lista);
+      return lista;
+    } catch (e) {
+      toast({ variant: "destructive", title: "No se pudo cargar el historial", description: e instanceof Error ? e.message : "Intenta volver a abrir Rafa." });
+      return [];
     }
-  }, []);
+  }, [toast]);
 
   const recargar = useCallback(async (id: string) => {
     const lista = await cargarMensajes(id);
@@ -180,8 +185,20 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
   }, []);
 
   useEffect(() => {
-    cargarConversaciones();
-  }, [cargarConversaciones]);
+    if (inicializadoRef.current) return;
+    inicializadoRef.current = true;
+    void (async () => {
+      const lista = await cargarConversaciones();
+      const ultima = lista[0];
+      if (!ultima) return;
+      try {
+        await recargar(ultima.id);
+        setConversacionId(ultima.id);
+      } catch (e) {
+        toast({ variant: "destructive", title: "No se pudo abrir la última conversación", description: e instanceof Error ? e.message : "" });
+      }
+    })();
+  }, [cargarConversaciones, recargar, toast]);
 
   useEffect(() => {
     finRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
@@ -231,8 +248,12 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
       setArchivos([]);
       setAudioBlob(null);
       setConversacionId(r.conversacion_id);
-      await recargar(r.conversacion_id);
-      cargarConversaciones();
+      try {
+        await recargar(r.conversacion_id);
+      } catch (e) {
+        toast({ variant: "destructive", title: "Charla enviada; no se pudo cargar el historial", description: e instanceof Error ? e.message : "Vuelve a abrir esta conversación." });
+      }
+      void cargarConversaciones();
     } catch (e) {
       setMensajes((prev) => prev.filter((m) => m.id !== provisional.id));
       toast({ variant: "destructive", title: "Rafa no pudo responder", description: e instanceof Error ? e.message : "Error inesperado" });
@@ -324,6 +345,25 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
       )}
 
       <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border bg-card">
+        {!compacto && (
+          <div className="shrink-0 space-y-2 border-b p-3 md:hidden">
+            {lateral}
+            <div className="flex min-w-0 items-center gap-2">
+              <Select value={conversacionId || "nueva"} onValueChange={(id) => id === "nueva" ? nueva() : void abrir(id)} disabled={enviando}>
+                <SelectTrigger aria-label="Conversaciones guardadas" className="min-w-0 flex-1">
+                  <SelectValue placeholder="Conversaciones guardadas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nueva">Nueva conversación</SelectItem>
+                  {conversaciones.map((c) => <SelectItem key={c.id} value={c.id}>{c.titulo}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="icon" disabled={enviando} onClick={nueva} aria-label="Nueva conversación">
+                <MessageSquarePlus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           {mensajes.length === 0 && !enviando && (
             <div className="space-y-3 py-6 text-center text-sm text-muted-foreground">

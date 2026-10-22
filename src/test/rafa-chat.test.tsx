@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 
 const invoke = vi.fn();
 const tablas: Record<string, unknown[]> = {};
+const errores: Record<string, { message: string }> = {};
 
 vi.mock("@/integrations/supabase/client", () => {
   const consulta = (tabla: string) => {
@@ -12,7 +13,7 @@ vi.mock("@/integrations/supabase/client", () => {
       eq: () => q,
       in: () => q,
       order: () => q,
-      limit: () => Promise.resolve({ data: tablas[tabla] || [], error: null }),
+      limit: () => Promise.resolve({ data: tablas[tabla] || [], error: errores[tabla] || null }),
       delete: () => q,
       then: (ok: (v: unknown) => void) => ok({ data: tablas[tabla] || [], error: null }),
     };
@@ -72,6 +73,30 @@ describe("chat de Rafa", () => {
   beforeEach(() => {
     invoke.mockReset();
     for (const k of Object.keys(tablas)) delete tablas[k];
+    for (const k of Object.keys(errores)) delete errores[k];
+  });
+
+  it("reabre la última charla guardada al volver a Rafa", async () => {
+    tablas.rafa_conversaciones = [{ id: "c-guardada", titulo: "Presupuesto guardado", updated_at: "2026-10-22T19:00:00Z", contexto: {} }];
+    tablas.rafa_mensajes = [{ id: "m-guardado", rol: "usuario", contenido: "Presupuesto de los lotes 52 al 66", datos: {}, version_conocimiento: "k", created_at: "2026-10-22T19:00:00Z" }];
+    render(<MemoryRouter><RafaChat /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText("Presupuesto de los lotes 52 al 66")).toBeInTheDocument());
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("conserva el mensaje y la conversación si falla la lectura después de enviar", async () => {
+    invoke.mockImplementation(async () => {
+      errores.rafa_mensajes = { message: "Lectura no disponible" };
+      return { data: { conversacion_id: "c-confirmada", mensaje_id: "m-confirmado", contenido: "Recibido", version_conocimiento: "k" }, error: null };
+    });
+    render(<MemoryRouter><RafaChat compacto /></MemoryRouter>);
+    fireEvent.change(screen.getByPlaceholderText(/Escribe a Rafa/), { target: { value: "Mi presupuesto guardado" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() => expect(screen.getByPlaceholderText(/Escribe a Rafa/)).toHaveValue(""));
+    expect(screen.getByText("Mi presupuesto guardado")).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText(/Escribe a Rafa/), { target: { value: "Continuar" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() => expect(invoke).toHaveBeenLastCalledWith("rafa-asistente", { body: expect.objectContaining({ conversacion_id: "c-confirmada", mensaje: "Continuar" }) }));
   });
 
   it("envía el mensaje con el contexto de pantalla, muestra la respuesta y confirma con la huella presentada", async () => {
@@ -137,6 +162,7 @@ describe("respuestas rápidas e hipervínculos", () => {
   beforeEach(() => {
     invoke.mockReset();
     for (const k of Object.keys(tablas)) delete tablas[k];
+    for (const k of Object.keys(errores)) delete errores[k];
   });
 
   it("convierte la elección de empresa en botones que envían el id y muestra enlaces internos", async () => {

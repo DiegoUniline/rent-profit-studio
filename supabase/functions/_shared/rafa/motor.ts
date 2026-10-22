@@ -140,7 +140,7 @@ export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamar
     .limit(MAX_HISTORIAL);
 
   // 3. Guardar el mensaje del usuario (sin el contenido binario de adjuntos).
-  await ctx.servicio.from("rafa_mensajes").insert({
+  const { error: errorMensajeUsuario } = await ctx.servicio.from("rafa_mensajes").insert({
     conversacion_id: conversacion.id,
     user_id: ctx.usuario.id,
     rol: "usuario",
@@ -152,6 +152,7 @@ export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamar
     },
     version_conocimiento: ctx.versionConocimiento,
   });
+  if (errorMensajeUsuario) throw new Error(`No se pudo guardar tu mensaje: ${errorMensajeUsuario.message}`);
 
   const mensajes: MensajeModelo[] = [
     { role: "system", content: promptSistema(ctx, conversacion.contexto, entrada.contexto_pantalla, mensaje) },
@@ -205,7 +206,8 @@ export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamar
 
   // 5. Contexto de la conversación y respuesta persistida.
   const contexto = actualizarContexto(conversacion.contexto, llamadas);
-  await ctx.servicio.from("rafa_conversaciones").update({ contexto }).eq("id", conversacion.id).eq("user_id", ctx.usuario.id);
+  const { error: errorContexto } = await ctx.servicio.from("rafa_conversaciones").update({ contexto }).eq("id", conversacion.id).eq("user_id", ctx.usuario.id);
+  if (errorContexto) throw new Error(`Tu mensaje se guardó, pero no se pudo actualizar la conversación: ${errorContexto.message}`);
   const datos = {
     herramientas: llamadas.map((l) => ({
       nombre: l.nombre,
@@ -228,11 +230,12 @@ export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamar
     memoria: memoriaDe(llamadas),
     completo: terminado,
   };
-  const { data: guardado } = await ctx.servicio
+  const { data: guardado, error: errorRespuesta } = await ctx.servicio
     .from("rafa_mensajes")
     .insert({ conversacion_id: conversacion.id, user_id: ctx.usuario.id, rol: "asistente", contenido, datos, version_conocimiento: ctx.versionConocimiento })
     .select("id")
     .single();
+  if (errorRespuesta || !guardado) throw new Error(`Tu mensaje se guardó, pero no se pudo guardar la respuesta de Rafa: ${errorRespuesta?.message || "Sin confirmación de guardado"}`);
 
   return {
     conversacion_id: conversacion.id,
