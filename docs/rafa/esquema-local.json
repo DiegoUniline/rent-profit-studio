@@ -2808,6 +2808,60 @@
                 }
             ]
         },
+        "rafa_plan_guardados": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "operacion_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": "auth.uid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "jsonb",
+                    "nombre": "resultado",
+                    "defecto": "'{}'::jsonb"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(user_id = auth.uid())",
+                    "nombre": "Leer guardados de plan propios",
+                    "comando": "SELECT"
+                },
+                {
+                    "check": "(user_id = auth.uid())",
+                    "roles": "authenticated",
+                    "using": null,
+                    "nombre": "Registrar guardados de plan propios",
+                    "comando": "INSERT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "PK",
+                    "nombre": "rafa_plan_guardados_pkey",
+                    "definicion": "PRIMARY KEY (operacion_id)"
+                }
+            ]
+        },
         "presupuesto_guardados": {
             "rls": true,
             "columnas": [
@@ -3295,6 +3349,11 @@
             "argumentos": "p_accion_id uuid, p_tarea jsonb"
         },
         {
+            "nombre": "rafa_guardar_plan",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_operacion uuid, p_plan jsonb"
+        },
+        {
             "nombre": "rafa_registrar_ejecucion",
             "seguridad": "SECURITY INVOKER",
             "argumentos": "p_accion_id uuid, p_resultado jsonb"
@@ -3320,5 +3379,5 @@
             "argumentos": ""
         }
     ],
-    "migraciones_sha256": "8d24732ca3eb995ad5cead93a5e83b7699a16d85511adde86b03292cb1644d78"
+    "migraciones_sha256": "927781f9014dbe8bd6a289a2c18ab3620c25df15ab6ac3bd38afe0661bd8a402"
 }

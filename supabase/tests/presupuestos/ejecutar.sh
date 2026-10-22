@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Pruebas funcionales del guardado de Presupuestos en un entorno AISLADO:
+# Pruebas funcionales del guardado de Presupuestos y del editor de planes de
+# Rafa en un entorno AISLADO:
 #   PostgreSQL (migraciones del repo + semilla sintética) → PostgREST → proxy.
 # Requisitos: PGHOST/PGPORT/PGUSER de un PostgreSQL local de pruebas,
 #             POSTGREST_BIN (PostgREST ≥ 12), Node ≥ 22.
@@ -34,5 +35,6 @@ for i in $(seq 1 60); do
   sleep 1
 done
 
-REST_URL=http://127.0.0.1:54321/rest/v1 SERVICIO="$SERVICIO" ANON="$ANON" \
-  node --test --test-concurrency=1 "$AQUI/guardado.e2e.test.mjs"
+export REST_URL=http://127.0.0.1:54321/rest/v1 SERVICIO="$SERVICIO" ANON="$ANON"
+node --test --test-concurrency=1 "$AQUI/guardado.e2e.test.mjs"
+(cd "$RAIZ" && npx vitest run src/test/rafa-plan.integracion.test.ts)

@@ -46,7 +46,7 @@ export interface PartidaEditable {
 export interface PropuestaEditable {
   empresaId: string;
   centro: { modo: "existente" | "nuevo"; id: string; nombre: string; tipoActividad: string };
-  tercero: { modo: "existente" | "nuevo" | "ninguno"; id: string; nombre: string };
+  tercero: { modo: "existente" | "nuevo" | "ninguno"; id: string; nombre: string; rfc?: string };
   ivaIncluir: boolean;
   ivaTasa: number;
   partidas: PartidaEditable[];
