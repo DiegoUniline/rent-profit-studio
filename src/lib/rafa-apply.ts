@@ -109,6 +109,8 @@ export async function aplicarPlanRafa(p: PropuestaEditable, operacion: string = 
       cantidad: partida.cantidad,
       precio_unitario: Number(precioUnitarioFinal(partida, p.ivaIncluir, p.ivaTasa).toFixed(4)),
       notas: partida.unidad ? `Unidad: ${partida.unidad}` : null,
+      // Sin esto la partida queda "Pendiente de clasificar" y no aparece en Ingresos/Egresos.
+      tipo_movimiento: p.programacion.tipo,
       flujos: fechas
         .map((fecha, j) => ({
           fecha: fecha.toISOString().slice(0, 10),
