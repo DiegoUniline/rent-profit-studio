@@ -180,6 +180,14 @@ export function RafaPropuesta({
                 placeholder="Nombre del contratista"
               />
             )}
+            {propuesta.tercero.modo === "nuevo" && (
+              <Input
+                value={propuesta.tercero.rfc || ""}
+                onChange={(e) => set({ tercero: { ...propuesta.tercero, rfc: e.target.value.toUpperCase() } })}
+                placeholder="RFC (opcional; sin RFC se usa XAXX010101000)"
+                maxLength={13}
+              />
+            )}
             <Button
               variant="link"
               size="sm"

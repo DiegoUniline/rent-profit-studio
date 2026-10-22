@@ -56,6 +56,9 @@ export default function Rafa() {
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosavePromiseRef = useRef<Promise<unknown> | null>(null);
   const aplicandoRef = useRef(false);
+  // Clave de operación del guardado: un reintento idéntico (p. ej. tras un
+  // corte de red) reutiliza la misma para que el servidor no lo repita.
+  const intentoRef = useRef<{ firma: string; operacion: string } | null>(null);
 
   const cargarSesiones = useCallback(async () => {
     const { data } = await supabase
@@ -347,7 +350,12 @@ export default function Rafa() {
         );
       }
 
-      const r = await aplicarPlanRafa(propuestaAplicar);
+      const firma = JSON.stringify(propuestaAplicar);
+      if (!intentoRef.current || intentoRef.current.firma !== firma) {
+        intentoRef.current = { firma, operacion: crypto.randomUUID() };
+      }
+      const r = await aplicarPlanRafa(propuestaAplicar, intentoRef.current.operacion);
+      intentoRef.current = null;
       setPropuesta(r.propuesta);
       if (sesionId) {
         await supabase
@@ -357,7 +365,11 @@ export default function Rafa() {
       }
       toast({
         title: "Listo",
-        description: `${r.partidasCreadas} partidas nuevas, ${r.partidasActualizadas} actualizadas y ${r.flujosCreados} flujos programados.`,
+        description:
+          `${r.partidasCreadas} partidas nuevas, ${r.partidasActualizadas} actualizadas` +
+          (r.partidasDadasDeBaja ? `, ${r.partidasDadasDeBaja} dadas de baja` : "") +
+          ` y ${r.flujosCreados} flujos programados.` +
+          (r.omitidasProyecto ? ` ${r.omitidasProyecto} partida(s) de Proyecto conservan su programación de Proyectos.` : ""),
       });
       cargarSesiones();
     } catch (e) {

@@ -1251,6 +1251,27 @@ export type Database = {
           },
         ]
       }
+      rafa_plan_guardados: {
+        Row: {
+          created_at: string
+          operacion_id: string
+          resultado: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          operacion_id: string
+          resultado?: Json
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          operacion_id?: string
+          resultado?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       rafa_sesiones: {
         Row: {
           created_at: string
@@ -1488,6 +1509,10 @@ export type Database = {
       }
       rafa_crear_tarea: {
         Args: { p_accion_id: string; p_tarea: Json }
+        Returns: Json
+      }
+      rafa_guardar_plan: {
+        Args: { p_operacion: string; p_plan: Json }
         Returns: Json
       }
       rafa_registrar_ejecucion: {

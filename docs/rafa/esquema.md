@@ -1,6 +1,6 @@
 # Esquema de la base (SQL local)
 
-ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-0eb5c9306116). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `8d24732ca3eb995a`.
+ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-75685f762ee6). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `927781f9014dbe8b`.
 
 El significado de negocio de cada tabla y campo está en `docs/rafa/modulos/`.
 
@@ -724,6 +724,27 @@ Triggers:
 Políticas:
 - Cada usuario gestiona sus conversaciones con Rafa (ALL, authenticated) USING `(user_id = auth.uid())` CHECK `(user_id = auth.uid())`
 
+## rafa_plan_guardados
+
+RLS: activado.
+
+| Columna | Tipo | Obligatorio | Predeterminado |
+|---|---|---|---|
+| operacion_id | uuid | Sí |  |
+| user_id | uuid | Sí | `auth.uid()` |
+| resultado | jsonb | Sí | `'{}'::jsonb` |
+| created_at | timestamp with time zone | Sí | `now()` |
+
+Restricciones e índices:
+- PK `rafa_plan_guardados_pkey`: `PRIMARY KEY (operacion_id)`
+
+Triggers:
+- ninguno
+
+Políticas:
+- Leer guardados de plan propios (SELECT, authenticated) USING `(user_id = auth.uid())` CHECK `—`
+- Registrar guardados de plan propios (INSERT, authenticated) USING `—` CHECK `(user_id = auth.uid())`
+
 ## presupuesto_guardados
 
 RLS: activado.
@@ -875,6 +896,7 @@ Políticas:
 - `rafa_crear_asientos_borrador(p_accion_id uuid, p_asientos jsonb)` — SECURITY INVOKER
 - `rafa_crear_programaciones(p_accion_id uuid, p_items jsonb)` — SECURITY INVOKER
 - `rafa_crear_tarea(p_accion_id uuid, p_tarea jsonb)` — SECURITY INVOKER
+- `rafa_guardar_plan(p_operacion uuid, p_plan jsonb)` — SECURITY INVOKER
 - `rafa_registrar_ejecucion(p_accion_id uuid, p_resultado jsonb)` — SECURITY INVOKER
 - `sync_iva_flujos()` — SECURITY DEFINER
 - `update_updated_at_column()` — SECURITY INVOKER

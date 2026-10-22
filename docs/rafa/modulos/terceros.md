@@ -10,4 +10,4 @@ Se usa en: `presupuestos.tercero_id` (contraparte de la partida), `presupuestos.
 
 Permisos: ruta admin/contador; RLS lectura a autenticados, escritura admin/contador, borrado admin. Baja lógica con `activo`.
 
-Rafa (flujo de plan de presupuesto) crea terceros nuevos con RFC genérico `XAXX010101000`: como el RFC es único por empresa, solo puede existir un tercero con ese RFC por empresa; un segundo alta con RFC genérico falla. Es una limitación conocida (ver [pendientes](../pendientes.md)).
+Rafa (flujo de plan de presupuesto): un tercero "nuevo" con el mismo nombre que uno de la empresa se reutiliza; si no existe, se crea con el RFC capturado en el editor o, sin RFC, con el genérico `XAXX010101000`. Como el RFC es único por empresa, si el genérico ya está usado el guardado se rechaza completo con un mensaje que pide el RFC, elegir un tercero existente o guardar sin tercero.
