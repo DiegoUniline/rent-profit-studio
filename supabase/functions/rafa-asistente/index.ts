@@ -10,6 +10,7 @@ import { procesarTurno } from "../_shared/rafa/motor.ts";
 import { cancelarAccion, confirmarAccion } from "../_shared/rafa/acciones.ts";
 import { PLAN_PARAMETROS, PROMPT_PLAN } from "../_shared/rafa/plan.ts";
 import { esUuid } from "../_shared/rafa/validacion.ts";
+import { crearExtractor } from "../_shared/rafa/extraccion.ts";
 
 const MODELO = Deno.env.get("RAFA_MODELO") || "google/gemini-3.6-flash";
 const URL_IA = Deno.env.get("RAFA_AI_URL") || "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -38,6 +39,8 @@ Deno.serve(async (req) => {
 
     if (modo === "chat") {
       const llamar = crearLlamadaGateway({ url: URL_IA, apiKey, modelo: MODELO });
+      const archivosChat: ArchivoEntrada[] = Array.isArray(body.archivos) ? body.archivos.slice(0, 5) : [];
+      const extractor = crearExtractor({ url: URL_IA, apiKey, modelo: MODELO, archivos: archivosChat });
       try {
         const salida = await procesarTurno(
           ctx,
@@ -48,7 +51,8 @@ Deno.serve(async (req) => {
             archivos: Array.isArray(body.archivos) ? body.archivos.slice(0, 5) : [],
             audio: body.audio || undefined,
           },
-          llamar
+          llamar,
+          extractor
         );
         return json(salida);
       } catch (e) {
@@ -154,6 +158,9 @@ async function interpretarPlan(body: Record<string, unknown>, apiKey: string) {
         (archivos.length
           ? "Se adjuntan archivos con el catálogo de conceptos: extrae TODAS las partidas con su clave, descripción, unidad, cantidad, precio unitario e importe.\n\n"
           : "") +
+        (archivos.length
+          ? "IMPORTANTE: el sistema extraerá automáticamente TODAS las partidas del archivo completo. En partidas envía solo las primeras 3 como muestra.\n\n"
+          : "") +
         "Catálogo de cuentas contables disponibles (código — nombre):\n" +
         cuentas.map((c) => `${c.codigo} — ${c.nombre}`).join("\n"),
     },
@@ -211,7 +218,14 @@ async function interpretarPlan(body: Record<string, unknown>, apiKey: string) {
     return json({ error: "La IA no pudo estructurar la instrucción. Intenta describirla con más detalle." }, 502);
   }
 
-  return json({ plan: JSON.parse(call.function.arguments) });
+  const plan = JSON.parse(call.function.arguments);
+  const extractor = crearExtractor({ url: URL_IA, apiKey, modelo: MODELO, archivos });
+  if (!extractor) return json({ plan });
+  try {
+    return json({ plan: await extractor(plan, texto || String(plan.transcripcion || ""), cuentas) });
+  } catch (e) {
+    return json({ error: e instanceof Error ? e.message : "No pude leer el archivo completo." }, 502);
+  }
 }
 
 function json(payload: unknown, status = 200) {
