@@ -1,5 +1,5 @@
 /** Límite total de adjuntos por envío a Rafa (la IA rechaza o corta envíos más pesados). */
-export const LIMITE_ADJUNTOS_MB = 8;
+export const LIMITE_ADJUNTOS_MB = 50;
 
 /** Devuelve un mensaje de error si los archivos superan el límite; null si están bien. */
 export function validarPesoAdjuntos(archivos: Blob[]): string | null {
