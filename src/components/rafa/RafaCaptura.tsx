@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Mic, Square, Paperclip, Sparkles, X, Loader2 } from "lucide-react";
-import { toBase64 } from "@/lib/archivos";
+import { toBase64, validarPesoAdjuntos } from "@/lib/archivos";
 
 export interface CapturaPayload {
   texto: string;
@@ -53,6 +53,12 @@ export function RafaCaptura({ loading, onEnviar }: Props) {
   };
 
   const enviar = async () => {
+    const errorPeso = validarPesoAdjuntos(audioBlob ? [...archivos, audioBlob] : archivos);
+    if (errorPeso) {
+      setError(errorPeso);
+      return;
+    }
+    setError(null);
     const audioFile = archivos.find((f) => f.type.startsWith("audio/"));
     const adjuntos = archivos.filter((f) => !f.type.startsWith("audio/"));
 
