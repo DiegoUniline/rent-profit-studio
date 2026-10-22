@@ -1,0 +1,3 @@
+## Rafa conversation persistence
+- Load the latest conversation from the authenticated user's RLS-filtered history when Rafa opens, and expose that same history on narrow screens so saved messages remain accessible without separate client storage.
+- Check conversation and message write errors before acknowledging chat success; a failed history refresh must not be reported as a failed send because the turn may already be saved.
