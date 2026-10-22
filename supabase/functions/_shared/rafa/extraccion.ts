@@ -25,8 +25,8 @@ type Cuentas = { codigo: string; nombre: string }[];
 /** Recibe el plan del modelo y lo devuelve con TODAS las partidas del archivo. */
 export type Extractor = (plan: Record<string, unknown>, instruccion: string, cuentas?: Cuentas) => Promise<Record<string, unknown>>;
 
-const PAGINAS_POR_BLOQUE = 2;
-const PARALELO = 4;
+const PAGINAS_POR_BLOQUE = 1;
+const PARALELO = 6;
 const REINTENTOS = 2;
 
 const PARAMETROS = {
