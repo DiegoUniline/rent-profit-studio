@@ -17,6 +17,7 @@ import {
   eliminarConversacion,
   enviarMensaje,
   estadoAcciones,
+  generarAvisosSemana,
   listarArchivos,
   listarCentros,
   listarConversaciones,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/rafa-chat";
 import type { PlanRafa } from "@/lib/rafa-types";
 import { ResultadosHerramientas } from "./RafaResultados";
+import { RafaResumenCentro } from "./RafaResumenCentro";
 import {
   Building2,
   Download,
@@ -252,6 +254,17 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
       .then(setCentros)
       .catch(() => setCentros([]));
   }, []);
+
+  // Aviso semanal: al abrir Rafa, el servidor deja (una vez por semana) el aviso
+  // en la charla de cada centro. En segundo plano; si falla no estorba al chat.
+  useEffect(() => {
+    if (compacto) return;
+    generarAvisosSemana()
+      .then((r) => {
+        if (r.generados > 0) void cargarConversaciones();
+      })
+      .catch(() => undefined);
+  }, [compacto, cargarConversaciones]);
 
   useEffect(() => {
     if (inicializadoRef.current) return;
@@ -697,6 +710,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
                   </p>
                 </div>
               </div>
+              {!compacto && <RafaResumenCentro centroId={centroActual.id} />}
               {charlasDelCentro.length > 0 && (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {charlasDelCentro.map((c) => (

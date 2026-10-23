@@ -12,7 +12,8 @@ import {
   type TablaRafa,
 } from "@/lib/rafa-chat";
 import type { PlanRafa } from "@/lib/rafa-types";
-import { AlertTriangle, CheckCircle2, ChevronDown, Database, ExternalLink, FileText, Loader2, XCircle } from "lucide-react";
+import { exportarExcel, exportarPdf } from "@/lib/rafa-exportar";
+import { AlertTriangle, CheckCircle2, ChevronDown, Database, ExternalLink, FileSpreadsheet, FileText, Loader2, XCircle } from "lucide-react";
 
 const moneda = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
 
@@ -35,7 +36,17 @@ export function TablaResultado({ tabla }: { tabla: TablaRafa }) {
   const columnas = tabla.columnas.filter((c) => !c.clave.startsWith("_"));
   return (
     <div className="space-y-1">
-      <p className="text-xs font-medium text-muted-foreground">{tabla.titulo}</p>
+      <div className="flex items-center gap-1">
+        <p className="flex-1 text-xs font-medium text-muted-foreground">{tabla.titulo}</p>
+        <Button variant="ghost" size="sm" className="h-6 gap-1 px-1.5 text-[11px]" onClick={() => void exportarExcel(tabla)} aria-label={`Exportar ${tabla.titulo} a Excel`}>
+          <FileSpreadsheet className="h-3.5 w-3.5" />
+          Excel
+        </Button>
+        <Button variant="ghost" size="sm" className="h-6 gap-1 px-1.5 text-[11px]" onClick={() => void exportarPdf(tabla)} aria-label={`Exportar ${tabla.titulo} a PDF`}>
+          <FileText className="h-3.5 w-3.5" />
+          PDF
+        </Button>
+      </div>
       <div className="max-h-80 overflow-auto rounded-md border">
         <Table>
           <TableHeader>

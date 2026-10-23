@@ -566,3 +566,47 @@ test("conversación nueva con centro elegido y consulta explícita de toda la em
   assert.equal(h.argumentos.empresa_id, E1);
   assert.ok(h.resultado.tablas[0].filas.some((f) => f.centro !== "Oficina Central"));
 });
+
+// ================================================================ RESUMEN Y AVISO SEMANAL POR CENTRO
+test("resumen del centro: presupuesto, pagos de la semana, excesos y permisos", async () => {
+  const r = await llamar("contador", { modo: "resumen_centro", centro_negocio_id: CN_OFICINA });
+  assert.equal(r.status, 200, JSON.stringify(r.cuerpo));
+  const s = r.cuerpo;
+  assert.equal(s.centro.centro_nombre, "Oficina Central");
+  assert.match(s.semana.desde, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(new Date(`${s.semana.desde}T00:00:00Z`).getUTCDay(), 1, "la semana empieza en lunes");
+  // Mismo total que la base (pruebas anteriores ajustan la Renta): partidas activas del centro.
+  const suma = async (tipo) =>
+    (await rest(`presupuestos?centro_negocio_id=eq.${CN_OFICINA}&activo=eq.true&tipo_movimiento=eq.${tipo}&select=cantidad,precio_unitario`)).reduce(
+      (t, p) => t + Number(p.cantidad) * Number(p.precio_unitario),
+      0
+    );
+  assert.equal(s.presupuesto.egresos.presupuestado, Math.round((await suma("egreso")) * 100) / 100);
+  assert.equal(s.presupuesto.ingresos.presupuestado, Math.round((await suma("ingreso")) * 100) / 100);
+  assert.ok(s.presupuesto.egresos.presupuestado > 0 && s.presupuesto.ingresos.presupuestado > 0);
+  assert.ok(Array.isArray(s.pagos_semana.lista));
+  assert.ok(s.pagos_semana.lista.every((p) => p.fecha >= s.semana.desde && p.fecha <= s.semana.hasta));
+  assert.ok(Array.isArray(s.excesos_semana));
+  assert.equal(s.tareas_vencidas, null, "Oficina Central no tiene proyecto");
+  const sinRol = await llamar("usuario", { modo: "resumen_centro", centro_negocio_id: CN_OFICINA });
+  assert.equal(sinRol.status, 403);
+});
+
+test("aviso semanal: una vez por semana en la charla más reciente de cada centro", async () => {
+  const r1 = await llamar("contador", { modo: "avisos_semana" });
+  assert.equal(r1.status, 200, JSON.stringify(r1.cuerpo));
+  assert.ok(r1.cuerpo.generados >= 1, JSON.stringify(r1.cuerpo));
+  assert.deepEqual(r1.cuerpo.errores, []);
+  const [simultaneo1, simultaneo2] = await Promise.all([llamar("contador", { modo: "avisos_semana" }), llamar("contador", { modo: "avisos_semana" })]);
+  assert.equal(simultaneo1.cuerpo.generados + simultaneo2.cuerpo.generados, 0, "no se repite en la misma semana");
+  const avisos = await rest(`rafa_mensajes?user_id=eq.${USUARIOS.contador.id}&datos->>aviso_semana=eq.${r1.cuerpo.semana}&select=conversacion_id,contenido,datos`);
+  const deOficina = await rest(`rafa_conversaciones?user_id=eq.${USUARIOS.contador.id}&centro_negocio_id=eq.${CN_OFICINA}&select=id&order=updated_at.desc`);
+  const enOficina = avisos.filter((a) => deOficina.some((c) => c.id === a.conversacion_id));
+  assert.equal(enOficina.length, 1);
+  assert.match(enOficina[0].contenido, /Aviso semanal · Oficina Central/);
+  assert.equal(enOficina[0].datos.herramientas[0].nombre, "aviso_semanal");
+  assert.equal(await contar(`rafa_avisos?user_id=eq.${USUARIOS.contador.id}&centro_negocio_id=eq.${CN_OFICINA}&select=semana`), 1);
+  // Otro usuario sin conversaciones de centro: nada que avisar.
+  const ajeno = await llamar("admin", { modo: "avisos_semana" });
+  assert.equal(ajeno.status, 200);
+});
