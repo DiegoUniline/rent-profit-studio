@@ -237,16 +237,21 @@ describe("conversaciones por centro de negocio", () => {
   const CENTRO = "a1000000-0000-0000-0000-000000000002";
 
   it("agrupa las conversaciones por centro y muestra el centro de la conversación abierta", async () => {
-    tablas.centros_negocio = [{ id: CENTRO, codigo: "CN002", nombre: "Oficina Central", empresa_id: "e1" }];
+    const empresa = { razon_social: "Empresa Uno SA de CV", nombre_comercial: "Empresa Uno" };
+    tablas.centros_negocio = [
+      { id: CENTRO, codigo: "CN002", nombre: "Oficina Central", empresa_id: "e1", empresas: empresa },
+      { id: "a2", codigo: "CN010", nombre: "Oficina Central", empresa_id: "e2", empresas: { razon_social: "Empresa Dos SA", nombre_comercial: null } },
+    ];
     tablas.rafa_conversaciones = [
-      { id: "c1", titulo: "Pagos de la oficina", updated_at: "2026-10-23T10:00:00Z", contexto: {}, centro_negocio_id: CENTRO, empresa_id: "e1", centros_negocio: { codigo: "CN002", nombre: "Oficina Central" } },
+      { id: "c1", titulo: "Pagos de la oficina", updated_at: "2026-10-23T10:00:00Z", contexto: {}, centro_negocio_id: CENTRO, empresa_id: "e1", centros_negocio: { codigo: "CN002", nombre: "Oficina Central", empresas: empresa } },
       { id: "c2", titulo: "Dudas generales", updated_at: "2026-10-22T10:00:00Z", contexto: {}, centro_negocio_id: null, empresa_id: null, centros_negocio: null },
     ];
     tablas.rafa_mensajes = [];
     render(<MemoryRouter><RafaChat /></MemoryRouter>);
-    await waitFor(() => expect(screen.getAllByText("CN002 · Oficina Central").length).toBeGreaterThan(0));
+    // Centros con el mismo nombre se distinguen por la empresa.
+    await waitFor(() => expect(screen.getAllByText("CN002 · Oficina Central — Empresa Uno").length).toBeGreaterThan(0));
     expect(screen.getAllByText("Sin centro").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Todo lo que preguntes aquí se refiere al centro CN002 · Oficina Central/)).toBeInTheDocument();
+    expect(screen.getByText(/Todo lo que preguntes aquí se refiere al centro CN002 · Oficina Central — Empresa Uno/)).toBeInTheDocument();
   });
 
   it("«Usar» vuelve a enviar un archivo guardado de la conversación sin subirlo otra vez", async () => {
