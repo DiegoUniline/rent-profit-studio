@@ -60,7 +60,8 @@ Deno.serve(async (req) => {
           },
           llamar,
           extractor,
-          almacen
+          almacen,
+          (archivos) => crearExtractor({ url: URL_IA, apiKey, modelo: MODELO, archivos })
         );
         return json(salida);
       } catch (e) {

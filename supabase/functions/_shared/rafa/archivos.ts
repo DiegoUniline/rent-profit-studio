@@ -101,19 +101,34 @@ export async function cargarArchivosGuardados(ctx: Contexto, almacen: AlmacenArc
   return salida;
 }
 
-/** Lista breve de los archivos de la conversación para el prompt. */
-export async function archivosDeConversacion(ctx: Contexto, conversacionId: string): Promise<{ id: string; nombre: string; fecha: string }[]> {
-  const { data } = await ctx.db
-    .from("rafa_archivos")
-    .select("id, nombre, created_at")
-    .eq("conversacion_id", conversacionId)
-    .order("created_at", { ascending: false })
-    .limit(30);
-  return ((data || []) as { id: string; nombre: string; created_at: string }[]).map((f) => ({
+export interface ArchivoDisponible {
+  id: string;
+  nombre: string;
+  fecha: string;
+  /** "conversacion" = subido en esta charla; "centro" = en otra charla del mismo centro. */
+  origen: "conversacion" | "centro";
+}
+
+/** Archivos que Rafa puede abrir: los de esta charla y los de otras charlas del mismo centro. */
+export async function archivosDisponibles(ctx: Contexto, conversacionId: string, centroId?: string | null): Promise<ArchivoDisponible[]> {
+  let q = ctx.db.from("rafa_archivos").select("id, nombre, created_at, conversacion_id");
+  q = centroId ? q.or(`conversacion_id.eq.${conversacionId},centro_negocio_id.eq.${centroId}`) : q.eq("conversacion_id", conversacionId);
+  const { data } = await q.order("created_at", { ascending: false }).limit(40);
+  return ((data || []) as { id: string; nombre: string; created_at: string; conversacion_id: string }[]).map((f) => ({
     id: f.id,
     nombre: f.nombre,
     fecha: String(f.created_at || "").slice(0, 10),
+    origen: f.conversacion_id === conversacionId ? "conversacion" : "centro",
   }));
+}
+
+/** Descarga archivos ya autorizados (por la herramienta abrir_archivos) para dárselos al modelo. */
+export async function descargarArchivos(almacen: AlmacenArchivos, archivos: { id: string; nombre: string; mime: string; ruta: string }[]): Promise<ArchivoReusado[]> {
+  const salida: ArchivoReusado[] = [];
+  for (const f of archivos.slice(0, MAX_ARCHIVOS_POR_MENSAJE)) {
+    salida.push({ id: f.id, filename: f.nombre, mime: f.mime, data: await almacen.descargar(f.ruta) });
+  }
+  return salida;
 }
 
 function aBase64(bytes: Uint8Array): string {

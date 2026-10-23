@@ -491,6 +491,7 @@ test("rechaza peticiones sin sesión válida", async () => {
 
 // ================================================================ CONVERSACIONES POR CENTRO
 const CN_OFICINA = "a1000000-0000-0000-0000-000000000002"; // Oficina Central (Empresa Uno)
+let archivoDelCentro = null;
 const ultimoUsuario = (body) => [...body.messages].reverse().find((m) => m.role === "user").content;
 
 test("conversación anclada a un centro: contexto automático, archivos guardados y reutilizados", async () => {
@@ -528,6 +529,7 @@ test("conversación anclada a un centro: contexto automático, archivos guardado
 
   const archivos = await rest(`rafa_archivos?conversacion_id=eq.${conv.id}&select=*`);
   assert.equal(archivos.length, 1);
+  archivoDelCentro = archivos[0];
   assert.equal(archivos[0].centro_negocio_id, CN_OFICINA);
   assert.equal(archivos[0].empresa_id, E1);
   assert.equal(archivos[0].nombre, "catálogo manzana 7.pdf");
@@ -542,7 +544,7 @@ test("conversación anclada a un centro: contexto automático, archivos guardado
     return fin("Revisé el catálogo.");
   });
   await chat("contador", "Revisa otra vez el catálogo", { conversacion_id: conv.id, archivos_guardados: [archivos[0].id] });
-  assert.match(sistemaVisto, /ARCHIVOS GUARDADOS EN ESTA CONVERSACIÓN: "catálogo manzana 7.pdf"/);
+  assert.match(sistemaVisto, /ARCHIVOS GUARDADOS \(de esta charla y de otras charlas del mismo centro\): "catálogo manzana 7.pdf" \(\d{4}-\d{2}-\d{2}; id=/);
   const parte = usuarioVisto.find((p) => p.type === "file");
   assert.equal(parte.file.filename, "catálogo manzana 7.pdf");
   assert.equal(parte.file.file_data, `data:application/pdf;base64,${pdf}`);
@@ -609,4 +611,32 @@ test("aviso semanal: una vez por semana en la charla más reciente de cada centr
   // Otro usuario sin conversaciones de centro: nada que avisar.
   const ajeno = await llamar("admin", { modo: "avisos_semana" });
   assert.equal(ajeno.status, 200);
+});
+
+test("Rafa abre por sí mismo un archivo guardado en otra charla del mismo centro", async () => {
+  assert.ok(archivoDelCentro, "depende de la prueba de archivos guardados");
+  let sistemaVisto = "";
+  let usuarioTrasAbrir = null;
+  guion(
+    (body) => {
+      sistemaVisto = sistema(body);
+      return usar("abrir_archivos", { archivo_ids: [archivoDelCentro.id] });
+    },
+    (body) => {
+      usuarioTrasAbrir = ultimoUsuario(body);
+      return fin("Leí el catálogo.");
+    }
+  );
+  const s = await chat("contador", "Revisa el catálogo que subí ayer", { centro_negocio_id: CN_OFICINA });
+  assert.notEqual(s.conversacion_id, archivoDelCentro.conversacion_id, "es otra charla del mismo centro");
+  assert.match(sistemaVisto, new RegExp(`"catálogo manzana 7.pdf" \\(\\d{4}-\\d{2}-\\d{2}, otra charla del centro; id=${archivoDelCentro.id}\\)`));
+  assert.equal(s.herramientas[0].resultado.ok, true, s.herramientas[0].resultado.resumen);
+  const parte = usuarioTrasAbrir.find((p) => p.type === "file");
+  assert.equal(parte.file.filename, "catálogo manzana 7.pdf");
+
+  // Otro usuario no puede abrirlo aunque conozca el id.
+  guion(usar("abrir_archivos", { archivo_ids: [archivoDelCentro.id] }), fin("No pude."));
+  const ajeno = await chat("admin", "Abre ese archivo", { centro_negocio_id: CN_OFICINA });
+  assert.equal(ajeno.herramientas[0].resultado.ok, false);
+  assert.match(ajeno.herramientas[0].resultado.resumen, /no es tuyo/);
 });

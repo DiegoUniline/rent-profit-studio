@@ -50,7 +50,7 @@ describe("ancla de la conversación (centro de negocio)", () => {
     const p = promptSistema(ctx, {}, undefined, "¿cómo vamos?", { ancla: ANCLA, archivos: [{ id: "x", nombre: "catalogo.pdf", fecha: "2026-10-22" }] });
     expect(p).toContain("CENTRO DE NEGOCIO DE ESTA CONVERSACIÓN: CN002 · Oficina Central");
     expect(p).toContain(`proyecto_id=${ANCLA.proyecto_id}`);
-    expect(p).toContain('"catalogo.pdf" (2026-10-22)');
+    expect(p).toContain('"catalogo.pdf" (2026-10-22; id=x)');
     expect(promptSistema(ctx, {}, undefined, "hola")).toContain("CENTRO DE NEGOCIO DE ESTA CONVERSACIÓN: ninguno");
   });
 
