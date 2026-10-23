@@ -19,11 +19,13 @@ import {
   listarArchivos,
   listarCentros,
   listarConversaciones,
+  nombreEmpresa,
   obtenerCentro,
   urlArchivo,
   type AccionRafa,
   type ArchivoRafa,
   type CentroRafa,
+  type EmpresaDeCentro,
   type ContextoPantalla,
   type ConversacionRafa,
   type MensajeRafa,
@@ -137,8 +139,12 @@ function opcionesDe(m: MensajeRafa): Opcion[] {
 const SIN_CENTRO = "sin";
 const TODOS = "todos";
 
-const etiquetaCentro = (c?: { codigo?: string | null; nombre?: string | null } | null) =>
-  c ? `${c.codigo ? `${c.codigo} · ` : ""}${c.nombre ?? ""}` : "Sin centro";
+/** "CN002 · Oficina Central — Empresa": la empresa distingue centros con el mismo nombre. */
+const etiquetaCentro = (c?: { codigo?: string | null; nombre?: string | null; empresas?: EmpresaDeCentro } | null) => {
+  if (!c) return "Sin centro";
+  const empresa = nombreEmpresa(c.empresas);
+  return `${c.codigo ? `${c.codigo} · ` : ""}${c.nombre ?? ""}${empresa ? ` — ${empresa}` : ""}`;
+};
 
 /** Agrupa las conversaciones por centro, en orden de actividad más reciente. */
 function agruparPorCentro(lista: ConversacionRafa[]) {
@@ -492,7 +498,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compact
                   <SelectItem value="nueva">Nueva conversación</SelectItem>
                   {conversaciones.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.centro_negocio_id ? `${etiquetaCentro(c.centros_negocio)} — ` : ""}
+                      {c.centro_negocio_id && !c.titulo.startsWith("Centro ") ? `${etiquetaCentro(c.centros_negocio)} — ` : ""}
                       {c.titulo}
                     </SelectItem>
                   ))}

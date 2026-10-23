@@ -81,13 +81,19 @@ export interface ConversacionRafa {
   /** Centro de negocio al que está anclada la conversación (null = general). */
   centro_negocio_id: string | null;
   empresa_id: string | null;
-  centros_negocio?: { codigo: string; nombre: string } | null;
+  centros_negocio?: { codigo: string; nombre: string; empresas?: EmpresaDeCentro } | null;
 }
+
+/** Empresa embebida en el centro (para distinguir centros con el mismo nombre). */
+export type EmpresaDeCentro = { razon_social?: string | null; nombre_comercial?: string | null } | null;
+
+export const nombreEmpresa = (e?: EmpresaDeCentro) => e?.nombre_comercial || e?.razon_social || "";
 
 export interface CentroRafa {
   id: string;
   codigo: string;
   nombre: string;
+  empresas?: EmpresaDeCentro;
   empresa_id: string;
 }
 
@@ -208,7 +214,8 @@ export function cancelarAccion(accionId: string) {
   return invocar<ResultadoAccion>({ modo: "cancelar", accion_id: accionId });
 }
 
-const COLUMNAS_CONVERSACION = "id, titulo, updated_at, contexto, centro_negocio_id, empresa_id, centros_negocio:centro_negocio_id(codigo, nombre)";
+const COLUMNAS_CONVERSACION = "id, titulo, updated_at, contexto, centro_negocio_id, empresa_id, centros_negocio:centro_negocio_id(codigo, nombre, empresas:empresa_id(razon_social, nombre_comercial))";
+const COLUMNAS_CENTRO = "id, codigo, nombre, empresa_id, empresas:empresa_id(razon_social, nombre_comercial)";
 
 export async function listarConversaciones(): Promise<ConversacionRafa[]> {
   const { data, error } = await supabase
@@ -222,24 +229,27 @@ export async function listarConversaciones(): Promise<ConversacionRafa[]> {
 
 /** Centros activos para anclar conversaciones. */
 export async function listarCentros(): Promise<CentroRafa[]> {
-  const { data, error } = await supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("activo", true).order("nombre");
+  const { data, error } = await supabase.from("centros_negocio").select(COLUMNAS_CENTRO).eq("activo", true).order("nombre");
   if (error) throw error;
-  return (data || []) as CentroRafa[];
+  return (data || []) as unknown as CentroRafa[];
 }
 
 export async function obtenerCentro(id: string): Promise<CentroRafa | null> {
-  const { data, error } = await supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("id", id).maybeSingle();
+  const { data, error } = await supabase.from("centros_negocio").select(COLUMNAS_CENTRO).eq("id", id).maybeSingle();
   if (error) throw error;
-  return (data as CentroRafa | null) ?? null;
+  return (data as unknown as CentroRafa | null) ?? null;
 }
 
 /** Crea una conversación anclada a un centro (la empresa la pone la base desde el centro). */
-export async function crearConversacionDeCentro(centro: Pick<CentroRafa, "id" | "nombre">): Promise<ConversacionRafa> {
+export async function crearConversacionDeCentro(centro: Pick<CentroRafa, "id" | "nombre"> & { empresas?: EmpresaDeCentro }): Promise<ConversacionRafa> {
   const { data: u } = await supabase.auth.getUser();
   if (!u?.user) throw new Error("Sesión inválida. Vuelve a iniciar sesión.");
+  // El título lleva la empresa: hay centros con el mismo nombre en distintas empresas.
+  const empresa = nombreEmpresa(centro.empresas ?? (await obtenerCentro(centro.id))?.empresas);
+  const titulo = `Centro ${centro.nombre}${empresa ? ` · ${empresa}` : ""}`.slice(0, 80);
   const { data, error } = await supabase
     .from("rafa_conversaciones")
-    .insert({ user_id: u.user.id, titulo: `Centro ${centro.nombre}`.slice(0, 80), centro_negocio_id: centro.id })
+    .insert({ user_id: u.user.id, titulo, centro_negocio_id: centro.id })
     .select(COLUMNAS_CONVERSACION)
     .single();
   if (error) throw new Error(`No se pudo crear la conversación del centro: ${error.message}`);
@@ -247,7 +257,7 @@ export async function crearConversacionDeCentro(centro: Pick<CentroRafa, "id" | 
 }
 
 /** Conversación más reciente del centro; si no hay, la crea. */
-export async function conversacionDeCentro(centro: Pick<CentroRafa, "id" | "nombre">): Promise<ConversacionRafa> {
+export async function conversacionDeCentro(centro: Pick<CentroRafa, "id" | "nombre"> & { empresas?: EmpresaDeCentro }): Promise<ConversacionRafa> {
   const { data, error } = await supabase
     .from("rafa_conversaciones")
     .select(COLUMNAS_CONVERSACION)

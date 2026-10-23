@@ -41,6 +41,7 @@ describe.skipIf(!process.env.REST_URL)("conversaciones de Rafa por centro de neg
     expect(creada.centro_negocio_id).toBe(OFICINA.id);
     expect(creada.empresa_id).toBe(E1);
     expect(creada.centros_negocio?.nombre).toBe("Oficina Central");
+    expect(creada.titulo).toBe("Centro Oficina Central · Demo Uno");
     const abierta = await conversacionDeCentro(OFICINA);
     expect(abierta.id).toBe(creada.id);
 
