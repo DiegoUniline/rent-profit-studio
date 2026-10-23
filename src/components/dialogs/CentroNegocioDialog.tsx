@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+import { crearConversacionDeCentro } from "@/lib/rafa-chat";
 import { z } from "zod";
 import {
   Dialog,
@@ -84,6 +87,7 @@ export function CentroNegocioDialog({
   onSuccess,
 }: CentroNegocioDialogProps) {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [form, setForm] = useState<CentroForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [allEmpresas, setAllEmpresas] = useState<Empresa[]>(empresas);
@@ -133,6 +137,7 @@ export function CentroNegocioDialog({
     setSaving(true);
 
     let error;
+    let centroCreadoId: string | null = null;
     if (centro) {
       // Update: don't change the code
       const updateData = {
@@ -155,7 +160,9 @@ export function CentroNegocioDialog({
         tipo_actividad: form.tipo_actividad || null,
         responsable: form.responsable || null,
       };
-      ({ error } = await supabase.from("centros_negocio").insert(insertData));
+      const { data: creado, error: errorAlta } = await supabase.from("centros_negocio").insert(insertData).select("id").single();
+      error = errorAlta;
+      centroCreadoId = creado?.id ?? null;
     }
 
     setSaving(false);
@@ -181,6 +188,30 @@ export function CentroNegocioDialog({
       title: centro ? "Centro actualizado" : "Centro creado",
       description: `${form.nombre} ha sido ${centro ? "actualizado" : "creado"} exitosamente`,
     });
+
+    // Cada centro nuevo nace con su conversación con Rafa.
+    if (centroCreadoId) {
+      const id = centroCreadoId;
+      crearConversacionDeCentro({ id, nombre: form.nombre })
+        .then(() =>
+          toast({
+            title: "Conversación con Rafa lista",
+            description: `Rafa ya trabaja sobre ${form.nombre}.`,
+            action: (
+              <ToastAction altText="Abrir en Rafa" onClick={() => navigate(`/rafa?centro=${id}`)}>
+                Abrir en Rafa
+              </ToastAction>
+            ),
+          })
+        )
+        .catch((e) =>
+          toast({
+            variant: "destructive",
+            title: "El centro se creó, pero no su conversación con Rafa",
+            description: e instanceof Error ? e.message : "Ábrela desde Centros de negocio.",
+          })
+        );
+    }
 
     onOpenChange(false);
     onSuccess();

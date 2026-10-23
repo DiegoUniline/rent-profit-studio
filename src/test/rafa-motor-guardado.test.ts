@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Contexto } from "../../supabase/functions/_shared/rafa/tipos";
 
-vi.mock("../../supabase/functions/_shared/rafa/registro.ts", () => ({ definicionesParaModelo: () => [], ejecutarHerramienta: vi.fn() }));
+vi.mock("../../supabase/functions/_shared/rafa/registro.ts", () => ({ definicionesParaModelo: () => [], ejecutarHerramienta: vi.fn(), herramientaPorNombre: () => undefined }));
 vi.mock("../../supabase/functions/_shared/rafa/prompt.ts", () => ({ promptSistema: () => "Rafa" }));
 
 import { procesarTurno } from "../../supabase/functions/_shared/rafa/motor";

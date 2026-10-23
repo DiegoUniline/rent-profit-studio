@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FilterSelect } from "@/components/ui/filter-select";
-import { Briefcase, Plus, Edit, Power, Search, FolderKanban } from "lucide-react";
+import { Briefcase, Plus, Edit, Power, Search, FolderKanban, MessageCircle } from "lucide-react";
 import { CentroNegocioDialog } from "@/components/dialogs/CentroNegocioDialog";
 
 interface Empresa {
@@ -290,6 +290,15 @@ export default function CentrosNegocio() {
                       </TableCell>
                       {canEdit && (
                         <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Conversación con Rafa de este centro"
+                            aria-label={`Abrir Rafa en ${centro.nombre}`}
+                            onClick={() => navigate(`/rafa?centro=${centro.id}`)}
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"

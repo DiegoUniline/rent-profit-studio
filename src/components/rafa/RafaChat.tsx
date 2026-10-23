@@ -8,25 +8,36 @@ import { useToast } from "@/hooks/use-toast";
 import { toBase64, validarPesoAdjuntos } from "@/lib/archivos";
 import { formatDateObj } from "@/lib/date-utils";
 import {
+  asignarCentro,
   cancelarAccion,
   cargarMensajes,
   confirmarAccion,
+  conversacionDeCentro,
   eliminarConversacion,
   enviarMensaje,
   estadoAcciones,
+  listarArchivos,
+  listarCentros,
   listarConversaciones,
+  obtenerCentro,
+  urlArchivo,
   type AccionRafa,
+  type ArchivoRafa,
+  type CentroRafa,
   type ContextoPantalla,
   type ConversacionRafa,
   type MensajeRafa,
 } from "@/lib/rafa-chat";
 import type { PlanRafa } from "@/lib/rafa-types";
 import { ResultadosHerramientas } from "./RafaResultados";
-import { Loader2, MessageSquarePlus, Mic, Paperclip, Send, Square, Trash2, X } from "lucide-react";
+import { Building2, Download, FileText, Loader2, MessageSquarePlus, Mic, Paperclip, RotateCcw, Send, Square, Trash2, X } from "lucide-react";
 
 interface Props {
   contextoPantalla?: ContextoPantalla;
-  onAbrirPlan?: (plan: PlanRafa) => void;
+  /** Abre el editor del plan; recibe el centro de la conversación para preseleccionarlo. */
+  onAbrirPlan?: (plan: PlanRafa, centroId?: string | null) => void;
+  /** Centro con el que se abre Rafa (p. ej. /rafa?centro=ID): abre o crea su conversación. */
+  centroInicial?: string | null;
   /** Panel lateral: oculta la lista de conversaciones. */
   compacto?: boolean;
   /** Contenido extra al inicio de la barra lateral (p. ej. acceso a "Cargar presupuesto"). */
@@ -123,6 +134,23 @@ function opcionesDe(m: MensajeRafa): Opcion[] {
   });
 }
 
+const SIN_CENTRO = "sin";
+const TODOS = "todos";
+
+const etiquetaCentro = (c?: { codigo?: string | null; nombre?: string | null } | null) =>
+  c ? `${c.codigo ? `${c.codigo} · ` : ""}${c.nombre ?? ""}` : "Sin centro";
+
+/** Agrupa las conversaciones por centro, en orden de actividad más reciente. */
+function agruparPorCentro(lista: ConversacionRafa[]) {
+  const grupos = new Map<string, { clave: string; titulo: string; conversaciones: ConversacionRafa[] }>();
+  for (const c of lista) {
+    const clave = c.centro_negocio_id || SIN_CENTRO;
+    if (!grupos.has(clave)) grupos.set(clave, { clave, titulo: c.centro_negocio_id ? etiquetaCentro(c.centros_negocio) : "Sin centro", conversaciones: [] });
+    grupos.get(clave)!.conversaciones.push(c);
+  }
+  return Array.from(grupos.values());
+}
+
 const SUGERENCIAS = [
   "¿Todos los pagos de esta semana están dentro del presupuesto?",
   "¿Cuánto llevamos ejercido por partida?",
@@ -130,7 +158,7 @@ const SUGERENCIAS = [
   "Programa 15 lotes por mes hasta completar 550",
 ];
 
-export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, lateral }: Props) {
+export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compacto = false, lateral }: Props) {
   const { toast } = useToast();
   const [conversaciones, setConversaciones] = useState<ConversacionRafa[]>([]);
   const [conversacionId, setConversacionId] = useState<string | null>(null);
@@ -149,6 +177,13 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
   const contenedorRef = useRef<HTMLDivElement>(null);
   const [alto, setAlto] = useState<number | null>(null);
   const inicializadoRef = useRef(false);
+  const [centros, setCentros] = useState<CentroRafa[]>([]);
+  const [filtroCentro, setFiltroCentro] = useState<string>(TODOS);
+  // Centro elegido para una conversación nueva que aún no tiene mensajes.
+  const [centroNueva, setCentroNueva] = useState<string | null>(null);
+  const [archivosConv, setArchivosConv] = useState<ArchivoRafa[]>([]);
+  const [verArchivos, setVerArchivos] = useState(false);
+  const [reusar, setReusar] = useState<ArchivoRafa[]>([]);
 
   // En página completa el chat ocupa exactamente el espacio visible restante:
   // la página no hace scroll, solo la lista de mensajes, y el cuadro de texto
@@ -182,6 +217,14 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
     setMensajes(lista);
     const ids = lista.flatMap((m) => (m.datos?.herramientas || []).map((h) => h.accion?.id).filter(Boolean) as string[]);
     setAcciones(await estadoAcciones(Array.from(new Set(ids))));
+    // Los archivos son complementarios: si fallan no se pierde la conversación.
+    setArchivosConv(await listarArchivos(id).catch(() => []));
+  }, []);
+
+  useEffect(() => {
+    listarCentros()
+      .then(setCentros)
+      .catch(() => setCentros([]));
   }, []);
 
   useEffect(() => {
@@ -189,6 +232,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
     inicializadoRef.current = true;
     void (async () => {
       const lista = await cargarConversaciones();
+      if (centroInicial) return; // la abre el efecto del centro
       const ultima = lista[0];
       if (!ultima) return;
       try {
@@ -198,7 +242,25 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
         toast({ variant: "destructive", title: "No se pudo abrir la última conversación", description: e instanceof Error ? e.message : "" });
       }
     })();
-  }, [cargarConversaciones, recargar, toast]);
+  }, [cargarConversaciones, recargar, toast, centroInicial]);
+
+  // Abrir Rafa desde un centro: su conversación más reciente o una nueva anclada.
+  useEffect(() => {
+    if (!centroInicial) return;
+    void (async () => {
+      try {
+        const centro = await obtenerCentro(centroInicial);
+        if (!centro) throw new Error("El centro de negocio no existe.");
+        const conv = await conversacionDeCentro(centro);
+        setFiltroCentro(conv.centro_negocio_id || TODOS);
+        setConversacionId(conv.id);
+        await recargar(conv.id);
+        await cargarConversaciones();
+      } catch (e) {
+        toast({ variant: "destructive", title: "No se pudo abrir la conversación del centro", description: e instanceof Error ? e.message : "" });
+      }
+    })();
+  }, [centroInicial, cargarConversaciones, recargar, toast]);
 
   useEffect(() => {
     finRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
@@ -206,6 +268,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
 
   const abrir = async (id: string) => {
     setConversacionId(id);
+    setReusar([]);
     try {
       await recargar(id);
     } catch (e) {
@@ -217,11 +280,47 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
     setConversacionId(null);
     setMensajes([]);
     setAcciones(new Map());
+    setArchivosConv([]);
+    setReusar([]);
+    // Si se está viendo un centro, la conversación nueva nace anclada a él.
+    setCentroNueva(filtroCentro !== TODOS && filtroCentro !== SIN_CENTRO ? filtroCentro : null);
   };
+
+  const conversacionActual = conversaciones.find((c) => c.id === conversacionId) || null;
+  const centroActualId = conversacionId ? conversacionActual?.centro_negocio_id ?? null : centroNueva;
+
+  const cambiarCentro = async (valor: string) => {
+    const centroId = valor === SIN_CENTRO ? null : valor;
+    if (!conversacionId) {
+      setCentroNueva(centroId);
+      return;
+    }
+    try {
+      await asignarCentro(conversacionId, centroId);
+      await cargarConversaciones();
+    } catch (e) {
+      toast({ variant: "destructive", title: "No se cambió el centro", description: e instanceof Error ? e.message : "" });
+    }
+  };
+
+  const descargar = async (a: ArchivoRafa) => {
+    try {
+      window.open(await urlArchivo(a.ruta), "_blank", "noopener");
+    } catch (e) {
+      toast({ variant: "destructive", title: "No se pudo abrir el archivo", description: e instanceof Error ? e.message : "" });
+    }
+  };
+
+  const grupos = useMemo(() => {
+    const visibles = conversaciones.filter((c) =>
+      filtroCentro === TODOS ? true : filtroCentro === SIN_CENTRO ? !c.centro_negocio_id : c.centro_negocio_id === filtroCentro
+    );
+    return agruparPorCentro(visibles);
+  }, [conversaciones, filtroCentro]);
 
   const enviar = async (mensajeDirecto?: string, contextoExtra?: Partial<ContextoPantalla>) => {
     const mensaje = (mensajeDirecto ?? texto).trim();
-    if ((!mensaje && !audioBlob && archivos.length === 0) || enviando) return;
+    if ((!mensaje && !audioBlob && archivos.length === 0 && reusar.length === 0) || enviando) return;
     const errorPeso = validarPesoAdjuntos(audioBlob ? [...archivos, audioBlob] : archivos);
     if (errorPeso) {
       toast({ variant: "destructive", title: "Archivo demasiado pesado", description: errorPeso });
@@ -232,7 +331,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
       id: `tmp-${Date.now()}`,
       rol: "usuario",
       contenido: mensaje || "(audio/archivos)",
-      datos: { adjuntos: archivos.map((a) => a.name) },
+      datos: { adjuntos: [...archivos.map((a) => a.name), ...reusar.map((a) => a.nombre)] },
       version_conocimiento: null,
       created_at: new Date().toISOString(),
     };
@@ -248,9 +347,18 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
         ? { data: await toBase64(audioArchivo), format: (audioArchivo.name.split(".").pop() || "mp3").toLowerCase() }
         : undefined;
       const contexto = contextoExtra ? { ...(contextoPantalla || {}), ...contextoExtra } : contextoPantalla;
-      const r = await enviarMensaje({ conversacion_id: conversacionId, mensaje, contexto_pantalla: contexto, archivos: adjuntos, audio });
+      const r = await enviarMensaje({
+        conversacion_id: conversacionId,
+        mensaje,
+        contexto_pantalla: contexto,
+        archivos: adjuntos,
+        archivos_guardados: reusar.map((a) => a.id),
+        audio,
+        centro_negocio_id: conversacionId ? undefined : centroNueva,
+      });
       if (mensajeDirecto === undefined) setTexto("");
       setArchivos([]);
+      setReusar([]);
       setAudioBlob(null);
       setConversacionId(r.conversacion_id);
       try {
@@ -328,22 +436,44 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
       {!compacto && (
         <aside className="hidden w-60 shrink-0 flex-col gap-2 overflow-y-auto md:flex">
           {lateral}
+          <Select value={filtroCentro} onValueChange={setFiltroCentro}>
+            <SelectTrigger aria-label="Filtrar por centro de negocio" className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TODOS}>Todos los centros</SelectItem>
+              <SelectItem value={SIN_CENTRO}>Sin centro</SelectItem>
+              {centros.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {etiquetaCentro(c)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={nueva}>
             <MessageSquarePlus className="h-4 w-4" />
             Nueva conversación
           </Button>
-          {conversaciones.map((c) => (
-            <div
-              key={c.id}
-              className={`group flex items-center gap-1 rounded-md border px-2 py-1.5 text-sm ${c.id === conversacionId ? "border-primary bg-primary/5" : ""}`}
-            >
-              <button className="min-w-0 flex-1 text-left" onClick={() => abrir(c.id)}>
-                <span className="block truncate">{c.titulo}</span>
-                <span className="text-xs text-muted-foreground">{formatDateObj(new Date(c.updated_at))}</span>
-              </button>
-              <button className="opacity-0 group-hover:opacity-100" onClick={() => borrar(c.id)} aria-label="Eliminar conversación">
-                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-              </button>
+          {grupos.map((g) => (
+            <div key={g.clave} className="space-y-1">
+              <p className="flex items-center gap-1 px-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <Building2 className="h-3 w-3 shrink-0" />
+                <span className="truncate">{g.titulo}</span>
+              </p>
+              {g.conversaciones.map((c) => (
+                <div
+                  key={c.id}
+                  className={`group flex items-center gap-1 rounded-md border px-2 py-1.5 text-sm ${c.id === conversacionId ? "border-primary bg-primary/5" : ""}`}
+                >
+                  <button className="min-w-0 flex-1 text-left" onClick={() => abrir(c.id)}>
+                    <span className="block truncate">{c.titulo}</span>
+                    <span className="text-xs text-muted-foreground">{formatDateObj(new Date(c.updated_at))}</span>
+                  </button>
+                  <button className="opacity-0 group-hover:opacity-100" onClick={() => borrar(c.id)} aria-label="Eliminar conversación">
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </button>
+                </div>
+              ))}
             </div>
           ))}
         </aside>
@@ -360,7 +490,12 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="nueva">Nueva conversación</SelectItem>
-                  {conversaciones.map((c) => <SelectItem key={c.id} value={c.id}>{c.titulo}</SelectItem>)}
+                  {conversaciones.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.centro_negocio_id ? `${etiquetaCentro(c.centros_negocio)} — ` : ""}
+                      {c.titulo}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Button variant="outline" size="icon" disabled={enviando} onClick={nueva} aria-label="Nueva conversación">
@@ -369,10 +504,70 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
             </div>
           </div>
         )}
+        <div className="shrink-0 space-y-2 border-b px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <Select value={centroActualId || SIN_CENTRO} onValueChange={(v) => void cambiarCentro(v)} disabled={enviando}>
+              <SelectTrigger aria-label="Centro de negocio de la conversación" className="h-8 min-w-0 flex-1 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SIN_CENTRO}>Sin centro (conversación general)</SelectItem>
+                {centros.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {etiquetaCentro(c)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant={verArchivos ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 shrink-0 gap-1 px-2 text-xs"
+              onClick={() => setVerArchivos((v) => !v)}
+              disabled={!conversacionId}
+              aria-label="Archivos de la conversación"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Archivos ({archivosConv.length})
+            </Button>
+          </div>
+          {verArchivos && conversacionId && (
+            <div className="max-h-40 space-y-1 overflow-y-auto text-xs">
+              {archivosConv.length === 0 && <p className="text-muted-foreground">Aún no hay archivos en esta conversación. Los que adjuntes se guardan aquí.</p>}
+              {archivosConv.map((a) => (
+                <div key={a.id} className="flex items-center gap-2 rounded border px-2 py-1">
+                  <span className="min-w-0 flex-1 truncate" title={a.nombre}>
+                    {a.nombre}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">{formatDateObj(new Date(a.created_at))}</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => descargar(a)} aria-label={`Descargar ${a.nombre}`}>
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 gap-1 px-1.5 text-xs"
+                    disabled={reusar.some((r) => r.id === a.id) || reusar.length >= 5}
+                    onClick={() => setReusar((prev) => [...prev, a])}
+                    aria-label={`Usar ${a.nombre}`}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Usar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
           {mensajes.length === 0 && !enviando && (
             <div className="space-y-3 py-6 text-center text-sm text-muted-foreground">
-              <p>Pregúntame por presupuestos, programación, asientos, proyectos o cómo funciona el sistema.</p>
+              <p>
+                {centroActualId
+                  ? `Todo lo que preguntes aquí se refiere al centro ${etiquetaCentro(centros.find((c) => c.id === centroActualId))}.`
+                  : "Pregúntame por presupuestos, programación, asientos, proyectos o cómo funciona el sistema. Elige arriba un centro para trabajar ordenado por centro."}
+              </p>
               <div className="flex flex-wrap justify-center gap-2">
                 {SUGERENCIAS.map((s) => (
                   <button key={s} onClick={() => setTexto(s)} className="rounded-full border px-3 py-1 text-xs hover:bg-muted">
@@ -408,7 +603,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
                   procesando={procesando}
                   onConfirmar={(a) => operar(a, "confirmar")}
                   onCancelar={(a) => operar(a, "cancelar")}
-                  onAbrirPlan={onAbrirPlan}
+                  onAbrirPlan={onAbrirPlan ? (plan) => onAbrirPlan(plan, centroActualId) : undefined}
                 />
               </div>
             )
@@ -423,7 +618,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
         </div>
 
         <div className="shrink-0 space-y-2 border-t p-3">
-          {(contextoTexto || audioBlob || archivos.length > 0) && (
+          {(contextoTexto || audioBlob || archivos.length > 0 || reusar.length > 0) && (
             <div className="flex flex-wrap gap-1.5">
               {contextoTexto && <Badge variant="outline">{contextoTexto}</Badge>}
               {audioBlob && (
@@ -434,6 +629,15 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, compacto = false, late
                   </button>
                 </Badge>
               )}
+              {reusar.map((a) => (
+                <Badge key={a.id} variant="secondary" className="gap-1">
+                  <RotateCcw className="h-3 w-3" />
+                  {a.nombre}
+                  <button onClick={() => setReusar((prev) => prev.filter((r) => r.id !== a.id))} aria-label={`Quitar ${a.nombre}`}>
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
               {archivos.map((f, i) => (
                 <Badge key={`${f.name}-${i}`} variant="secondary" className="gap-1">
                   {f.name}

@@ -63,6 +63,10 @@ export const HERRAMIENTAS: Herramienta<any>[] = [
 
 const porNombre = new Map(HERRAMIENTAS.map((h) => [h.nombre, h]));
 
+export function herramientaPorNombre(nombre: string) {
+  return porNombre.get(nombre);
+}
+
 export function herramientasDisponibles(ctx: Contexto) {
   return HERRAMIENTAS.filter((h) => h.roles.some((r) => ctx.usuario.roles.includes(r)));
 }

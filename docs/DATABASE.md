@@ -181,6 +181,22 @@ Registro de idempotencia de `guardar_presupuesto` (guardado atómico de partida 
 | 4 | resultado | jsonb | NO | '{}' | |
 | 5 | created_at | timestamptz | NO | now() | |
 
+#### `rafa_archivos`
+Archivos que el usuario sube en una conversación con Rafa, clasificados por conversación y centro de negocio (Storage privado `rafa-archivos`). RLS: cada usuario lee/borra los suyos; los registra la Edge Function. `rafa_conversaciones` tiene además `centro_negocio_id` y `empresa_id` (la empresa la fija un trigger desde el centro).
+
+| # | Columna | Tipo | Nullable | Default | Claves |
+|---|---|---|---|---|---|
+| 1 | id | uuid | NO | gen_random_uuid() | **PK** |
+| 2 | user_id | uuid | NO | auth.uid() | |
+| 3 | conversacion_id | uuid | NO | — | **FK** → `rafa_conversaciones.id` (CASCADE) |
+| 4 | centro_negocio_id | uuid | SÍ | — | **FK** → `centros_negocio.id` (SET NULL) |
+| 5 | empresa_id | uuid | SÍ | — | **FK** → `empresas.id` (SET NULL) |
+| 6 | nombre | text | NO | — | |
+| 7 | mime | text | NO | — | |
+| 8 | tamano | bigint | NO | 0 | |
+| 9 | ruta | text | NO | — | UNIQUE (ruta en Storage) |
+| 10 | created_at | timestamptz | NO | now() | |
+
 #### `asientos_contables`
 Encabezado de póliza contable (partida doble).
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +39,9 @@ interface Cuenta { id: string; codigo: string; nombre: string; empresa_id: strin
 export default function Rafa() {
   const { toast } = useToast();
   const { role } = useAuth();
+  // /rafa?centro=ID: abre la conversación de ese centro de negocio.
+  const [parametros] = useSearchParams();
+  const centroInicial = parametros.get("centro");
   // Solo quien puede editar presupuestos puede guardar desde Rafa.
   const puedeEditarPresupuestos = role === "admin" || role === "contador";
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
@@ -166,8 +170,13 @@ export default function Rafa() {
 
   // Plan generado desde la conversación: se abre en el mismo editor de
   // propuestas (nada se guarda en presupuestos hasta pulsar Guardar).
-  const abrirPlanDesdeChat = async (nuevoPlan: PlanRafa) => {
-    const nuevaPropuesta = construirPropuesta(nuevoPlan, null);
+  const abrirPlanDesdeChat = async (nuevoPlan: PlanRafa, centroId?: string | null) => {
+    const base = construirPropuesta(nuevoPlan, null);
+    // Desde la conversación de un centro, el plan se guarda en ese centro.
+    const centro = centroId ? centros.find((c) => c.id === centroId) : undefined;
+    const nuevaPropuesta: PropuestaEditable = centro
+      ? { ...base, empresaId: centro.empresa_id, centro: { ...base.centro, modo: "existente", id: centro.id, nombre: centro.nombre } }
+      : base;
     setPlan(nuevoPlan);
     setPropuesta(nuevaPropuesta);
     setSesionId(null);
@@ -390,6 +399,7 @@ export default function Rafa() {
     <div>
       {pestana === "chat" ? (
         <RafaChat
+          centroInicial={centroInicial}
           onAbrirPlan={puedeEditarPresupuestos ? abrirPlanDesdeChat : undefined}
           lateral={
             <div className="flex items-center gap-2 pb-1">

@@ -488,3 +488,81 @@ test("rechaza peticiones sin sesión válida", async () => {
   const r = await fetch(RAFA, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modo: "chat", mensaje: "hola" }) });
   assert.equal(r.status, 401);
 });
+
+// ================================================================ CONVERSACIONES POR CENTRO
+const CN_OFICINA = "a1000000-0000-0000-0000-000000000002"; // Oficina Central (Empresa Uno)
+const ultimoUsuario = (body) => [...body.messages].reverse().find((m) => m.role === "user").content;
+
+test("conversación anclada a un centro: contexto automático, archivos guardados y reutilizados", async () => {
+  // La conversación nace anclada (como al dar de alta el centro); la empresa la pone la base.
+  const [conv] = await rest("rafa_conversaciones", {
+    metodo: "POST",
+    token: tokenDe(USUARIOS.contador),
+    cuerpo: { user_id: USUARIOS.contador.id, titulo: "Centro Oficina Central", centro_negocio_id: CN_OFICINA, empresa_id: E2 },
+  });
+  assert.equal(conv.empresa_id, E1, "la empresa sale del centro, no del navegador");
+
+  // Sin indicar empresa ni centro, la consulta usa el centro de la conversación.
+  let sistemaVisto = "";
+  let usuarioVisto = null;
+  guion(
+    (body) => {
+      sistemaVisto = sistema(body);
+      usuarioVisto = ultimoUsuario(body);
+      return usar("resumen_presupuesto", {});
+    },
+    fin("Resumen del centro.")
+  );
+  const pdf = Buffer.from("%PDF-1.4 catalogo de prueba").toString("base64");
+  const s = await chat("contador", "¿Cómo va el presupuesto?", {
+    conversacion_id: conv.id,
+    archivos: [{ filename: "catálogo manzana 7.pdf", mime: "application/pdf", data: pdf }],
+  });
+  assert.match(sistemaVisto, /CENTRO DE NEGOCIO DE ESTA CONVERSACIÓN: CN002 · Oficina Central/);
+  assert.ok(Array.isArray(usuarioVisto) && usuarioVisto.some((p) => p.type === "file"), "el archivo llega al modelo");
+  const h = s.herramientas[0];
+  assert.equal(h.argumentos.centro_negocio_id, CN_OFICINA);
+  assert.equal(h.argumentos.empresa_id, E1);
+  assert.equal(h.resultado.ok, true, h.resultado.resumen);
+  assert.ok(h.resultado.tablas[0].filas.every((f) => f.centro === "Oficina Central"));
+
+  const archivos = await rest(`rafa_archivos?conversacion_id=eq.${conv.id}&select=*`);
+  assert.equal(archivos.length, 1);
+  assert.equal(archivos[0].centro_negocio_id, CN_OFICINA);
+  assert.equal(archivos[0].empresa_id, E1);
+  assert.equal(archivos[0].nombre, "catálogo manzana 7.pdf");
+  assert.match(archivos[0].ruta, new RegExp(`^${USUARIOS.contador.id}/${conv.id}/`));
+  const [msgUsuario] = await rest(`rafa_mensajes?conversacion_id=eq.${conv.id}&rol=eq.usuario&select=datos`);
+  assert.deepEqual(msgUsuario.datos.archivos, [{ id: archivos[0].id, nombre: "catálogo manzana 7.pdf" }]);
+
+  // Turno siguiente: Rafa conoce el archivo y "Usar" lo reenvía sin volver a subirlo.
+  guion((body) => {
+    sistemaVisto = sistema(body);
+    usuarioVisto = ultimoUsuario(body);
+    return fin("Revisé el catálogo.");
+  });
+  await chat("contador", "Revisa otra vez el catálogo", { conversacion_id: conv.id, archivos_guardados: [archivos[0].id] });
+  assert.match(sistemaVisto, /ARCHIVOS GUARDADOS EN ESTA CONVERSACIÓN: "catálogo manzana 7.pdf"/);
+  const parte = usuarioVisto.find((p) => p.type === "file");
+  assert.equal(parte.file.filename, "catálogo manzana 7.pdf");
+  assert.equal(parte.file.file_data, `data:application/pdf;base64,${pdf}`);
+  assert.equal(await contar(`rafa_archivos?conversacion_id=eq.${conv.id}&select=id`), 1, "reusar no duplica el archivo");
+
+  // Otro usuario no puede usar ni ver ese archivo.
+  const ajeno = await llamar("admin", { modo: "chat", mensaje: "Usa ese archivo", archivos_guardados: [archivos[0].id] });
+  assert.notEqual(ajeno.status, 200);
+  assert.match(ajeno.cuerpo.error, /no existe o no es tuyo/);
+  assert.equal((await rest(`rafa_archivos?id=eq.${archivos[0].id}&select=id`, { token: tokenDe(USUARIOS.admin) })).length, 0);
+});
+
+test("conversación nueva con centro elegido y consulta explícita de toda la empresa", async () => {
+  guion(usar("resumen_presupuesto", { centro_negocio_id: null }), fin("Toda la empresa."));
+  const s = await chat("contador", "Dame el resumen de toda la empresa", { centro_negocio_id: CN_OFICINA });
+  const [conv] = await rest(`rafa_conversaciones?id=eq.${s.conversacion_id}&select=centro_negocio_id,empresa_id`);
+  assert.equal(conv.centro_negocio_id, CN_OFICINA);
+  assert.equal(conv.empresa_id, E1);
+  const h = s.herramientas[0];
+  assert.equal(h.argumentos.centro_negocio_id, null, "null explícito = toda la empresa");
+  assert.equal(h.argumentos.empresa_id, E1);
+  assert.ok(h.resultado.tablas[0].filas.some((f) => f.centro !== "Oficina Central"));
+});

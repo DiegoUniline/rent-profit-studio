@@ -6,10 +6,12 @@
 
 import type { Contexto, ContextoConversacion, ContextoPantalla, Referencia, ResultadoHerramienta } from "./tipos.ts";
 import type { LlamadaModelo, MensajeModelo } from "./llm.ts";
-import { definicionesParaModelo, ejecutarHerramienta } from "./registro.ts";
+import { definicionesParaModelo, ejecutarHerramienta, herramientaPorNombre } from "./registro.ts";
 import { promptSistema } from "./prompt.ts";
 import { esUuid } from "./validacion.ts";
 import type { Extractor } from "./extraccion.ts";
+import { aplicarAncla, cargarAncla } from "./ancla.ts";
+import { archivosDeConversacion, guardarArchivos, type AlmacenArchivos, type ArchivoReusado } from "./archivos.ts";
 
 export const MAX_ITERACIONES = 8;
 export const MAX_HERRAMIENTAS_POR_TURNO = 16;
@@ -21,7 +23,11 @@ export interface EntradaTurno {
   mensaje: string;
   contexto_pantalla?: ContextoPantalla;
   archivos?: { filename: string; mime: string; data: string }[];
+  /** Archivos ya guardados de la conversación que el usuario vuelve a usar. */
+  archivos_reusados?: ArchivoReusado[];
   audio?: { data: string; format: string };
+  /** Centro de negocio al crear una conversación nueva anclada. */
+  centro_negocio_id?: string;
 }
 
 export interface LlamadaRegistrada {
@@ -103,34 +109,75 @@ function contenidoUsuario(entrada: EntradaTurno): unknown {
     partes.push({ type: "text", text: "El usuario adjunta un audio con la instrucción: transcríbelo y úsalo como instrucción principal." });
     partes.push({ type: "input_audio", input_audio: { data: entrada.audio.data, format: entrada.audio.format } });
   }
-  for (const a of entrada.archivos || []) {
+  for (const a of [...(entrada.archivos || []), ...(entrada.archivos_reusados || [])]) {
     if (a.mime?.startsWith("image/")) partes.push({ type: "image_url", image_url: { url: `data:${a.mime};base64,${a.data}` } });
     else partes.push({ type: "file", file: { filename: a.filename, file_data: `data:${a.mime || "application/pdf"};base64,${a.data}` } });
   }
   return partes.length === 1 ? entrada.mensaje : partes;
 }
 
-export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamarModelo: LlamadaModelo, extractor?: Extractor | null): Promise<SalidaTurno> {
+export async function procesarTurno(
+  ctx: Contexto,
+  entrada: EntradaTurno,
+  llamarModelo: LlamadaModelo,
+  extractor?: Extractor | null,
+  almacen?: AlmacenArchivos | null
+): Promise<SalidaTurno> {
   const mensaje = (entrada.mensaje || "").slice(0, 8000);
-  if (!mensaje && !entrada.audio && !(entrada.archivos || []).length) throw new Error("Escribe un mensaje para Rafa.");
+  if (!mensaje && !entrada.audio && !(entrada.archivos || []).length && !(entrada.archivos_reusados || []).length) {
+    throw new Error("Escribe un mensaje para Rafa.");
+  }
 
-  // 1. Conversación (propia, por RLS).
-  let conversacion: { id: string; contexto: ContextoConversacion } | null = null;
+  // 1. Conversación (propia, por RLS) y su centro de negocio.
+  type Conversacion = { id: string; contexto: ContextoConversacion; centro_negocio_id: string | null; empresa_id: string | null };
+  let conversacion: Conversacion | null = null;
   if (entrada.conversacion_id) {
     if (!esUuid(entrada.conversacion_id)) throw new Error("Conversación inválida.");
-    const { data } = await ctx.db.from("rafa_conversaciones").select("id, contexto, user_id").eq("id", entrada.conversacion_id).maybeSingle();
+    const { data } = await ctx.db
+      .from("rafa_conversaciones")
+      .select("id, contexto, user_id, centro_negocio_id, empresa_id")
+      .eq("id", entrada.conversacion_id)
+      .maybeSingle();
     if (!data || data.user_id !== ctx.usuario.id) throw new Error("La conversación no existe o no es tuya.");
-    conversacion = { id: data.id, contexto: (data.contexto || {}) as ContextoConversacion };
+    conversacion = {
+      id: data.id,
+      contexto: (data.contexto || {}) as ContextoConversacion,
+      centro_negocio_id: data.centro_negocio_id ?? null,
+      empresa_id: data.empresa_id ?? null,
+    };
   } else {
+    if (entrada.centro_negocio_id && !esUuid(entrada.centro_negocio_id)) throw new Error("Centro de negocio inválido.");
     const { data, error } = await ctx.db
       .from("rafa_conversaciones")
-      .insert({ user_id: ctx.usuario.id, titulo: (mensaje || "Conversación con Rafa").slice(0, 80) })
-      .select("id, contexto")
+      .insert({
+        user_id: ctx.usuario.id,
+        titulo: (mensaje || "Conversación con Rafa").slice(0, 80),
+        centro_negocio_id: entrada.centro_negocio_id || null,
+      })
+      .select("id, contexto, centro_negocio_id, empresa_id")
       .single();
     if (error) throw new Error(`No pude crear la conversación: ${error.message}`);
-    conversacion = { id: data.id, contexto: {} };
+    conversacion = { id: data.id, contexto: {}, centro_negocio_id: data.centro_negocio_id ?? null, empresa_id: data.empresa_id ?? null };
   }
   ctx.conversacionId = conversacion.id;
+
+  // El centro de la conversación es el contexto por defecto (empresa y proyecto incluidos).
+  const ancla = await cargarAncla(ctx, conversacion.centro_negocio_id);
+  if (ancla) {
+    conversacion.contexto = {
+      ...conversacion.contexto,
+      empresa_id: conversacion.contexto.empresa_id || ancla.empresa_id,
+      empresa_nombre: conversacion.contexto.empresa_id ? conversacion.contexto.empresa_nombre : ancla.empresa_nombre,
+      ...(ancla.proyecto_id && !conversacion.contexto.proyecto_id ? { proyecto_id: ancla.proyecto_id, proyecto_nombre: ancla.proyecto_nombre ?? undefined } : {}),
+    };
+  }
+
+  // Archivos nuevos: se guardan en la conversación (y su centro) antes de responder.
+  const nuevos = (entrada.archivos || []).filter((a) => !(a.mime || "").startsWith("audio/"));
+  if (nuevos.length && !almacen) throw new Error("No está disponible el almacenamiento de archivos.");
+  const archivosGuardados = nuevos.length && almacen ? await guardarArchivos(ctx, almacen, conversacion, nuevos) : [];
+  const reusados = entrada.archivos_reusados || [];
+  const archivosConversacion = await archivosDeConversacion(ctx, conversacion.id);
 
   // 2. Historial desde la base (no se confía en el historial del navegador).
   const { data: historial } = await ctx.db
@@ -148,7 +195,8 @@ export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamar
     contenido: mensaje,
     datos: {
       contexto_pantalla: entrada.contexto_pantalla ?? null,
-      adjuntos: (entrada.archivos || []).map((a) => a.filename),
+      adjuntos: [...(entrada.archivos || []), ...reusados].map((a) => a.filename),
+      archivos: [...archivosGuardados, ...reusados.map((a) => ({ id: a.id, nombre: a.filename }))],
       audio: Boolean(entrada.audio),
     },
     version_conocimiento: ctx.versionConocimiento,
@@ -156,7 +204,7 @@ export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamar
   if (errorMensajeUsuario) throw new Error(`No se pudo guardar tu mensaje: ${errorMensajeUsuario.message}`);
 
   const mensajes: MensajeModelo[] = [
-    { role: "system", content: promptSistema(ctx, conversacion.contexto, entrada.contexto_pantalla, mensaje) },
+    { role: "system", content: promptSistema(ctx, conversacion.contexto, entrada.contexto_pantalla, mensaje, { ancla, archivos: archivosConversacion }) },
     ...((historial || []) as any[])
       .reverse()
       .map((m): MensajeModelo =>
@@ -202,6 +250,8 @@ export async function procesarTurno(ctx: Contexto, entrada: EntradaTurno, llamar
           if (extractor && tc.function.name === "proponer_plan_presupuesto" && argumentos && typeof argumentos === "object") {
             argumentos = await extractor(argumentos as Record<string, unknown>, mensaje);
           }
+          // Lo que el modelo no indicó se completa con el centro de la conversación.
+          argumentos = aplicarAncla(herramientaPorNombre(tc.function.name), argumentos, ancla);
           resultado = await ejecutarHerramienta(ctx, tc.function.name, argumentos);
         } catch (e) {
           resultado = { ok: false, tipo: "error", resumen: e instanceof Error ? e.message : "No pude leer el archivo completo.", error: "extraccion" };

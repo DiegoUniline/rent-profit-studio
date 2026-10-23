@@ -32,7 +32,7 @@ PIDS+=($!)
 
 SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_ANON_KEY="$ANON" SUPABASE_SERVICE_ROLE_KEY="$SERVICIO" \
 LOVABLE_API_KEY=clave-de-pruebas RAFA_AI_URL=http://127.0.0.1:54322/v1/chat/completions \
-  "$DENO_BIN" run --allow-net --allow-env --allow-read "$RAIZ/supabase/functions/rafa-asistente/index.ts" > "$REGISTROS/deno.log" 2>&1 &
+  "$DENO_BIN" run --node-modules-dir=none --no-lock --allow-net --allow-env --allow-read "$RAIZ/supabase/functions/rafa-asistente/index.ts" > "$REGISTROS/deno.log" 2>&1 &
 PIDS+=($!)
 
 for i in $(seq 1 60); do

@@ -226,3 +226,47 @@ describe("respuestas rápidas e hipervínculos", () => {
     );
   });
 });
+
+describe("conversaciones por centro de negocio", () => {
+  beforeEach(() => {
+    invoke.mockReset();
+    for (const k of Object.keys(tablas)) delete tablas[k];
+    for (const k of Object.keys(errores)) delete errores[k];
+  });
+
+  const CENTRO = "a1000000-0000-0000-0000-000000000002";
+
+  it("agrupa las conversaciones por centro y muestra el centro de la conversación abierta", async () => {
+    tablas.centros_negocio = [{ id: CENTRO, codigo: "CN002", nombre: "Oficina Central", empresa_id: "e1" }];
+    tablas.rafa_conversaciones = [
+      { id: "c1", titulo: "Pagos de la oficina", updated_at: "2026-10-23T10:00:00Z", contexto: {}, centro_negocio_id: CENTRO, empresa_id: "e1", centros_negocio: { codigo: "CN002", nombre: "Oficina Central" } },
+      { id: "c2", titulo: "Dudas generales", updated_at: "2026-10-22T10:00:00Z", contexto: {}, centro_negocio_id: null, empresa_id: null, centros_negocio: null },
+    ];
+    tablas.rafa_mensajes = [];
+    render(<MemoryRouter><RafaChat /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByText("CN002 · Oficina Central").length).toBeGreaterThan(0));
+    expect(screen.getAllByText("Sin centro").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Todo lo que preguntes aquí se refiere al centro CN002 · Oficina Central/)).toBeInTheDocument();
+  });
+
+  it("«Usar» vuelve a enviar un archivo guardado de la conversación sin subirlo otra vez", async () => {
+    tablas.centros_negocio = [{ id: CENTRO, codigo: "CN002", nombre: "Oficina Central", empresa_id: "e1" }];
+    tablas.rafa_conversaciones = [
+      { id: "c1", titulo: "Manzana 7", updated_at: "2026-10-23T10:00:00Z", contexto: {}, centro_negocio_id: CENTRO, empresa_id: "e1", centros_negocio: { codigo: "CN002", nombre: "Oficina Central" } },
+    ];
+    tablas.rafa_mensajes = [];
+    tablas.rafa_archivos = [{ id: "f1", conversacion_id: "c1", nombre: "catalogo.pdf", mime: "application/pdf", tamano: 10, ruta: "u/c1/f1-catalogo.pdf", created_at: "2026-10-23T10:00:00Z" }];
+    invoke.mockResolvedValue({ data: { conversacion_id: "c1", mensaje_id: "m1", contenido: "", version_conocimiento: "k" }, error: null });
+    render(<MemoryRouter><RafaChat /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole("button", { name: /Archivos de la conversación/ })).toHaveTextContent("Archivos (1)"));
+    fireEvent.click(screen.getByRole("button", { name: /Archivos de la conversación/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Usar catalogo.pdf" }));
+    fireEvent.change(screen.getByPlaceholderText(/Escribe a Rafa/), { target: { value: "Revisa el catálogo" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("rafa-asistente", {
+        body: expect.objectContaining({ conversacion_id: "c1", mensaje: "Revisa el catálogo", archivos: [], archivos_guardados: ["f1"] }),
+      })
+    );
+  });
+});

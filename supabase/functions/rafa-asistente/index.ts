@@ -11,6 +11,7 @@ import { cancelarAccion, confirmarAccion } from "../_shared/rafa/acciones.ts";
 import { PLAN_PARAMETROS, PROMPT_PLAN } from "../_shared/rafa/plan.ts";
 import { esUuid } from "../_shared/rafa/validacion.ts";
 import { crearExtractor } from "../_shared/rafa/extraccion.ts";
+import { cargarArchivosGuardados, crearAlmacenSupabase } from "../_shared/rafa/archivos.ts";
 
 const MODELO = Deno.env.get("RAFA_MODELO") || "google/gemini-3.6-flash";
 const URL_IA = Deno.env.get("RAFA_AI_URL") || "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -39,8 +40,11 @@ Deno.serve(async (req) => {
 
     if (modo === "chat") {
       const llamar = crearLlamadaGateway({ url: URL_IA, apiKey, modelo: MODELO });
-      const archivosChat: ArchivoEntrada[] = Array.isArray(body.archivos) ? body.archivos.slice(0, 5) : [];
-      const extractor = crearExtractor({ url: URL_IA, apiKey, modelo: MODELO, archivos: archivosChat });
+      const almacen = crearAlmacenSupabase(ctx.servicio);
+      const archivosNuevos: ArchivoEntrada[] = Array.isArray(body.archivos) ? body.archivos.slice(0, 5) : [];
+      // Archivos ya guardados en la conversación que el usuario vuelve a usar.
+      const reusados = await cargarArchivosGuardados(ctx, almacen, body.archivos_guardados);
+      const extractor = crearExtractor({ url: URL_IA, apiKey, modelo: MODELO, archivos: [...archivosNuevos, ...reusados] });
       try {
         const salida = await procesarTurno(
           ctx,
@@ -48,11 +52,14 @@ Deno.serve(async (req) => {
             conversacion_id: body.conversacion_id || undefined,
             mensaje: String(body.mensaje ?? ""),
             contexto_pantalla: body.contexto_pantalla || undefined,
-            archivos: Array.isArray(body.archivos) ? body.archivos.slice(0, 5) : [],
+            archivos: archivosNuevos,
+            archivos_reusados: reusados,
             audio: body.audio || undefined,
+            centro_negocio_id: typeof body.centro_negocio_id === "string" ? body.centro_negocio_id : undefined,
           },
           llamar,
-          extractor
+          extractor,
+          almacen
         );
         return json(salida);
       } catch (e) {

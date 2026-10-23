@@ -37,4 +37,4 @@ done
 
 export REST_URL=http://127.0.0.1:54321/rest/v1 SERVICIO="$SERVICIO" ANON="$ANON"
 node --test --test-concurrency=1 "$AQUI/guardado.e2e.test.mjs"
-(cd "$RAIZ" && npx vitest run src/test/rafa-plan.integracion.test.ts)
+(cd "$RAIZ" && npx vitest run src/test/rafa-plan.integracion.test.ts src/test/rafa-centro.integracion.test.ts)
