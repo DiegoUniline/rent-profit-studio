@@ -190,7 +190,21 @@ export default function Rafa() {
     await crearSesion(nuevoPlan, nuevaPropuesta);
   };
 
-  const interpretar = async (payload: CapturaPayload) => {
+  const interpretar = async (entrada: CapturaPayload) => {
+    // Nunca se manda a Rafa una instrucción vacía (audio vacío, archivos sin contenido o solo espacios).
+    const payload: CapturaPayload = {
+      texto: entrada.texto.trim(),
+      audio: entrada.audio?.data ? entrada.audio : undefined,
+      archivos: entrada.archivos.filter((a) => a.data),
+    };
+    if (!payload.texto && !payload.audio && payload.archivos.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Falta la instrucción",
+        description: "Escribe qué necesitas, graba un audio con sonido o adjunta un archivo antes de enviar.",
+      });
+      return;
+    }
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("rafa-asistente", {
