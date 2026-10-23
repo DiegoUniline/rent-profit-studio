@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      asiento_guardados: {
+        Row: {
+          created_at: string
+          asiento_id: string
+          operacion_id: string
+          resultado: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          asiento_id: string
+          operacion_id: string
+          resultado?: Json
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          asiento_id?: string
+          operacion_id?: string
+          resultado?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asiento_guardados_asiento_id_fkey"
+            columns: ["asiento_id"]
+            isOneToOne: false
+            referencedRelation: "asientos_contables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asiento_movimientos: {
         Row: {
           asiento_id: string
@@ -387,6 +419,38 @@ export type Database = {
             columns: ["presupuesto_id"]
             isOneToOne: false
             referencedRelation: "presupuestos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      programacion_partida_guardados: {
+        Row: {
+          created_at: string
+          programacion_id: string
+          operacion_id: string
+          resultado: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          programacion_id: string
+          operacion_id: string
+          resultado?: Json
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          programacion_id?: string
+          operacion_id?: string
+          resultado?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programacion_partida_guardados_programacion_id_fkey"
+            columns: ["programacion_id"]
+            isOneToOne: false
+            referencedRelation: "proyecto_programacion_financiera"
             referencedColumns: ["id"]
           },
         ]
@@ -1215,6 +1279,30 @@ export type Database = {
           },
         ]
       }
+      rafa_avisos: {
+        Row: {
+          centro_negocio_id: string
+          conversacion_id: string | null
+          created_at: string
+          semana: string
+          user_id: string
+        }
+        Insert: {
+          centro_negocio_id: string
+          conversacion_id?: string | null
+          created_at?: string
+          semana: string
+          user_id: string
+        }
+        Update: {
+          centro_negocio_id?: string
+          conversacion_id?: string | null
+          created_at?: string
+          semana?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       rafa_conversaciones: {
         Row: {
           centro_negocio_id: string | null
@@ -1552,6 +1640,16 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      guardar_asiento: {
+        Args: {
+          p_datos: Json
+          p_id: string
+          p_movimientos: Json
+          p_operacion: string
+          p_version?: string
+        }
+        Returns: Json
+      }
       guardar_presupuesto: {
         Args: {
           p_datos: Json
@@ -1560,6 +1658,10 @@ export type Database = {
           p_operacion: string
           p_version?: string
         }
+        Returns: Json
+      }
+      guardar_programacion_partida: {
+        Args: { p_datos: Json; p_operacion: string; p_pagos: Json }
         Returns: Json
       }
       has_role: {

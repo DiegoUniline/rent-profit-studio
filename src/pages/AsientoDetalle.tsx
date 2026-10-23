@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { guardarAsiento, useClaveOperacion } from "@/lib/guardado-atomico";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -112,6 +113,10 @@ export default function AsientoDetalle() {
   const [form, setForm] = useState<AsientoForm>(emptyForm);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [saving, setSaving] = useState(false);
+  // Guardado atómico: versión leída al abrir, guardia contra doble clic y clave de operación.
+  const [version, setVersion] = useState<string | null>(null);
+  const guardandoRef = useRef(false);
+  const { clave, reiniciar } = useClaveOperacion();
   const [loading, setLoading] = useState(true);
   const [numeroAsiento, setNumeroAsiento] = useState<number | null>(null);
 
@@ -165,6 +170,7 @@ export default function AsientoDetalle() {
 
           if (!isCopy) {
             setNumeroAsiento(asiento.numero_asiento);
+            setVersion(asiento.updated_at ?? null);
           }
 
           // Load movimientos
@@ -347,61 +353,33 @@ export default function AsientoDetalle() {
       return;
     }
 
+    if (guardandoRef.current) return;
+    guardandoRef.current = true;
     setSaving(true);
     try {
-      const asientoData = {
-        empresa_id: form.empresa_id,
-        fecha: form.fecha,
-        tipo: form.tipo,
-        tercero_id: form.tercero_id || null,
-        centro_negocio_id: form.centro_negocio_id || null,
-        observaciones: form.observaciones || null,
-        total_debe: totals.totalDebe,
-        total_haber: totals.totalHaber,
+      // Una sola llamada transaccional: cabecera + renglones (por id) o nada.
+      const solicitud = {
+        id: isEditing ? id! : null,
+        datos: {
+          empresa_id: form.empresa_id,
+          fecha: form.fecha,
+          tipo: form.tipo,
+          tercero_id: form.tercero_id || null,
+          centro_negocio_id: form.centro_negocio_id || null,
+          observaciones: form.observaciones || null,
+        },
+        movimientos: movimientos.map((m) => ({
+          id: isEditing ? m.id ?? null : null,
+          cuenta_id: m.cuenta_id,
+          partida: m.partida,
+          debe: m.debe,
+          haber: m.haber,
+          presupuesto_id: m.presupuesto_id || null,
+        })),
+        version: isEditing ? version : null,
       };
-
-      let asientoId: string;
-
-      if (isEditing) {
-        // Update existing
-        const { error } = await supabase
-          .from("asientos_contables")
-          .update(asientoData)
-          .eq("id", id);
-        if (error) throw error;
-        asientoId = id!;
-
-        // Delete existing movimientos
-        await supabase
-          .from("asiento_movimientos")
-          .delete()
-          .eq("asiento_id", id);
-      } else {
-        // Create new (including copy mode)
-        const { data: newAsiento, error } = await supabase
-          .from("asientos_contables")
-          .insert({ ...asientoData, created_by: user?.id })
-          .select()
-          .single();
-        if (error) throw error;
-        asientoId = newAsiento.id;
-      }
-
-      // Insert movimientos
-      const movimientosData = movimientos.map((m, idx) => ({
-        asiento_id: asientoId,
-        cuenta_id: m.cuenta_id,
-        partida: m.partida,
-        debe: m.debe,
-        haber: m.haber,
-        orden: idx,
-        presupuesto_id: m.presupuesto_id || null,
-      }));
-
-      const { error: movError } = await supabase
-        .from("asiento_movimientos")
-        .insert(movimientosData);
-      if (movError) throw movError;
+      await guardarAsiento(clave(solicitud), solicitud);
+      reiniciar();
 
       toast({ title: isEditing ? "Asiento actualizado" : "Asiento creado" });
       // Clear filters only for brand new entries (not copies) so new entry is visible
@@ -422,6 +400,7 @@ export default function AsientoDetalle() {
         variant: "destructive",
       });
     } finally {
+      guardandoRef.current = false;
       setSaving(false);
     }
   };
