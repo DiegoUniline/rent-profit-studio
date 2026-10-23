@@ -81,7 +81,7 @@ export interface ConversacionRafa {
   /** Centro de negocio al que está anclada la conversación (null = general). */
   centro_negocio_id: string | null;
   empresa_id: string | null;
-  centros_negocio?: { codigo: string; nombre: string; empresas?: EmpresaDeCentro } | null;
+  centros_negocio?: { codigo: string; nombre: string; activo?: boolean; empresas?: EmpresaDeCentro } | null;
 }
 
 /** Empresa embebida en el centro (para distinguir centros con el mismo nombre). */
@@ -95,6 +95,8 @@ export interface CentroRafa {
   nombre: string;
   empresas?: EmpresaDeCentro;
   empresa_id: string;
+  /** false = dado de baja. */
+  activo?: boolean;
 }
 
 export interface ArchivoRafa {
@@ -214,8 +216,12 @@ export function cancelarAccion(accionId: string) {
   return invocar<ResultadoAccion>({ modo: "cancelar", accion_id: accionId });
 }
 
-const COLUMNAS_CONVERSACION = "id, titulo, updated_at, contexto, centro_negocio_id, empresa_id, centros_negocio:centro_negocio_id(codigo, nombre, empresas:empresa_id(razon_social, nombre_comercial))";
-const COLUMNAS_CENTRO = "id, codigo, nombre, empresa_id, empresas:empresa_id(razon_social, nombre_comercial)";
+const COLUMNAS_CONVERSACION = "id, titulo, updated_at, contexto, centro_negocio_id, empresa_id, centros_negocio:centro_negocio_id(codigo, nombre, activo, empresas:empresa_id(razon_social, nombre_comercial))";
+const COLUMNAS_CENTRO = "id, codigo, nombre, empresa_id, activo, empresas:empresa_id(razon_social, nombre_comercial)";
+
+/** Las charlas de centros dados de baja no se muestran (se conservan). */
+export const conversacionVisible = (c: Pick<ConversacionRafa, "centro_negocio_id" | "centros_negocio">) =>
+  !c.centro_negocio_id || c.centros_negocio?.activo !== false;
 
 export async function listarConversaciones(): Promise<ConversacionRafa[]> {
   const { data, error } = await supabase
@@ -228,8 +234,9 @@ export async function listarConversaciones(): Promise<ConversacionRafa[]> {
 }
 
 /** Centros activos para anclar conversaciones. */
-export async function listarCentros(): Promise<CentroRafa[]> {
-  const { data, error } = await supabase.from("centros_negocio").select(COLUMNAS_CENTRO).eq("activo", true).order("nombre");
+/** Centros activos; con soloBajas, los dados de baja. */
+export async function listarCentros(soloBajas = false): Promise<CentroRafa[]> {
+  const { data, error } = await supabase.from("centros_negocio").select(COLUMNAS_CENTRO).eq("activo", !soloBajas).order("nombre");
   if (error) throw error;
   return (data || []) as unknown as CentroRafa[];
 }

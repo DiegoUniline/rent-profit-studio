@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { BotonBaja } from "@/components/BotonBaja";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -667,7 +668,8 @@ export default function ProyectoDetalle() {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-gradient text-2xl sm:text-3xl font-bold truncate">{proyecto.nombre}</h1>
-            {!proyecto.activo && <Badge variant="secondary">Inactivo</Badge>}
+            {!proyecto.activo && <Badge variant="secondary">Dado de baja</Badge>}
+            {canEdit && <BotonBaja entidad="proyecto" id={proyecto.id} nombre={proyecto.nombre} activo={proyecto.activo} onCambio={fetchAll} conTexto />}
             {canEdit && (
               <Button
                 variant="ghost"

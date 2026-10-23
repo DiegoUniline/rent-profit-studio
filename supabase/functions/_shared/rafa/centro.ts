@@ -201,9 +201,13 @@ export async function asegurarAvisosSemana(ctx: Contexto): Promise<{ semana: str
   for (const c of (convs || []) as { id: string; centro_negocio_id: string }[]) {
     if (!porCentro.has(c.centro_negocio_id)) porCentro.set(c.centro_negocio_id, c.id);
   }
+  // Centros dados de baja: sin aviso.
+  const ids = Array.from(porCentro.keys());
+  const { data: activos } = ids.length ? await ctx.db.from("centros_negocio").select("id").in("id", ids).eq("activo", true) : { data: [] };
+  const vigentes = new Set(((activos || []) as { id: string }[]).map((c) => c.id));
   const errores: string[] = [];
   let generados = 0;
-  for (const [centroId, conversacionId] of Array.from(porCentro.entries()).slice(0, MAX_CENTROS_POR_LLAMADA)) {
+  for (const [centroId, conversacionId] of Array.from(porCentro.entries()).filter(([c]) => vigentes.has(c)).slice(0, MAX_CENTROS_POR_LLAMADA)) {
     // Reserva: si ya existe para esta semana, no se repite (también con dos pestañas a la vez).
     const { error: errReserva } = await ctx.servicio
       .from("rafa_avisos")

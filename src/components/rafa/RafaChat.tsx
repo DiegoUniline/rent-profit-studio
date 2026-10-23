@@ -21,6 +21,7 @@ import {
   listarArchivos,
   listarCentros,
   listarConversaciones,
+  conversacionVisible,
   nombreEmpresa,
   obtenerCentro,
   urlArchivo,
@@ -207,6 +208,9 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
   // Buscador de la barra (centros y charlas) y vista de cuadros de centros.
   const [busqueda, setBusqueda] = useState("");
   const [vista, setVista] = useState<"chat" | "centros">("chat");
+  // Centros dados de baja: ocultos; se pueden ver en la vista de cuadros.
+  const [verBajas, setVerBajas] = useState(false);
+  const [centrosBaja, setCentrosBaja] = useState<CentroRafa[]>([]);
   // Centro elegido para una conversación nueva que aún no tiene mensajes.
   const [centroNueva, setCentroNueva] = useState<string | null>(null);
   const [archivosConv, setArchivosConv] = useState<ArchivoRafa[]>([]);
@@ -272,7 +276,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
     void (async () => {
       const lista = await cargarConversaciones();
       if (centroInicial) return; // la abre el efecto del centro
-      const ultima = lista[0];
+      const ultima = lista.find(conversacionVisible);
       if (!ultima) return;
       try {
         await recargar(ultima.id);
@@ -354,6 +358,14 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
     }
   };
 
+  useEffect(() => {
+    if (!verBajas) return;
+    listarCentros(true)
+      .then(setCentrosBaja)
+      .catch(() => setCentrosBaja([]));
+  }, [verBajas]);
+  const visibles = useMemo(() => conversaciones.filter(conversacionVisible), [conversaciones]);
+
   // Centros como "proyectos": cada uno con sus charlas, los de actividad reciente primero.
   const centrosConCharlas = useMemo<CentroConCharlas[]>(() => {
     const lista = centros.map((centro) => {
@@ -371,10 +383,22 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
     [centrosConCharlas, busqueda]
   );
   const charlasSinCentro = useMemo(
-    () => conversaciones.filter((c) => !c.centro_negocio_id && coincide(c.titulo, busqueda)),
-    [conversaciones, busqueda]
+    () => visibles.filter((c) => !c.centro_negocio_id && coincide(c.titulo, busqueda)),
+    [visibles, busqueda]
   );
-  const centroActual = centros.find((c) => c.id === centroActualId) || null;
+  const bajasVisibles = useMemo(
+    () =>
+      verBajas
+        ? centrosBaja
+            .map((centro) => {
+              const charlas = conversaciones.filter((c) => c.centro_negocio_id === centro.id);
+              return { centro, charlas, ultima: charlas[0]?.updated_at ?? null };
+            })
+            .filter((g) => coincide(etiquetaCentro(g.centro), busqueda))
+        : [],
+    [verBajas, centrosBaja, conversaciones, busqueda]
+  );
+  const centroActual = [...centros, ...centrosBaja].find((c) => c.id === centroActualId) || null;
   useEffect(() => {
     onCentroActual?.(centroActualId);
   }, [centroActualId, onCentroActual]);
@@ -592,7 +616,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="nueva">Nueva conversación</SelectItem>
-                  {conversaciones.map((c) => (
+                  {visibles.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.centro_negocio_id && !c.titulo.startsWith("Centro ") ? `${etiquetaCentro(c.centros_negocio)} — ` : ""}
                       {c.titulo}
@@ -668,6 +692,10 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="flex-1 text-base font-semibold">Centros</h2>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <input type="checkbox" checked={verBajas} onChange={(e) => setVerBajas(e.target.checked)} aria-label="Mostrar centros dados de baja" />
+                Mostrar dados de baja
+              </label>
               <div className="relative w-full sm:w-72">
                 <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar centro, empresa o charla…" aria-label="Buscar centros" className="pl-8" />
@@ -696,6 +724,30 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
               ))}
             </div>
             {centrosVisibles.length === 0 && <p className="text-sm text-muted-foreground">Ningún centro coincide con la búsqueda.</p>}
+            {bajasVisibles.length > 0 && (
+              <>
+                <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dados de baja</p>
+                <div className="grid grid-cols-1 gap-3 opacity-70 sm:grid-cols-2 xl:grid-cols-3">
+                  {bajasVisibles.map((g) => (
+                    <button
+                      key={g.centro.id}
+                      onClick={() => abrirCentro(g.centro.id)}
+                      className="flex flex-col gap-1 rounded-lg border border-dashed bg-background p-3 text-left hover:border-primary"
+                      aria-label={`Abrir centro dado de baja ${etiquetaCentro(g.centro)}`}
+                    >
+                      <span className="flex items-center gap-2 text-sm font-medium">
+                        <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="line-clamp-2">{g.centro.nombre}</span>
+                        <Badge variant="secondary" className="ml-auto text-[10px]">Baja</Badge>
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {g.centro.codigo} · {nombreEmpresa(g.centro.empresas) || "Sin empresa"} · {g.charlas.length} {g.charlas.length === 1 ? "charla" : "charlas"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         ) : (
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
@@ -705,6 +757,9 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
                 <FolderOpen className="mt-0.5 h-6 w-6 shrink-0 text-primary" />
                 <div className="min-w-0">
                   <h2 className="text-base font-semibold">{centroActual.nombre}</h2>
+                  {centroActual.activo === false && (
+                    <p className="text-xs font-medium text-destructive">Centro dado de baja: sus charlas se conservan; reactívalo en Centros de negocio o pídeselo a Rafa.</p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {centroActual.codigo} · {nombreEmpresa(centroActual.empresas)} · Escribe abajo para empezar una charla nueva en este centro.
                   </p>

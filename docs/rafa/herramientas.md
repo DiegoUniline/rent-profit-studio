@@ -37,6 +37,7 @@ Cada herramienta valida su entrada contra el esquema (rechaza parámetros no dec
 | `proponer_programacion_financiera` | proyectos | Acción | admin, contador, usuario, arquitecto | Sí, en la interfaz |
 | `proponer_tercero` | terceros | Acción | admin, contador | Sí, en la interfaz |
 | `proponer_acceso_proyecto` | proyectos | Acción | admin | Sí, en la interfaz |
+| `proponer_baja` | general | Acción | admin, contador | Sí, en la interfaz |
 
 ## buscar_conocimiento
 
@@ -84,7 +85,7 @@ Parámetros (* obligatorio):
 - `entidad` * — centros_negocio / terceros / cuentas_contables / presupuestos / proyectos / unidades_medida / asientos / programaciones / tareas: Módulo a buscar
 - `empresa_id` — string (uuid): Empresa (obligatoria salvo unidades_medida; si falta y hay varias, se pedirá)
 - `texto` — string: Texto a buscar (nombre, código, RFC, partida u observaciones)
-- `activo` — boolean: Filtrar activos/inactivos (catálogos y partidas)
+- `activo` — boolean: Por defecto solo activos (lo dado de baja no aparece); false = solo los dados de baja
 - `estado` — string: Estado (asientos: borrador/aplicado/cancelado; programaciones: pendiente/ejecutado/cancelado; tareas)
 - `tipo` — string: Tipo (asientos: ingreso/egreso/diario; programaciones: ingreso/egreso; terceros: cliente/proveedor/ambos; partidas: tipo_movimiento)
 - `centro_negocio_id` — string (uuid): Centro de negocio
@@ -497,3 +498,17 @@ Parámetros (* obligatorio):
 - `editar_cronograma` — boolean: Puede editar el cronograma
 - `editar_programacion_financiera` — boolean: Puede editar la programación financiera
 - `quitar` — boolean: Quitar el acceso al proyecto
+
+## proponer_baja
+
+Propone dar de baja (o reactivar con reactivar=true) un centro de negocio, partida de presupuesto, tercero, cuenta contable o proyecto. Es baja lógica: el registro y su historial se conservan y deja de aparecer en listas y en Rafa. Un centro se da de baja con sus partidas activas y su proyecto (en_cascada, por defecto sí); al reactivarlo vuelven exactamente esos. Requiere confirmación.
+
+- Módulo: general. Tipo: Acción. Roles: admin, contador. Confirmación: Sí, en la interfaz.
+- Validaciones: admin/contador (RLS); El registro no está ya en ese estado; Avisa programaciones pendientes ligadas.
+- Devuelve: Propuesta con antes/después; al confirmar, cambiar_activo en una transacción.
+
+Parámetros (* obligatorio):
+- `entidad` * — centro_negocio / presupuesto / tercero / cuenta / proyecto: Tipo de registro
+- `id` * — string (uuid): Registro
+- `reactivar` — boolean: true para reactivar en vez de dar de baja
+- `en_cascada` — boolean: Solo centros: incluir sus partidas y proyecto (por defecto sí)

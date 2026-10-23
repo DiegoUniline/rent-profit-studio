@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { BookOpen, Plus, Edit, Trash2, Search, Eye } from "lucide-react";
+import { BotonBaja } from "@/components/BotonBaja";
 import { CuentaDialog } from "@/components/dialogs/CuentaDialog";
 import { formatCurrency } from "@/lib/accounting-utils";
 
@@ -579,6 +580,11 @@ export default function Cuentas() {
                                 <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(cuenta); }}>
                                   <Edit className="h-4 w-4" />
                                 </Button>
+                              )}
+                              {canEdit && (
+                                <span onClick={(e) => e.stopPropagation()}>
+                                  <BotonBaja entidad="cuenta" id={cuenta.id} nombre={`${cuenta.codigo} ${cuenta.nombre}`} activo={cuenta.activa} onCambio={fetchData} />
+                                </span>
                               )}
                               {canDelete && (
                                 <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(cuenta); }}>

@@ -365,3 +365,33 @@ describe("centros como proyectos (tipo ChatGPT)", () => {
     expect(screen.getByRole("heading", { name: "MR Industrial Hub Salinas Victoria" })).toBeInTheDocument();
   });
 });
+
+describe("centros dados de baja en Rafa", () => {
+  beforeEach(() => {
+    invoke.mockReset();
+    for (const k of Object.keys(tablas)) delete tablas[k];
+    for (const k of Object.keys(errores)) delete errores[k];
+  });
+
+  it("no muestra las charlas de centros dados de baja ni las abre al entrar; se pueden ver con «Mostrar dados de baja»", async () => {
+    const BAJA = "c0000000-0000-0000-0000-0000000000ba";
+    tablas.centros_negocio = [{ id: "a1", codigo: "CN001", nombre: "Activo", empresa_id: "e1", activo: true }];
+    tablas.rafa_conversaciones = [
+      { id: "vieja", titulo: "Charla del centro cerrado", updated_at: "2026-10-23T12:00:00Z", contexto: {}, centro_negocio_id: BAJA, empresa_id: "e1", centros_negocio: { codigo: "CN099", nombre: "Cerrado", activo: false } },
+      { id: "general", titulo: "Duda general", updated_at: "2026-10-22T12:00:00Z", contexto: {}, centro_negocio_id: null, empresa_id: null, centros_negocio: null },
+    ];
+    tablas.rafa_mensajes = [];
+    render(<MemoryRouter><RafaChat /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByText("Duda general").length).toBeGreaterThan(0));
+    expect(screen.queryByText("Charla del centro cerrado")).toBeNull();
+    expect(screen.queryByTitle(/CN099/)).toBeNull();
+
+    // En la vista de cuadros aparecen aparte al marcar la casilla.
+    tablas.centros_negocio = [{ id: BAJA, codigo: "CN099", nombre: "Cerrado", empresa_id: "e1", activo: false }];
+    fireEvent.click(screen.getByRole("button", { name: "Ver centros en cuadros" }));
+    fireEvent.click(screen.getByLabelText("Mostrar centros dados de baja"));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Abrir centro dado de baja CN099/ })).toHaveTextContent("1 charla"));
+    fireEvent.click(screen.getByRole("button", { name: /Abrir centro dado de baja CN099/ }));
+    expect(screen.getByText(/Centro dado de baja/)).toBeInTheDocument();
+  });
+});

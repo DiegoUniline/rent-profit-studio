@@ -1,6 +1,6 @@
 # Esquema de la base (SQL local)
 
-ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-0a1b7a455fec). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `8f0b5290171a0e86`.
+ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-336e6b61f032). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `a9e7e8e4d07faac5`.
 
 El significado de negocio de cada tabla y campo está en `docs/rafa/modulos/`.
 
@@ -522,6 +522,29 @@ Políticas:
 - Admins and contadores can update unidades_medida (UPDATE, authenticated) USING `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))` CHECK `—`
 - Authenticated users can view unidades_medida (SELECT, authenticated) USING `true` CHECK `—`
 
+## bajas_en_cascada
+
+RLS: activado.
+
+| Columna | Tipo | Obligatorio | Predeterminado |
+|---|---|---|---|
+| centro_negocio_id | uuid | Sí |  |
+| entidad | text | Sí |  |
+| registro_id | uuid | Sí |  |
+| created_by | uuid | No | `auth.uid()` |
+| created_at | timestamp with time zone | Sí | `now()` |
+
+Restricciones e índices:
+- CHECK `bajas_en_cascada_entidad_check`: `CHECK ((entidad = ANY (ARRAY['presupuesto'::text, 'proyecto'::text])))`
+- FK `bajas_en_cascada_centro_negocio_id_fkey`: `FOREIGN KEY (centro_negocio_id) REFERENCES centros_negocio(id) ON DELETE CASCADE`
+- PK `bajas_en_cascada_pkey`: `PRIMARY KEY (centro_negocio_id, entidad, registro_id)`
+
+Triggers:
+- ninguno
+
+Políticas:
+- Contables gestionan bajas en cascada (ALL, authenticated) USING `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))` CHECK `(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))`
+
 ## rafa_ejecuciones
 
 RLS: activado.
@@ -992,6 +1015,7 @@ Políticas:
 - `actualizar_cronograma_partida(_presupuesto_id uuid, _fecha_inicio date, _fecha_fin date, _avance_manual numeric)` — SECURITY DEFINER
 - `audit_presupuesto_change()` — SECURITY DEFINER
 - `block_flujos_legacy_si_es_project_con_programacion_propia()` — SECURITY DEFINER
+- `cambiar_activo(p_entidad text, p_id uuid, p_activo boolean, p_en_cascada boolean)` — SECURITY INVOKER
 - `cleanup_flujos_legacy_al_crear_programacion_propia()` — SECURITY DEFINER
 - `get_cronograma_publico(_token text)` — SECURITY DEFINER
 - `get_user_role(_user_id uuid)` — SECURITY DEFINER
@@ -1004,6 +1028,7 @@ Políticas:
 - `rafa_ajustar_presupuestos(p_accion_id uuid, p_cambios jsonb)` — SECURITY INVOKER
 - `rafa_aplicar_asientos(p_accion_id uuid, p_asientos jsonb)` — SECURITY INVOKER
 - `rafa_asignar_acceso_proyecto(p_accion_id uuid, p_acceso jsonb)` — SECURITY INVOKER
+- `rafa_cambiar_activo(p_accion_id uuid, p_cambio jsonb)` — SECURITY INVOKER
 - `rafa_cambiar_estado_programaciones(p_accion_id uuid, p_cambios jsonb)` — SECURITY INVOKER
 - `rafa_conversacion_empresa_del_centro()` — SECURITY INVOKER
 - `rafa_crear_asientos_borrador(p_accion_id uuid, p_asientos jsonb)` — SECURITY INVOKER

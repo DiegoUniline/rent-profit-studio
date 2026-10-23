@@ -219,7 +219,7 @@ export const buscarRegistrosTool: Herramienta<EntradaBuscar> = {
       entidad: s.enumerado(Object.keys(ENTIDADES), "Módulo a buscar"),
       empresa_id: s.uuid("Empresa (obligatoria salvo unidades_medida; si falta y hay varias, se pedirá)"),
       texto: s.texto("Texto a buscar (nombre, código, RFC, partida u observaciones)", 80),
-      activo: s.booleano("Filtrar activos/inactivos (catálogos y partidas)"),
+      activo: s.booleano("Por defecto solo activos (lo dado de baja no aparece); false = solo los dados de baja"),
       estado: s.texto("Estado (asientos: borrador/aplicado/cancelado; programaciones: pendiente/ejecutado/cancelado; tareas)", 30),
       tipo: s.texto("Tipo (asientos: ingreso/egreso/diario; programaciones: ingreso/egreso; terceros: cliente/proveedor/ambos; partidas: tipo_movimiento)", 30),
       centro_negocio_id: s.uuid("Centro de negocio"),
@@ -257,9 +257,10 @@ export const buscarRegistrosTool: Herramienta<EntradaBuscar> = {
     if (empresa) q = q.eq("empresa_id", empresa.id);
     const texto = textoBusqueda(e.texto);
     if (texto) q = q.or(cfg.texto.map((c) => `${c}.ilike.*${texto}*`).join(","));
-    if (e.activo !== undefined) {
+    // Lo dado de baja no aparece salvo que se pida explícitamente (activo: false).
+    if (e.entidad !== "asientos" && e.entidad !== "programaciones" && e.entidad !== "tareas") {
       const col = ["cuentas_contables", "unidades_medida"].includes(e.entidad) ? "activa" : "activo";
-      if (e.entidad !== "asientos" && e.entidad !== "programaciones" && e.entidad !== "tareas") q = q.eq(col, e.activo);
+      q = q.eq(col, e.activo ?? true);
     }
     if (e.estado && ["asientos", "programaciones", "tareas"].includes(e.entidad)) q = q.eq("estado", e.estado);
     if (e.tipo) {
@@ -285,7 +286,7 @@ export const buscarRegistrosTool: Herramienta<EntradaBuscar> = {
       alcance: {
         empresa,
         periodo: e.desde || e.hasta ? { desde: e.desde || "", hasta: e.hasta || "" } : null,
-        filtros: { entidad: e.entidad, texto, activo: e.activo, estado: e.estado, tipo: e.tipo, centro_negocio_id: e.centro_negocio_id, desplazamiento: desde },
+        filtros: { entidad: e.entidad, texto, activo: e.activo ?? true, estado: e.estado, tipo: e.tipo, centro_negocio_id: e.centro_negocio_id, desplazamiento: desde },
         registros: filas.length,
         total,
         truncado,

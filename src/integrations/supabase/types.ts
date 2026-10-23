@@ -177,6 +177,30 @@ export type Database = {
           },
         ]
       }
+      bajas_en_cascada: {
+        Row: {
+          centro_negocio_id: string
+          created_at: string
+          created_by: string | null
+          entidad: string
+          registro_id: string
+        }
+        Insert: {
+          centro_negocio_id: string
+          created_at?: string
+          created_by?: string | null
+          entidad: string
+          registro_id: string
+        }
+        Update: {
+          centro_negocio_id?: string
+          created_at?: string
+          created_by?: string | null
+          entidad?: string
+          registro_id?: string
+        }
+        Relationships: []
+      }
       centros_negocio: {
         Row: {
           activo: boolean
@@ -1638,6 +1662,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      cambiar_activo: {
+        Args: { p_activo: boolean; p_en_cascada?: boolean; p_entidad: string; p_id: string }
+        Returns: Json
+      }
       get_cronograma_publico: {
         Args: { _token: string }
         Returns: {
@@ -1700,6 +1728,10 @@ export type Database = {
       }
       rafa_asignar_acceso_proyecto: {
         Args: { p_acceso: Json; p_accion_id: string }
+        Returns: Json
+      }
+      rafa_cambiar_activo: {
+        Args: { p_accion_id: string; p_cambio: Json }
         Returns: Json
       }
       rafa_cambiar_estado_programaciones: {

@@ -707,3 +707,38 @@ test("acción: accesos a proyecto solo por admin; dar y quitar", async () => {
   const contador = await chat("contador", "Dale acceso");
   assert.equal(resultado(contador).ok, false);
 });
+
+// ================================================================ BAJAS
+test("baja de centro en cascada con confirmación: deja de aparecer en Rafa y al reactivar vuelve lo mismo", async () => {
+  const CN_OBRA = "a1000000-0000-0000-0000-000000000001"; // Obra Norte: Cimentación (proyecto P1)
+  const activasAntes = (await rest(`presupuestos?centro_negocio_id=eq.${CN_OBRA}&activo=eq.true&select=id`)).map((p) => p.id).sort();
+  const { propuesta } = await proponerYConfirmar("contador", "proponer_baja", { entidad: "centro_negocio", id: CN_OBRA });
+  assert.match(propuesta.accion.descripcion, /Dar de baja centro de negocio .*con sus partidas y proyecto/);
+  assert.equal((await rest(`centros_negocio?id=eq.${CN_OBRA}&select=activo`))[0].activo, false);
+  assert.equal(await contar(`presupuestos?centro_negocio_id=eq.${CN_OBRA}&activo=eq.true&select=id`), 0);
+  assert.equal((await rest(`proyectos?id=eq.${P1}&select=activo`))[0].activo, false);
+
+  // Rafa ya no lo encuentra salvo que se pida lo dado de baja.
+  guion(usar("buscar_registros", { entidad: "centros_negocio", empresa_id: E1 }), usar("buscar_registros", { entidad: "centros_negocio", empresa_id: E1, activo: false }), fin());
+  const s = await chat("contador", "¿Qué centros hay?");
+  assert.ok(!resultado(s, 0).datos.filas.some((r) => r.id === CN_OBRA));
+  assert.ok(resultado(s, 1).datos.filas.some((r) => r.id === CN_OBRA));
+
+  // Reactivar: vuelven exactamente las partidas y el proyecto que se dieron de baja con él.
+  await proponerYConfirmar("contador", "proponer_baja", { entidad: "centro_negocio", id: CN_OBRA, reactivar: true });
+  assert.deepEqual((await rest(`presupuestos?centro_negocio_id=eq.${CN_OBRA}&activo=eq.true&select=id`)).map((p) => p.id).sort(), activasAntes);
+  assert.equal((await rest(`proyectos?id=eq.${P1}&select=activo`))[0].activo, true);
+  assert.equal(await contar(`bajas_en_cascada?centro_negocio_id=eq.${CN_OBRA}&select=registro_id`), 0);
+});
+
+test("baja de tercero y permisos: un usuario sin rol contable no puede dar de baja", async () => {
+  const [t] = await rest(`terceros?rfc=eq.CPR010101AB1&select=id,activo`);
+  await proponerYConfirmar("contador", "proponer_baja", { entidad: "tercero", id: t.id });
+  assert.equal((await rest(`terceros?id=eq.${t.id}&select=activo`))[0].activo, false);
+  guion(usar("proponer_baja", { entidad: "tercero", id: t.id }), fin());
+  const repetida = await chat("contador", "Dalo de baja otra vez");
+  assert.match(resultado(repetida).resumen, /ya está dado de baja/);
+  guion(usar("proponer_baja", { entidad: "tercero", id: t.id, reactivar: true }), fin());
+  const sinRol = await chat("usuario", "Reactívalo");
+  assert.equal(resultado(sinRol).ok, false);
+});
