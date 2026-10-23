@@ -1154,32 +1154,114 @@ export type Database = {
           },
         ]
       }
+      rafa_archivos: {
+        Row: {
+          centro_negocio_id: string | null
+          conversacion_id: string
+          created_at: string
+          empresa_id: string | null
+          id: string
+          mime: string
+          nombre: string
+          ruta: string
+          tamano: number
+          user_id: string
+        }
+        Insert: {
+          centro_negocio_id?: string | null
+          conversacion_id: string
+          created_at?: string
+          empresa_id?: string | null
+          id?: string
+          mime: string
+          nombre: string
+          ruta: string
+          tamano?: number
+          user_id?: string
+        }
+        Update: {
+          centro_negocio_id?: string | null
+          conversacion_id?: string
+          created_at?: string
+          empresa_id?: string | null
+          id?: string
+          mime?: string
+          nombre?: string
+          ruta?: string
+          tamano?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rafa_archivos_centro_negocio_id_fkey"
+            columns: ["centro_negocio_id"]
+            isOneToOne: false
+            referencedRelation: "centros_negocio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rafa_archivos_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "rafa_conversaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rafa_archivos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rafa_conversaciones: {
         Row: {
+          centro_negocio_id: string | null
           contexto: Json
           created_at: string
+          empresa_id: string | null
           id: string
           titulo: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          centro_negocio_id?: string | null
           contexto?: Json
           created_at?: string
+          empresa_id?: string | null
           id?: string
           titulo?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          centro_negocio_id?: string | null
           contexto?: Json
           created_at?: string
+          empresa_id?: string | null
           id?: string
           titulo?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "rafa_conversaciones_centro_negocio_id_fkey"
+            columns: ["centro_negocio_id"]
+            isOneToOne: false
+            referencedRelation: "centros_negocio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rafa_conversaciones_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rafa_ejecuciones: {
         Row: {

@@ -1,6 +1,6 @@
 # Esquema de la base (SQL local)
 
-ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-75685f762ee6). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `927781f9014dbe8b`.
+ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-72576e447dc8). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `79d7733a232052d5`.
 
 El significado de negocio de cada tabla y campo está en `docs/rafa/modulos/`.
 
@@ -276,6 +276,39 @@ Triggers:
 
 Políticas:
 - Cada usuario lee sus acciones de Rafa; admin audita todas (SELECT, authenticated) USING `((user_id = auth.uid()) OR has_role(auth.uid(), 'admin'::app_role))` CHECK `—`
+
+## rafa_archivos
+
+RLS: activado.
+
+| Columna | Tipo | Obligatorio | Predeterminado |
+|---|---|---|---|
+| id | uuid | Sí | `gen_random_uuid()` |
+| user_id | uuid | Sí | `auth.uid()` |
+| conversacion_id | uuid | Sí |  |
+| centro_negocio_id | uuid | No |  |
+| empresa_id | uuid | No |  |
+| nombre | text | Sí |  |
+| mime | text | Sí |  |
+| tamano | bigint | Sí | `0` |
+| ruta | text | Sí |  |
+| created_at | timestamp with time zone | Sí | `now()` |
+
+Restricciones e índices:
+- FK `rafa_archivos_centro_negocio_id_fkey`: `FOREIGN KEY (centro_negocio_id) REFERENCES centros_negocio(id) ON DELETE SET NULL`
+- FK `rafa_archivos_conversacion_id_fkey`: `FOREIGN KEY (conversacion_id) REFERENCES rafa_conversaciones(id) ON DELETE CASCADE`
+- FK `rafa_archivos_empresa_id_fkey`: `FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE SET NULL`
+- PK `rafa_archivos_pkey`: `PRIMARY KEY (id)`
+- UNIQUE `rafa_archivos_ruta_key`: `UNIQUE (ruta)`
+- INDICE `idx_rafa_archivos_centro`: `CREATE INDEX idx_rafa_archivos_centro ON public.rafa_archivos USING btree (user_id, centro_negocio_id, created_at DESC)`
+- INDICE `idx_rafa_archivos_conversacion`: `CREATE INDEX idx_rafa_archivos_conversacion ON public.rafa_archivos USING btree (conversacion_id, created_at)`
+
+Triggers:
+- ninguno
+
+Políticas:
+- Eliminar archivos propios de Rafa (DELETE, authenticated) USING `(user_id = auth.uid())` CHECK `—`
+- Leer archivos propios de Rafa (SELECT, authenticated) USING `(user_id = auth.uid())` CHECK `—`
 
 ## rafa_mensajes
 
@@ -712,13 +745,19 @@ RLS: activado.
 | contexto | jsonb | Sí | `'{}'::jsonb` |
 | created_at | timestamp with time zone | Sí | `now()` |
 | updated_at | timestamp with time zone | Sí | `now()` |
+| centro_negocio_id | uuid | No |  |
+| empresa_id | uuid | No |  |
 
 Restricciones e índices:
+- FK `rafa_conversaciones_centro_negocio_id_fkey`: `FOREIGN KEY (centro_negocio_id) REFERENCES centros_negocio(id) ON DELETE SET NULL`
+- FK `rafa_conversaciones_empresa_id_fkey`: `FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE SET NULL`
 - FK `rafa_conversaciones_user_id_fkey`: `FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE`
 - PK `rafa_conversaciones_pkey`: `PRIMARY KEY (id)`
+- INDICE `idx_rafa_conversaciones_centro`: `CREATE INDEX idx_rafa_conversaciones_centro ON public.rafa_conversaciones USING btree (user_id, centro_negocio_id, updated_at DESC)`
 - INDICE `idx_rafa_conversaciones_user`: `CREATE INDEX idx_rafa_conversaciones_user ON public.rafa_conversaciones USING btree (user_id, updated_at DESC)`
 
 Triggers:
+- `trg_rafa_conversacion_empresa`
 - `update_rafa_conversaciones_updated_at`
 
 Políticas:
@@ -893,6 +932,7 @@ Políticas:
 - `rafa_ajustar_presupuestos(p_accion_id uuid, p_cambios jsonb)` — SECURITY INVOKER
 - `rafa_aplicar_asientos(p_accion_id uuid, p_asientos jsonb)` — SECURITY INVOKER
 - `rafa_cambiar_estado_programaciones(p_accion_id uuid, p_cambios jsonb)` — SECURITY INVOKER
+- `rafa_conversacion_empresa_del_centro()` — SECURITY INVOKER
 - `rafa_crear_asientos_borrador(p_accion_id uuid, p_asientos jsonb)` — SECURITY INVOKER
 - `rafa_crear_programaciones(p_accion_id uuid, p_items jsonb)` — SECURITY INVOKER
 - `rafa_crear_tarea(p_accion_id uuid, p_tarea jsonb)` — SECURITY INVOKER

@@ -1196,6 +1196,126 @@
                 }
             ]
         },
+        "rafa_archivos": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "id",
+                    "defecto": "gen_random_uuid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": "auth.uid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "conversacion_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "centro_negocio_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "nombre",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "mime",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "bigint",
+                    "nombre": "tamano",
+                    "defecto": "0"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "ruta",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(user_id = auth.uid())",
+                    "nombre": "Eliminar archivos propios de Rafa",
+                    "comando": "DELETE"
+                },
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(user_id = auth.uid())",
+                    "nombre": "Leer archivos propios de Rafa",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_archivos_centro_negocio_id_fkey",
+                    "definicion": "FOREIGN KEY (centro_negocio_id) REFERENCES centros_negocio(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_archivos_conversacion_id_fkey",
+                    "definicion": "FOREIGN KEY (conversacion_id) REFERENCES rafa_conversaciones(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_archivos_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "rafa_archivos_pkey",
+                    "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "UNIQUE",
+                    "nombre": "rafa_archivos_ruta_key",
+                    "definicion": "UNIQUE (ruta)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_rafa_archivos_centro",
+                    "definicion": "CREATE INDEX idx_rafa_archivos_centro ON public.rafa_archivos USING btree (user_id, centro_negocio_id, created_at DESC)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_rafa_archivos_conversacion",
+                    "definicion": "CREATE INDEX idx_rafa_archivos_conversacion ON public.rafa_archivos USING btree (conversacion_id, created_at)"
+                }
+            ]
+        },
         "rafa_mensajes": {
             "rls": true,
             "columnas": [
@@ -2773,9 +2893,25 @@
                     "tipo": "timestamp with time zone",
                     "nombre": "updated_at",
                     "defecto": "now()"
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "centro_negocio_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "empresa_id",
+                    "defecto": null
                 }
             ],
             "triggers": [
+                {
+                    "nombre": "trg_rafa_conversacion_empresa",
+                    "definicion": "CREATE TRIGGER trg_rafa_conversacion_empresa BEFORE INSERT OR UPDATE OF centro_negocio_id ON public.rafa_conversaciones FOR EACH ROW EXECUTE FUNCTION rafa_conversacion_empresa_del_centro()"
+                },
                 {
                     "nombre": "update_rafa_conversaciones_updated_at",
                     "definicion": "CREATE TRIGGER update_rafa_conversaciones_updated_at BEFORE UPDATE ON public.rafa_conversaciones FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
@@ -2793,6 +2929,16 @@
             "restricciones": [
                 {
                     "tipo": "FK",
+                    "nombre": "rafa_conversaciones_centro_negocio_id_fkey",
+                    "definicion": "FOREIGN KEY (centro_negocio_id) REFERENCES centros_negocio(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_conversaciones_empresa_id_fkey",
+                    "definicion": "FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "FK",
                     "nombre": "rafa_conversaciones_user_id_fkey",
                     "definicion": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
                 },
@@ -2800,6 +2946,11 @@
                     "tipo": "PK",
                     "nombre": "rafa_conversaciones_pkey",
                     "definicion": "PRIMARY KEY (id)"
+                },
+                {
+                    "tipo": "INDICE",
+                    "nombre": "idx_rafa_conversaciones_centro",
+                    "definicion": "CREATE INDEX idx_rafa_conversaciones_centro ON public.rafa_conversaciones USING btree (user_id, centro_negocio_id, updated_at DESC)"
                 },
                 {
                     "tipo": "INDICE",
@@ -3334,6 +3485,11 @@
             "argumentos": "p_accion_id uuid, p_cambios jsonb"
         },
         {
+            "nombre": "rafa_conversacion_empresa_del_centro",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": ""
+        },
+        {
             "nombre": "rafa_crear_asientos_borrador",
             "seguridad": "SECURITY INVOKER",
             "argumentos": "p_accion_id uuid, p_asientos jsonb"
@@ -3379,5 +3535,5 @@
             "argumentos": ""
         }
     ],
-    "migraciones_sha256": "927781f9014dbe8bd6a289a2c18ab3620c25df15ab6ac3bd38afe0661bd8a402"
+    "migraciones_sha256": "79d7733a232052d5b6166c9abae87e3d9459e22235410e9f0a7c9ac5359d3378"
 }

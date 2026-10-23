@@ -68,7 +68,7 @@ export interface MensajeRafa {
   id: string;
   rol: "usuario" | "asistente";
   contenido: string;
-  datos: { herramientas?: HerramientaUsada[]; adjuntos?: string[]; completo?: boolean };
+  datos: { herramientas?: HerramientaUsada[]; adjuntos?: string[]; archivos?: { id: string; nombre: string }[]; completo?: boolean };
   version_conocimiento: string | null;
   created_at: string;
 }
@@ -78,7 +78,30 @@ export interface ConversacionRafa {
   titulo: string;
   updated_at: string;
   contexto: Record<string, unknown>;
+  /** Centro de negocio al que está anclada la conversación (null = general). */
+  centro_negocio_id: string | null;
+  empresa_id: string | null;
+  centros_negocio?: { codigo: string; nombre: string } | null;
 }
+
+export interface CentroRafa {
+  id: string;
+  codigo: string;
+  nombre: string;
+  empresa_id: string;
+}
+
+export interface ArchivoRafa {
+  id: string;
+  conversacion_id: string;
+  nombre: string;
+  mime: string;
+  tamano: number;
+  ruta: string;
+  created_at: string;
+}
+
+export const BUCKET_ARCHIVOS_RAFA = "rafa-archivos";
 
 export interface ContextoPantalla {
   ruta?: string;
@@ -156,9 +179,18 @@ export function enviarMensaje(payload: {
   mensaje: string;
   contexto_pantalla?: ContextoPantalla;
   archivos?: { filename: string; mime: string; data: string }[];
+  /** Ids de archivos ya guardados que se vuelven a enviar a Rafa. */
+  archivos_guardados?: string[];
   audio?: { data: string; format: string };
+  /** Centro al crear una conversación nueva anclada. */
+  centro_negocio_id?: string | null;
 }) {
-  return invocar<RespuestaChat>({ modo: "chat", ...payload, conversacion_id: payload.conversacion_id || undefined });
+  return invocar<RespuestaChat>({
+    modo: "chat",
+    ...payload,
+    conversacion_id: payload.conversacion_id || undefined,
+    centro_negocio_id: payload.conversacion_id ? undefined : payload.centro_negocio_id || undefined,
+  });
 }
 
 export interface ResultadoAccion {
@@ -176,14 +208,77 @@ export function cancelarAccion(accionId: string) {
   return invocar<ResultadoAccion>({ modo: "cancelar", accion_id: accionId });
 }
 
+const COLUMNAS_CONVERSACION = "id, titulo, updated_at, contexto, centro_negocio_id, empresa_id, centros_negocio:centro_negocio_id(codigo, nombre)";
+
 export async function listarConversaciones(): Promise<ConversacionRafa[]> {
   const { data, error } = await supabase
     .from("rafa_conversaciones")
-    .select("id, titulo, updated_at, contexto")
+    .select(COLUMNAS_CONVERSACION)
     .order("updated_at", { ascending: false })
-    .limit(30);
+    .limit(100);
   if (error) throw error;
-  return (data || []) as ConversacionRafa[];
+  return (data || []) as unknown as ConversacionRafa[];
+}
+
+/** Centros activos para anclar conversaciones. */
+export async function listarCentros(): Promise<CentroRafa[]> {
+  const { data, error } = await supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("activo", true).order("nombre");
+  if (error) throw error;
+  return (data || []) as CentroRafa[];
+}
+
+export async function obtenerCentro(id: string): Promise<CentroRafa | null> {
+  const { data, error } = await supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return (data as CentroRafa | null) ?? null;
+}
+
+/** Crea una conversación anclada a un centro (la empresa la pone la base desde el centro). */
+export async function crearConversacionDeCentro(centro: Pick<CentroRafa, "id" | "nombre">): Promise<ConversacionRafa> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u?.user) throw new Error("Sesión inválida. Vuelve a iniciar sesión.");
+  const { data, error } = await supabase
+    .from("rafa_conversaciones")
+    .insert({ user_id: u.user.id, titulo: `Centro ${centro.nombre}`.slice(0, 80), centro_negocio_id: centro.id })
+    .select(COLUMNAS_CONVERSACION)
+    .single();
+  if (error) throw new Error(`No se pudo crear la conversación del centro: ${error.message}`);
+  return data as unknown as ConversacionRafa;
+}
+
+/** Conversación más reciente del centro; si no hay, la crea. */
+export async function conversacionDeCentro(centro: Pick<CentroRafa, "id" | "nombre">): Promise<ConversacionRafa> {
+  const { data, error } = await supabase
+    .from("rafa_conversaciones")
+    .select(COLUMNAS_CONVERSACION)
+    .eq("centro_negocio_id", centro.id)
+    .order("updated_at", { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  const existente = (data || [])[0] as unknown as ConversacionRafa | undefined;
+  return existente ?? crearConversacionDeCentro(centro);
+}
+
+/** Cambia (o quita) el centro de una conversación. */
+export async function asignarCentro(conversacionId: string, centroId: string | null) {
+  const { error } = await supabase.from("rafa_conversaciones").update({ centro_negocio_id: centroId }).eq("id", conversacionId);
+  if (error) throw new Error(`No se pudo cambiar el centro de la conversación: ${error.message}`);
+}
+
+export async function listarArchivos(conversacionId: string): Promise<ArchivoRafa[]> {
+  const { data, error } = await supabase
+    .from("rafa_archivos")
+    .select("id, conversacion_id, nombre, mime, tamano, ruta, created_at")
+    .eq("conversacion_id", conversacionId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []) as ArchivoRafa[];
+}
+
+export async function urlArchivo(ruta: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(BUCKET_ARCHIVOS_RAFA).createSignedUrl(ruta, 300);
+  if (error || !data?.signedUrl) throw new Error(error?.message || "No se pudo abrir el archivo.");
+  return data.signedUrl;
 }
 
 export async function cargarMensajes(conversacionId: string): Promise<MensajeRafa[]> {
@@ -208,6 +303,12 @@ export async function estadoAcciones(ids: string[]): Promise<Map<string, AccionR
 }
 
 export async function eliminarConversacion(id: string) {
+  // Primero los archivos guardados (Storage); la fila se borra en cascada.
+  const archivos = await listarArchivos(id);
+  if (archivos.length) {
+    const { error: errorArchivos } = await supabase.storage.from(BUCKET_ARCHIVOS_RAFA).remove(archivos.map((a) => a.ruta));
+    if (errorArchivos) throw new Error(`No se pudieron eliminar los archivos de la conversación: ${errorArchivos.message}`);
+  }
   const { error } = await supabase.from("rafa_conversaciones").delete().eq("id", id);
   if (error) throw error;
 }
