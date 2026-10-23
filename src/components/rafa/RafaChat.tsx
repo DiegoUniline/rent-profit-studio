@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -12,7 +14,6 @@ import {
   cancelarAccion,
   cargarMensajes,
   confirmarAccion,
-  conversacionDeCentro,
   eliminarConversacion,
   enviarMensaje,
   estadoAcciones,
@@ -32,14 +33,34 @@ import {
 } from "@/lib/rafa-chat";
 import type { PlanRafa } from "@/lib/rafa-types";
 import { ResultadosHerramientas } from "./RafaResultados";
-import { Building2, Download, FileText, Loader2, MessageSquarePlus, Mic, Paperclip, RotateCcw, Send, Square, Trash2, X } from "lucide-react";
+import {
+  Building2,
+  Download,
+  FileText,
+  Folder,
+  FolderOpen,
+  LayoutGrid,
+  Loader2,
+  MessageSquare,
+  MessageSquarePlus,
+  Mic,
+  Paperclip,
+  RotateCcw,
+  Search,
+  Send,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
 
 interface Props {
   contextoPantalla?: ContextoPantalla;
   /** Abre el editor del plan; recibe el centro de la conversación para preseleccionarlo. */
   onAbrirPlan?: (plan: PlanRafa, centroId?: string | null) => void;
-  /** Centro con el que se abre Rafa (p. ej. /rafa?centro=ID): abre o crea su conversación. */
+  /** Centro con el que se abre Rafa (p. ej. /rafa?centro=ID): abre la página del centro. */
   centroInicial?: string | null;
+  /** Avisa el centro de la conversación abierta (p. ej. para "Cargar presupuesto"). */
+  onCentroActual?: (centroId: string | null) => void;
   /** Panel lateral: oculta la lista de conversaciones. */
   compacto?: boolean;
   /** Contenido extra al inicio de la barra lateral (p. ej. acceso a "Cargar presupuesto"). */
@@ -137,7 +158,6 @@ function opcionesDe(m: MensajeRafa): Opcion[] {
 }
 
 const SIN_CENTRO = "sin";
-const TODOS = "todos";
 
 /** "CN002 · Oficina Central — Empresa": la empresa distingue centros con el mismo nombre. */
 const etiquetaCentro = (c?: { codigo?: string | null; nombre?: string | null; empresas?: EmpresaDeCentro } | null) => {
@@ -146,15 +166,13 @@ const etiquetaCentro = (c?: { codigo?: string | null; nombre?: string | null; em
   return `${c.codigo ? `${c.codigo} · ` : ""}${c.nombre ?? ""}${empresa ? ` — ${empresa}` : ""}`;
 };
 
-/** Agrupa las conversaciones por centro, en orden de actividad más reciente. */
-function agruparPorCentro(lista: ConversacionRafa[]) {
-  const grupos = new Map<string, { clave: string; titulo: string; conversaciones: ConversacionRafa[] }>();
-  for (const c of lista) {
-    const clave = c.centro_negocio_id || SIN_CENTRO;
-    if (!grupos.has(clave)) grupos.set(clave, { clave, titulo: c.centro_negocio_id ? etiquetaCentro(c.centros_negocio) : "Sin centro", conversaciones: [] });
-    grupos.get(clave)!.conversaciones.push(c);
-  }
-  return Array.from(grupos.values());
+/** Búsqueda sin acentos ni mayúsculas. */
+const coincide = (texto: string, busqueda: string) => !busqueda.trim() || normalizar(texto).includes(normalizar(busqueda));
+
+interface CentroConCharlas {
+  centro: CentroRafa;
+  charlas: ConversacionRafa[];
+  ultima: string | null;
 }
 
 const SUGERENCIAS = [
@@ -164,7 +182,7 @@ const SUGERENCIAS = [
   "Programa 15 lotes por mes hasta completar 550",
 ];
 
-export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compacto = false, lateral }: Props) {
+export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentroActual, compacto = false, lateral }: Props) {
   const { toast } = useToast();
   const [conversaciones, setConversaciones] = useState<ConversacionRafa[]>([]);
   const [conversacionId, setConversacionId] = useState<string | null>(null);
@@ -184,7 +202,9 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compact
   const [alto, setAlto] = useState<number | null>(null);
   const inicializadoRef = useRef(false);
   const [centros, setCentros] = useState<CentroRafa[]>([]);
-  const [filtroCentro, setFiltroCentro] = useState<string>(TODOS);
+  // Buscador de la barra (centros y charlas) y vista de cuadros de centros.
+  const [busqueda, setBusqueda] = useState("");
+  const [vista, setVista] = useState<"chat" | "centros">("chat");
   // Centro elegido para una conversación nueva que aún no tiene mensajes.
   const [centroNueva, setCentroNueva] = useState<string | null>(null);
   const [archivosConv, setArchivosConv] = useState<ArchivoRafa[]>([]);
@@ -257,22 +277,23 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compact
       try {
         const centro = await obtenerCentro(centroInicial);
         if (!centro) throw new Error("El centro de negocio no existe.");
-        const conv = await conversacionDeCentro(centro);
-        setFiltroCentro(conv.centro_negocio_id || TODOS);
-        setConversacionId(conv.id);
-        await recargar(conv.id);
+        setCentros((prev) => (prev.some((c) => c.id === centro.id) ? prev : [...prev, centro]));
+        // Página del centro: sus charlas en cuadros y el cuadro de texto para una nueva.
+        abrirCentro(centro.id);
         await cargarConversaciones();
       } catch (e) {
         toast({ variant: "destructive", title: "No se pudo abrir la conversación del centro", description: e instanceof Error ? e.message : "" });
       }
     })();
-  }, [centroInicial, cargarConversaciones, recargar, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centroInicial, cargarConversaciones, toast]);
 
   useEffect(() => {
     finRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
   }, [mensajes.length, enviando]);
 
   const abrir = async (id: string) => {
+    setVista("chat");
     setConversacionId(id);
     setReusar([]);
     try {
@@ -282,15 +303,18 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compact
     }
   };
 
-  const nueva = () => {
+  /** Charla nueva; con centro, abre la página del centro (sus charlas + cuadro de texto). */
+  const nueva = (centroId: string | null = null) => {
+    setVista("chat");
     setConversacionId(null);
     setMensajes([]);
     setAcciones(new Map());
     setArchivosConv([]);
     setReusar([]);
-    // Si se está viendo un centro, la conversación nueva nace anclada a él.
-    setCentroNueva(filtroCentro !== TODOS && filtroCentro !== SIN_CENTRO ? filtroCentro : null);
+    setVerArchivos(false);
+    setCentroNueva(centroId);
   };
+  const abrirCentro = (centroId: string) => nueva(centroId);
 
   const conversacionActual = conversaciones.find((c) => c.id === conversacionId) || null;
   const centroActualId = conversacionId ? conversacionActual?.centro_negocio_id ?? null : centroNueva;
@@ -317,12 +341,35 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compact
     }
   };
 
-  const grupos = useMemo(() => {
-    const visibles = conversaciones.filter((c) =>
-      filtroCentro === TODOS ? true : filtroCentro === SIN_CENTRO ? !c.centro_negocio_id : c.centro_negocio_id === filtroCentro
-    );
-    return agruparPorCentro(visibles);
-  }, [conversaciones, filtroCentro]);
+  // Centros como "proyectos": cada uno con sus charlas, los de actividad reciente primero.
+  const centrosConCharlas = useMemo<CentroConCharlas[]>(() => {
+    const lista = centros.map((centro) => {
+      const charlas = conversaciones.filter((c) => c.centro_negocio_id === centro.id);
+      return { centro, charlas, ultima: charlas[0]?.updated_at ?? null };
+    });
+    return lista.sort((a, b) => (b.ultima || "").localeCompare(a.ultima || "") || a.centro.nombre.localeCompare(b.centro.nombre));
+  }, [centros, conversaciones]);
+
+  const centrosVisibles = useMemo(
+    () =>
+      centrosConCharlas.filter(
+        (g) => coincide(etiquetaCentro(g.centro), busqueda) || g.charlas.some((c) => coincide(c.titulo, busqueda))
+      ),
+    [centrosConCharlas, busqueda]
+  );
+  const charlasSinCentro = useMemo(
+    () => conversaciones.filter((c) => !c.centro_negocio_id && coincide(c.titulo, busqueda)),
+    [conversaciones, busqueda]
+  );
+  const centroActual = centros.find((c) => c.id === centroActualId) || null;
+  useEffect(() => {
+    onCentroActual?.(centroActualId);
+  }, [centroActualId, onCentroActual]);
+  const charlasDelCentro = centroActualId ? conversaciones.filter((c) => c.centro_negocio_id === centroActualId) : [];
+  const opcionesCentro = useMemo(
+    () => [{ id: SIN_CENTRO, label: "Sin centro (conversación general)" }, ...centros.map((c) => ({ id: c.id, label: etiquetaCentro(c) }))],
+    [centros]
+  );
 
   const enviar = async (mensajeDirecto?: string, contextoExtra?: Partial<ContextoPantalla>) => {
     const mensaje = (mensajeDirecto ?? texto).trim();
@@ -442,35 +489,71 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compact
       {!compacto && (
         <aside className="hidden w-60 shrink-0 flex-col gap-2 overflow-y-auto md:flex">
           {lateral}
-          <Select value={filtroCentro} onValueChange={setFiltroCentro}>
-            <SelectTrigger aria-label="Filtrar por centro de negocio" className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TODOS}>Todos los centros</SelectItem>
-              <SelectItem value={SIN_CENTRO}>Sin centro</SelectItem>
-              {centros.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {etiquetaCentro(c)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={nueva}>
-            <MessageSquarePlus className="h-4 w-4" />
-            Nueva conversación
-          </Button>
-          {grupos.map((g) => (
-            <div key={g.clave} className="space-y-1">
-              <p className="flex items-center gap-1 px-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <Building2 className="h-3 w-3 shrink-0" />
-                <span className="truncate">{g.titulo}</span>
-              </p>
-              {g.conversaciones.map((c) => (
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar centro o charla…"
+              aria-label="Buscar centro o charla"
+              className="h-8 pl-7 text-xs"
+            />
+          </div>
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => nueva()}>
+              <MessageSquarePlus className="h-4 w-4" />
+              Nueva
+            </Button>
+            <Button variant={vista === "centros" ? "secondary" : "outline"} size="sm" className="gap-1.5" onClick={() => setVista("centros")} aria-label="Ver centros en cuadros">
+              <LayoutGrid className="h-4 w-4" />
+              Centros
+            </Button>
+          </div>
+          <p className="px-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Centros</p>
+          {centrosVisibles.map((g) => {
+            const activo = vista === "chat" && g.centro.id === centroActualId;
+            const charlas = busqueda.trim() ? g.charlas.filter((c) => coincide(c.titulo, busqueda) || coincide(etiquetaCentro(g.centro), busqueda)) : g.charlas;
+            return (
+              <div key={g.centro.id}>
+                <button
+                  className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted ${activo ? "bg-primary/10 font-medium" : ""}`}
+                  onClick={() => abrirCentro(g.centro.id)}
+                  title={etiquetaCentro(g.centro)}
+                >
+                  {activo ? <FolderOpen className="h-4 w-4 shrink-0 text-primary" /> : <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{g.centro.nombre}</span>
+                    <span className="block truncate text-[11px] font-normal text-muted-foreground">{nombreEmpresa(g.centro.empresas)}</span>
+                  </span>
+                  {g.charlas.length > 0 && <span className="text-[11px] text-muted-foreground">{g.charlas.length}</span>}
+                </button>
+                {(activo || busqueda.trim()) && charlas.length > 0 && (
+                  <div className="ml-4 space-y-0.5 border-l pl-2">
+                    {charlas.map((c) => (
+                      <div key={c.id} className={`group flex items-center gap-1 rounded px-1.5 py-1 text-xs ${c.id === conversacionId ? "bg-primary/5 font-medium" : "hover:bg-muted"}`}>
+                        <button className="min-w-0 flex-1 truncate text-left" onClick={() => abrir(c.id)}>
+                          {c.titulo}
+                        </button>
+                        <button className="opacity-0 group-hover:opacity-100" onClick={() => borrar(c.id)} aria-label="Eliminar conversación">
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {centrosVisibles.length === 0 && <p className="px-1 text-xs text-muted-foreground">Ningún centro coincide.</p>}
+          {charlasSinCentro.length > 0 && (
+            <>
+              <p className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Sin centro</p>
+              {charlasSinCentro.map((c) => (
                 <div
                   key={c.id}
-                  className={`group flex items-center gap-1 rounded-md border px-2 py-1.5 text-sm ${c.id === conversacionId ? "border-primary bg-primary/5" : ""}`}
+                  className={`group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm ${c.id === conversacionId ? "bg-primary/5 font-medium" : "hover:bg-muted"}`}
                 >
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <button className="min-w-0 flex-1 text-left" onClick={() => abrir(c.id)}>
                     <span className="block truncate">{c.titulo}</span>
                     <span className="text-xs text-muted-foreground">{formatDateObj(new Date(c.updated_at))}</span>
@@ -480,8 +563,8 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compact
                   </button>
                 </div>
               ))}
-            </div>
-          ))}
+            </>
+          )}
         </aside>
       )}
 
@@ -490,7 +573,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compact
           <div className="shrink-0 space-y-2 border-b p-3 md:hidden">
             {lateral}
             <div className="flex min-w-0 items-center gap-2">
-              <Select value={conversacionId || "nueva"} onValueChange={(id) => id === "nueva" ? nueva() : void abrir(id)} disabled={enviando}>
+              <Select value={conversacionId || "nueva"} onValueChange={(id) => (id === "nueva" ? nueva() : void abrir(id))} disabled={enviando}>
                 <SelectTrigger aria-label="Conversaciones guardadas" className="min-w-0 flex-1">
                   <SelectValue placeholder="Conversaciones guardadas" />
                 </SelectTrigger>
@@ -504,28 +587,29 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compact
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="icon" disabled={enviando} onClick={nueva} aria-label="Nueva conversación">
+              <Button variant="outline" size="icon" disabled={enviando} onClick={() => nueva()} aria-label="Nueva conversación">
                 <MessageSquarePlus className="h-4 w-4" />
+              </Button>
+              <Button variant={vista === "centros" ? "secondary" : "outline"} size="icon" onClick={() => setVista("centros")} aria-label="Centros">
+                <LayoutGrid className="h-4 w-4" />
               </Button>
             </div>
           </div>
         )}
+        {vista === "chat" && (
         <div className="shrink-0 space-y-2 border-b px-3 py-2">
           <div className="flex min-w-0 items-center gap-2">
             <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <Select value={centroActualId || SIN_CENTRO} onValueChange={(v) => void cambiarCentro(v)} disabled={enviando}>
-              <SelectTrigger aria-label="Centro de negocio de la conversación" className="h-8 min-w-0 flex-1 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={SIN_CENTRO}>Sin centro (conversación general)</SelectItem>
-                {centros.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {etiquetaCentro(c)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={centroActualId || SIN_CENTRO}
+              onValueChange={(v) => void cambiarCentro(v)}
+              options={opcionesCentro}
+              placeholder="Centro de negocio"
+              searchPlaceholder="Buscar centro o empresa…"
+              emptyMessage="Ningún centro coincide"
+              disabled={enviando}
+              className="min-w-0 flex-1 text-xs [&_button]:h-8"
+            />
             <Button
               variant={verArchivos ? "secondary" : "ghost"}
               size="sm"
@@ -566,8 +650,72 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compact
             </div>
           )}
         </div>
+        )}
+        {vista === "centros" ? (
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="flex-1 text-base font-semibold">Centros</h2>
+              <div className="relative w-full sm:w-72">
+                <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar centro, empresa o charla…" aria-label="Buscar centros" className="pl-8" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {centrosVisibles.map((g) => (
+                <button
+                  key={g.centro.id}
+                  onClick={() => abrirCentro(g.centro.id)}
+                  className="flex flex-col gap-1 rounded-lg border bg-background p-3 text-left transition hover:border-primary hover:shadow-sm"
+                  aria-label={`Abrir centro ${etiquetaCentro(g.centro)}`}
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <Folder className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="line-clamp-2">{g.centro.nombre}</span>
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {g.centro.codigo} · {nombreEmpresa(g.centro.empresas) || "Sin empresa"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {g.charlas.length} {g.charlas.length === 1 ? "charla" : "charlas"}
+                    {g.ultima ? ` · ${formatDateObj(new Date(g.ultima))}` : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {centrosVisibles.length === 0 && <p className="text-sm text-muted-foreground">Ningún centro coincide con la búsqueda.</p>}
+          </div>
+        ) : (
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-          {mensajes.length === 0 && !enviando && (
+          {!conversacionId && centroActual && mensajes.length === 0 && !enviando && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <FolderOpen className="mt-0.5 h-6 w-6 shrink-0 text-primary" />
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold">{centroActual.nombre}</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {centroActual.codigo} · {nombreEmpresa(centroActual.empresas)} · Escribe abajo para empezar una charla nueva en este centro.
+                  </p>
+                </div>
+              </div>
+              {charlasDelCentro.length > 0 && (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {charlasDelCentro.map((c) => (
+                    <div key={c.id} className="group flex items-start gap-2 rounded-lg border p-3 hover:border-primary">
+                      <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <button className="min-w-0 flex-1 text-left" onClick={() => abrir(c.id)} aria-label={`Abrir charla ${c.titulo}`}>
+                        <span className="block truncate text-sm font-medium">{c.titulo}</span>
+                        <span className="text-xs text-muted-foreground">{formatDateObj(new Date(c.updated_at))}</span>
+                      </button>
+                      <button className="opacity-0 group-hover:opacity-100" onClick={() => borrar(c.id)} aria-label="Eliminar conversación">
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {mensajes.length === 0 && !enviando && (conversacionId || !centroActual) && (
             <div className="space-y-3 py-6 text-center text-sm text-muted-foreground">
               <p>
                 {centroActualId
@@ -622,7 +770,9 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compact
           )}
           <div ref={finRef} />
         </div>
+        )}
 
+        {vista === "chat" && (
         <div className="shrink-0 space-y-2 border-t p-3">
           {(contextoTexto || audioBlob || archivos.length > 0 || reusar.length > 0) && (
             <div className="flex flex-wrap gap-1.5">
@@ -707,6 +857,7 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, compact
             />
           </div>
         </div>
+        )}
       </section>
     </div>
   );
