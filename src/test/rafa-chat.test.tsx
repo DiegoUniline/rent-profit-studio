@@ -275,3 +275,72 @@ describe("conversaciones por centro de negocio", () => {
     );
   });
 });
+
+describe("centros como proyectos (tipo ChatGPT)", () => {
+  beforeEach(() => {
+    invoke.mockReset();
+    for (const k of Object.keys(tablas)) delete tablas[k];
+    for (const k of Object.keys(errores)) delete errores[k];
+  });
+
+  const MAQ = { razon_social: "Maq Rentable SA", nombre_comercial: "Maq Rentable" };
+  const HUB = "c0000000-0000-0000-0000-000000000021";
+  const SALINAS = "c0000000-0000-0000-0000-000000000025";
+  const preparar = () => {
+    tablas.centros_negocio = [
+      { id: HUB, codigo: "CN021", nombre: "MR Industrial Hub Pesqueria", empresa_id: "e1", empresas: MAQ },
+      { id: SALINAS, codigo: "CN025", nombre: "MR Industrial Hub Salinas Victoria", empresa_id: "e1", empresas: MAQ },
+    ];
+    tablas.rafa_conversaciones = [
+      { id: "g1", titulo: "Duda general", updated_at: "2026-10-23T12:00:00Z", contexto: {}, centro_negocio_id: null, empresa_id: null, centros_negocio: null },
+      { id: "h1", titulo: "Pagos de octubre", updated_at: "2026-10-23T10:00:00Z", contexto: {}, centro_negocio_id: HUB, empresa_id: "e1", centros_negocio: { codigo: "CN021", nombre: "MR Industrial Hub Pesqueria", empresas: MAQ } },
+      { id: "h2", titulo: "Lotes manzana 7", updated_at: "2026-10-22T10:00:00Z", contexto: {}, centro_negocio_id: HUB, empresa_id: "e1", centros_negocio: { codigo: "CN021", nombre: "MR Industrial Hub Pesqueria", empresas: MAQ } },
+    ];
+    tablas.rafa_mensajes = [];
+  };
+
+  it("el buscador filtra centros sin importar acentos ni mayúsculas", async () => {
+    preparar();
+    render(<MemoryRouter><RafaChat /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTitle(/CN025 · MR Industrial Hub Salinas Victoria/)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Buscar centro o charla"), { target: { value: "salinas" } });
+    expect(screen.queryByTitle(/CN021 · MR Industrial Hub Pesqueria/)).toBeNull();
+    expect(screen.getByTitle(/CN025 · MR Industrial Hub Salinas Victoria/)).toBeInTheDocument();
+    // Buscar por título de charla muestra su centro y la charla.
+    fireEvent.change(screen.getByLabelText("Buscar centro o charla"), { target: { value: "manzana" } });
+    expect(screen.getByTitle(/CN021/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Lotes manzana 7" })).toBeInTheDocument();
+  });
+
+  it("clic en un centro abre su página con sus charlas en cuadros; escribir ahí crea una charla del centro", async () => {
+    preparar();
+    invoke.mockResolvedValue({ data: { conversacion_id: "nueva-1", mensaje_id: "m1", contenido: "", version_conocimiento: "k" }, error: null });
+    const onCentroActual = vi.fn();
+    render(<MemoryRouter><RafaChat onCentroActual={onCentroActual} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTitle(/CN021 · MR Industrial Hub Pesqueria/)).toBeInTheDocument());
+    fireEvent.click(screen.getByTitle(/CN021 · MR Industrial Hub Pesqueria/));
+    // "Cargar presupuesto" recibe el centro de la conversación.
+    await waitFor(() => expect(onCentroActual).toHaveBeenLastCalledWith(HUB));
+    expect(screen.getByRole("heading", { name: "MR Industrial Hub Pesqueria" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abrir charla Pagos de octubre" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abrir charla Lotes manzana 7" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/Escribe a Rafa/), { target: { value: "¿Cómo vamos?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("rafa-asistente", { body: expect.objectContaining({ mensaje: "¿Cómo vamos?", centro_negocio_id: HUB, conversacion_id: undefined }) })
+    );
+  });
+
+  it("vista de centros en cuadros: buscar y entrar a un centro", async () => {
+    preparar();
+    render(<MemoryRouter><RafaChat /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTitle(/CN021/)).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Ver centros en cuadros" }));
+    expect(screen.getByRole("button", { name: /Abrir centro CN021/ })).toHaveTextContent("2 charlas");
+    fireEvent.change(screen.getByLabelText("Buscar centros"), { target: { value: "salinas" } });
+    expect(screen.queryByRole("button", { name: /Abrir centro CN021/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Abrir centro CN025/ }));
+    expect(screen.getByRole("heading", { name: "MR Industrial Hub Salinas Victoria" })).toBeInTheDocument();
+  });
+});

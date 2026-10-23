@@ -42,6 +42,8 @@ export default function Rafa() {
   // /rafa?centro=ID: abre la conversación de ese centro de negocio.
   const [parametros] = useSearchParams();
   const centroInicial = parametros.get("centro");
+  // Centro de la conversación abierta en el chat (para "Cargar presupuesto").
+  const [centroChat, setCentroChat] = useState<string | null>(null);
   // Solo quien puede editar presupuestos puede guardar desde Rafa.
   const puedeEditarPresupuestos = role === "admin" || role === "contador";
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
@@ -170,13 +172,16 @@ export default function Rafa() {
 
   // Plan generado desde la conversación: se abre en el mismo editor de
   // propuestas (nada se guarda en presupuestos hasta pulsar Guardar).
-  const abrirPlanDesdeChat = async (nuevoPlan: PlanRafa, centroId?: string | null) => {
-    const base = construirPropuesta(nuevoPlan, null);
-    // Desde la conversación de un centro, el plan se guarda en ese centro.
+  // El plan de una conversación de centro se guarda en ese centro (no en el que adivine Rafa).
+  const conCentro = (base: PropuestaEditable, centroId?: string | null): PropuestaEditable => {
     const centro = centroId ? centros.find((c) => c.id === centroId) : undefined;
-    const nuevaPropuesta: PropuestaEditable = centro
+    return centro
       ? { ...base, empresaId: centro.empresa_id, centro: { ...base.centro, modo: "existente", id: centro.id, nombre: centro.nombre } }
       : base;
+  };
+
+  const abrirPlanDesdeChat = async (nuevoPlan: PlanRafa, centroId?: string | null) => {
+    const nuevaPropuesta = conCentro(construirPropuesta(nuevoPlan, null), centroId);
     setPlan(nuevoPlan);
     setPropuesta(nuevaPropuesta);
     setSesionId(null);
@@ -198,7 +203,9 @@ export default function Rafa() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       const nuevoPlan = data.plan as PlanRafa;
-      const nuevaPropuesta = conciliarVinculosPresupuesto(construirPropuesta(nuevoPlan, propuesta), propuesta);
+      // "Cargar presupuesto" desde una conversación de centro: el plan nuevo va a ese centro.
+      const construida = construirPropuesta(nuevoPlan, propuesta);
+      const nuevaPropuesta = conciliarVinculosPresupuesto(propuesta ? construida : conCentro(construida, centroChat), propuesta);
       setPlan(nuevoPlan);
       setPropuesta(nuevaPropuesta);
       setReinstruir(false);
@@ -400,6 +407,7 @@ export default function Rafa() {
       {pestana === "chat" ? (
         <RafaChat
           centroInicial={centroInicial}
+          onCentroActual={setCentroChat}
           onAbrirPlan={puedeEditarPresupuestos ? abrirPlanDesdeChat : undefined}
           lateral={
             <div className="flex items-center gap-2 pb-1">
@@ -426,6 +434,11 @@ export default function Rafa() {
           </Button>
         {!propuesta ? (
           <>
+            <p className="text-sm text-muted-foreground">
+              {centroChat && centros.find((c) => c.id === centroChat)
+                ? `Las partidas se cargarán en el centro ${centros.find((c) => c.id === centroChat)!.codigo} · ${centros.find((c) => c.id === centroChat)!.nombre} (el de tu conversación). Puedes cambiarlo en el editor antes de guardar.`
+                : "Sin centro elegido: Rafa lo tomará de tu instrucción o del archivo y podrás cambiarlo en el editor. Para cargarlo directo a un centro, abre primero la conversación de ese centro."}
+            </p>
             <RafaCaptura loading={loading} onEnviar={interpretar} />
             <RafaSesiones
               sesiones={sesiones}
