@@ -23,7 +23,7 @@ Por partida de proyecto (`ProyectoDetalle`, `project-utils`):
 
 `proyecto_programacion_pagos`: los pagos calendarizados (`fecha`, `monto` > 0 CHECK, `concepto`, `es_anticipo`, `orden`) de esa programación. Representan el **proyectado** del proyecto, no pagos reales ni programación de tesorería.
 
-Guardar (`ProgramacionPartidaDialog.handleSave`): upsert de la cabecera, **borra todos los pagos y los reinserta**, y registra auditoría `programacion_financiera`. No es atómico: si falla la inserción, la partida puede quedar sin pagos. Triggers: `trg_validar_programacion_partida_project` (misma empresa/centro, partida activa y `es_project`, proyecto activo), `trg_validar_pago_programacion_project` (el pago pertenece al proyecto de su programación), `trg_cleanup_flujos_legacy` (al crear, borra flujos legacy de la partida).
+Guardar (`ProgramacionPartidaDialog.handleGuardar`) usa la RPC `guardar_programacion_partida` (migración `20261025000000`): en una transacción crea o actualiza la cabecera, **reemplaza todos los pagos** (verificando que el borrado sí ocurrió), valida que lo programado no supere el presupuesto y registra auditoría `programacion_financiera` (si la bitácora falla no bloquea). Idempotente por clave de operación (`programacion_partida_guardados`). Rafa propone la programación con `proponer_programacion_financiera` y el cronograma con `proponer_cronograma_partida`; los accesos (`proyecto_usuarios`) con `proponer_acceso_proyecto` (solo admin). Triggers: `trg_validar_programacion_partida_project` (misma empresa/centro, partida activa y `es_project`, proyecto activo), `trg_validar_pago_programacion_project` (el pago pertenece al proyecto de su programación), `trg_cleanup_flujos_legacy` (al crear, borra flujos legacy de la partida).
 
 ## Tareas
 

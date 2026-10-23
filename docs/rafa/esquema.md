@@ -1,6 +1,6 @@
 # Esquema de la base (SQL local)
 
-ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-fe17e74e886c). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `79d7733a232052d5`.
+ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-0a1b7a455fec). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `8f0b5290171a0e86`.
 
 El significado de negocio de cada tabla y campo está en `docs/rafa/modulos/`.
 
@@ -183,6 +183,29 @@ Políticas:
 - Admins can manage roles (ALL, authenticated) USING `has_role(auth.uid(), 'admin'::app_role)` CHECK `—`
 - Admins can view all roles (SELECT, authenticated) USING `has_role(auth.uid(), 'admin'::app_role)` CHECK `—`
 - Users can view their own role (SELECT, authenticated) USING `(auth.uid() = user_id)` CHECK `—`
+
+## rafa_avisos
+
+RLS: activado.
+
+| Columna | Tipo | Obligatorio | Predeterminado |
+|---|---|---|---|
+| user_id | uuid | Sí |  |
+| centro_negocio_id | uuid | Sí |  |
+| semana | date | Sí |  |
+| conversacion_id | uuid | No |  |
+| created_at | timestamp with time zone | Sí | `now()` |
+
+Restricciones e índices:
+- FK `rafa_avisos_centro_negocio_id_fkey`: `FOREIGN KEY (centro_negocio_id) REFERENCES centros_negocio(id) ON DELETE CASCADE`
+- FK `rafa_avisos_conversacion_id_fkey`: `FOREIGN KEY (conversacion_id) REFERENCES rafa_conversaciones(id) ON DELETE SET NULL`
+- PK `rafa_avisos_pkey`: `PRIMARY KEY (user_id, centro_negocio_id, semana)`
+
+Triggers:
+- ninguno
+
+Políticas:
+- Leer avisos propios de Rafa (SELECT, authenticated) USING `(user_id = auth.uid())` CHECK `—`
 
 ## presupuestos
 
@@ -522,6 +545,29 @@ Políticas:
 - Registrar ejecución de acción confirmada (INSERT, authenticated) USING `—` CHECK `((user_id = auth.uid()) AND (EXISTS ( SELECT 1
    FROM rafa_acciones a
   WHERE ((a.id = rafa_ejecuciones.accion_id) AND (a.user_id = auth.uid()) AND (a.estado = ANY (ARRAY['ejecutando'::text, 'ejecutada'::text]))))))`
+
+## asiento_guardados
+
+RLS: activado.
+
+| Columna | Tipo | Obligatorio | Predeterminado |
+|---|---|---|---|
+| operacion_id | uuid | Sí |  |
+| asiento_id | uuid | Sí |  |
+| user_id | uuid | Sí | `auth.uid()` |
+| resultado | jsonb | Sí | `'{}'::jsonb` |
+| created_at | timestamp with time zone | Sí | `now()` |
+
+Restricciones e índices:
+- FK `asiento_guardados_asiento_id_fkey`: `FOREIGN KEY (asiento_id) REFERENCES asientos_contables(id) ON DELETE CASCADE`
+- PK `asiento_guardados_pkey`: `PRIMARY KEY (operacion_id)`
+
+Triggers:
+- ninguno
+
+Políticas:
+- Leer guardados de asiento propios (SELECT, authenticated) USING `(user_id = auth.uid())` CHECK `—`
+- Registrar guardados de asiento propios (INSERT, authenticated) USING `—` CHECK `(user_id = auth.uid())`
 
 ## cuentas_contables
 
@@ -873,6 +919,29 @@ Políticas:
    FROM proyecto_usuarios pu
   WHERE ((pu.proyecto_id = proyecto_programacion_pagos.proyecto_id) AND (pu.user_id = auth.uid()) AND pu.ver_programacion_financiera))))` CHECK `—`
 
+## programacion_partida_guardados
+
+RLS: activado.
+
+| Columna | Tipo | Obligatorio | Predeterminado |
+|---|---|---|---|
+| operacion_id | uuid | Sí |  |
+| programacion_id | uuid | Sí |  |
+| user_id | uuid | Sí | `auth.uid()` |
+| resultado | jsonb | Sí | `'{}'::jsonb` |
+| created_at | timestamp with time zone | Sí | `now()` |
+
+Restricciones e índices:
+- FK `programacion_partida_guardados_programacion_id_fkey`: `FOREIGN KEY (programacion_id) REFERENCES proyecto_programacion_financiera(id) ON DELETE CASCADE`
+- PK `programacion_partida_guardados_pkey`: `PRIMARY KEY (operacion_id)`
+
+Triggers:
+- ninguno
+
+Políticas:
+- Leer guardados de programación propios (SELECT, authenticated) USING `(user_id = auth.uid())` CHECK `—`
+- Registrar guardados de programación propios (INSERT, authenticated) USING `—` CHECK `(user_id = auth.uid())`
+
 ## proyecto_programacion_financiera
 
 RLS: activado.
@@ -926,17 +995,23 @@ Políticas:
 - `cleanup_flujos_legacy_al_crear_programacion_propia()` — SECURITY DEFINER
 - `get_cronograma_publico(_token text)` — SECURITY DEFINER
 - `get_user_role(_user_id uuid)` — SECURITY DEFINER
+- `guardar_asiento(p_operacion uuid, p_id uuid, p_datos jsonb, p_movimientos jsonb, p_version timestamp with time zone)` — SECURITY INVOKER
 - `guardar_presupuesto(p_operacion uuid, p_id uuid, p_datos jsonb, p_flujos jsonb, p_version timestamp with time zone)` — SECURITY INVOKER
+- `guardar_programacion_partida(p_operacion uuid, p_datos jsonb, p_pagos jsonb)` — SECURITY INVOKER
 - `handle_new_user()` — SECURITY DEFINER
 - `has_role(_user_id uuid, _role app_role)` — SECURITY DEFINER
+- `rafa_actualizar_cronograma(p_accion_id uuid, p_cambio jsonb)` — SECURITY INVOKER
 - `rafa_ajustar_presupuestos(p_accion_id uuid, p_cambios jsonb)` — SECURITY INVOKER
 - `rafa_aplicar_asientos(p_accion_id uuid, p_asientos jsonb)` — SECURITY INVOKER
+- `rafa_asignar_acceso_proyecto(p_accion_id uuid, p_acceso jsonb)` — SECURITY INVOKER
 - `rafa_cambiar_estado_programaciones(p_accion_id uuid, p_cambios jsonb)` — SECURITY INVOKER
 - `rafa_conversacion_empresa_del_centro()` — SECURITY INVOKER
 - `rafa_crear_asientos_borrador(p_accion_id uuid, p_asientos jsonb)` — SECURITY INVOKER
 - `rafa_crear_programaciones(p_accion_id uuid, p_items jsonb)` — SECURITY INVOKER
 - `rafa_crear_tarea(p_accion_id uuid, p_tarea jsonb)` — SECURITY INVOKER
+- `rafa_crear_tercero(p_accion_id uuid, p_tercero jsonb)` — SECURITY INVOKER
 - `rafa_guardar_plan(p_operacion uuid, p_plan jsonb)` — SECURITY INVOKER
+- `rafa_guardar_programacion_partida(p_accion_id uuid, p_datos jsonb, p_pagos jsonb)` — SECURITY INVOKER
 - `rafa_registrar_ejecucion(p_accion_id uuid, p_resultado jsonb)` — SECURITY INVOKER
 - `sync_iva_flujos()` — SECURITY DEFINER
 - `update_updated_at_column()` — SECURITY INVOKER

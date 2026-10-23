@@ -12,7 +12,7 @@ Inicio: formulario de partida (pestaña de flujos) o plan de Rafa. Quién: admin
 
 ## Programar la financiera de una partida de proyecto
 
-Inicio: Proyecto → Programación financiera (`ProgramacionPartidaDialog`), también desde la partida en Presupuestos. Quién: admin/contador o usuario con `editar_programacion_financiera` (RLS). Valida anticipo con fecha, al menos un pago, montos > 0; triggers validan empresa/centro/proyecto y borran flujos legacy. Tablas: `proyecto_programacion_financiera`, `proyecto_programacion_pagos`, `proyecto_auditoria`. Reemplaza todos los pagos en cada guardado; no atómico.
+Inicio: Proyecto → Programación financiera (`ProgramacionPartidaDialog`), también desde la partida en Presupuestos. Quién: admin/contador o usuario con `editar_programacion_financiera` (RLS). Valida anticipo con fecha, al menos un pago, montos > 0; triggers validan empresa/centro/proyecto y borran flujos legacy. Tablas: `proyecto_programacion_financiera`, `proyecto_programacion_pagos`, `proyecto_auditoria`. Reemplaza todos los pagos en cada guardado con la RPC `guardar_programacion_partida` (migración `20261025000000`): una transacción, idempotente por clave de operación (`programacion_partida_guardados`), verifica que el borrado de pagos sí ocurrió y que lo programado no supere el presupuesto; la bitácora no bloquea el guardado. Rafa: `proponer_programacion_financiera` reparte lo que falta (presupuesto − ya pagado − anticipo) y, al confirmar, usa `rafa_guardar_programacion_partida` (la acción es la clave de operación).
 
 ## Crear, editar, copiar o eliminar una programación de tesorería
 
@@ -24,7 +24,7 @@ Inicio: Programación → Ejecutar (`handleExecute`). Solo cambia `estado` a `ej
 
 ## Capturar un asiento contable
 
-Inicio: Asientos → Nuevo/Editar/Copiar (`AsientoDialog`) o página `/asientos/:id`. Quién: admin/contador. Valida `validarAsiento` (cuadre, diario con partida, alcance de partidas en el diálogo). Tablas: `asientos_contables`, `asiento_movimientos`. Estado inicial `borrador`: no afecta ejercido ni saldos. Cliente, no atómico (editar borra y reinserta renglones). Rafa: `proponer_asientos_borrador` usa `rafa_crear_asientos_borrador` (una transacción, siempre borrador) y puede ligar la programación de origen (`programaciones.asiento_id`), rechazando un segundo asiento vigente para la misma programación.
+Inicio: Asientos → Nuevo/Editar/Copiar (`AsientoDialog`) o página `/asientos/:id`. Quién: admin/contador. Valida `validarAsiento` (cuadre, diario con partida, alcance de partidas en el diálogo). Tablas: `asientos_contables`, `asiento_movimientos`. Estado inicial `borrador`: no afecta ejercido ni saldos. Desde `/asientos/:id` se guarda con la RPC `guardar_asiento` (migración `20261025000000`): una transacción, idempotente (`asiento_guardados`), totales y cuadre calculados en el servidor, renglones por id (actualiza, inserta nuevos, elimina quitados: los flujos de IVA ligados a renglones que no cambian se conservan) y control de versión (`updated_at`). `AsientoDialog` no se usa en la aplicación. Rafa: `proponer_asientos_borrador` usa `rafa_crear_asientos_borrador` (una transacción, siempre borrador) y puede ligar la programación de origen (`programaciones.asiento_id`), rechazando un segundo asiento vigente para la misma programación.
 
 ## Aplicar, cancelar o eliminar un asiento
 
@@ -38,6 +38,8 @@ Rafa: `simular_incremento_presupuesto` (no escribe) y `proponer_ajuste_presupues
 
 Generar proyecto desde un centro; marcar partidas como de proyecto (`es_project`, auditado); editar cronograma (`actualizar_cronograma_partida`); tareas (crear/editar/mover/borrar, admin/contador); accesos (`proyecto_usuarios`, admin); compartir cronograma (token). Rafa puede crear tareas (`proponer_tarea`, `rafa_crear_tarea`) y consultar todo lo anterior según el acceso del usuario; las demás acciones de proyecto siguen en la interfaz.
 
+Acciones de Rafa con confirmación (migración `20261026000000`): `proponer_cronograma_partida` (fechas y avance; solo cambia lo indicado; permiso de editar cronograma; `rafa_actualizar_cronograma` → `actualizar_cronograma_partida`), `proponer_programacion_financiera` (ver arriba) y `proponer_acceso_proyecto` (dar, cambiar o quitar accesos; solo admin; busca al usuario por nombre en `profiles`; `rafa_asignar_acceso_proyecto`). Todas muestran antes/después, se recalculan al confirmar y no se repiten en un reintento.
+
 ## Catálogos
 
-Empresas, cuentas, terceros, centros y unidades: alta/edición admin/contador, borrado admin, baja lógica con `activa`/`activo`. Borrar una empresa es destructivo (cascada). Rafa los consulta; solo crea centros/terceros como parte del plan de presupuesto existente.
+Empresas, cuentas, terceros, centros y unidades: alta/edición admin/contador, borrado admin, baja lógica con `activa`/`activo`. Borrar una empresa es destructivo (cascada). Rafa los consulta; crea centros/terceros como parte del plan de presupuesto y da de alta terceros con `proponer_tercero` (RFC con formato válido y único en la empresa; `rafa_crear_tercero`; con confirmación).

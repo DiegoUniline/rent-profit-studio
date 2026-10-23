@@ -1671,6 +1671,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      rafa_actualizar_cronograma: {
+        Args: { p_accion_id: string; p_cambio: Json }
+        Returns: Json
+      }
+      rafa_asignar_acceso_proyecto: {
+        Args: { p_accion_id: string; p_acceso: Json }
+        Returns: Json
+      }
       rafa_ajustar_presupuestos: {
         Args: { p_accion_id: string; p_cambios: Json }
         Returns: Json
@@ -1693,6 +1701,14 @@ export type Database = {
       }
       rafa_crear_tarea: {
         Args: { p_accion_id: string; p_tarea: Json }
+        Returns: Json
+      }
+      rafa_crear_tercero: {
+        Args: { p_accion_id: string; p_tercero: Json }
+        Returns: Json
+      }
+      rafa_guardar_programacion_partida: {
+        Args: { p_accion_id: string; p_datos: Json; p_pagos: Json }
         Returns: Json
       }
       rafa_guardar_plan: {

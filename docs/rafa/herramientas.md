@@ -32,6 +32,11 @@ Cada herramienta valida su entrada contra el esquema (rechaza parámetros no dec
 | `proponer_aplicar_asientos` | asientos | Acción | admin, contador | Sí, en la interfaz |
 | `proponer_tarea` | proyectos | Acción | admin, contador | No |
 | `proponer_plan_presupuesto` | presupuestos | Acción | admin, contador | Sí, en la interfaz |
+| `abrir_archivos` | general | Consulta | admin, contador, usuario, arquitecto | No |
+| `proponer_cronograma_partida` | proyectos | Acción | admin, contador, usuario, arquitecto | Sí, en la interfaz |
+| `proponer_programacion_financiera` | proyectos | Acción | admin, contador, usuario, arquitecto | Sí, en la interfaz |
+| `proponer_tercero` | terceros | Acción | admin, contador | Sí, en la interfaz |
+| `proponer_acceso_proyecto` | proyectos | Acción | admin | Sí, en la interfaz |
 
 ## buscar_conocimiento
 
@@ -417,3 +422,78 @@ Parámetros (* obligatorio):
 - `total_objetivo` — number: Total del presupuesto mencionado por el usuario o del archivo. 0 si no aplica.
 - `partidas` * — array: Una entrada por concepto del archivo, en el mismo orden.
 - `programacion` * — object
+
+## abrir_archivos
+
+Abre archivos ya guardados de esta conversación o de su centro de negocio (los de la lista ARCHIVOS GUARDADOS del contexto) para leerlos en el siguiente paso, por ejemplo "con el catálogo que subí ayer". Úsala en vez de pedir al usuario que vuelva a subirlos. Máximo 5.
+
+- Módulo: general. Tipo: Consulta. Roles: admin, contador, usuario, arquitecto. Confirmación: No.
+- Validaciones: Archivos del propio usuario; De esta conversación o de otra charla del mismo centro de negocio.
+- Devuelve: Los archivos abiertos; su contenido llega en el siguiente paso.
+
+Parámetros (* obligatorio):
+- `archivo_ids` * — array: Archivos a abrir
+
+## proponer_cronograma_partida
+
+Propone cambiar las fechas de inicio/fin y el avance (%) de una partida en el cronograma del proyecto. Solo cambia lo indicado; requiere confirmación.
+
+- Módulo: proyectos. Tipo: Acción. Roles: admin, contador, usuario, arquitecto. Confirmación: Sí, en la interfaz.
+- Validaciones: Permiso de editar cronograma del proyecto (admin/contador/arquitecto o acceso asignado); Inicio ≤ fin; Avance 0–100.
+- Devuelve: Propuesta con antes/después; al confirmar, actualizar_cronograma_partida.
+
+Parámetros (* obligatorio):
+- `presupuesto_id` * — string (uuid): Partida
+- `fecha_inicio` — string (date): Nueva fecha de inicio
+- `fecha_fin` — string (date): Nueva fecha de fin
+- `avance_manual` — number: Avance en % (0 a 100)
+
+## proponer_programacion_financiera
+
+Propone la programación financiera de una partida de PROYECTO (es_project): reparte lo que falta por pagar (presupuesto − ya pagado − anticipo) en pagos periódicos y reemplaza los pagos programados actuales. Requiere confirmación.
+
+- Módulo: proyectos. Tipo: Acción. Roles: admin, contador, usuario, arquitecto. Confirmación: Sí, en la interfaz.
+- Validaciones: Partida activa de proyecto activo; Permiso de editar programación financiera; Anticipo + ya pagado ≤ presupuesto; Al confirmar: guardar_programacion_partida (una transacción).
+- Devuelve: Propuesta con los pagos resultantes; al confirmar reemplaza la programación de la partida.
+
+Parámetros (* obligatorio):
+- `presupuesto_id` * — string (uuid): Partida de proyecto
+- `frecuencia` * — semanal / quincenal / mensual / trimestral / semestral / anual: Frecuencia de los pagos
+- `fecha_inicio` * — string (date): Fecha del primer pago
+- `numero_pagos` * — integer: Número de pagos (1 a 120)
+- `anticipo_monto` — number: Anticipo (opcional)
+- `anticipo_fecha` — string (date): Fecha del anticipo
+
+## proponer_tercero
+
+Propone dar de alta un tercero (cliente, proveedor o ambos) con su RFC en una empresa. Valida formato del RFC y que no exista ya en la empresa. Requiere confirmación.
+
+- Módulo: terceros. Tipo: Acción. Roles: admin, contador. Confirmación: Sí, en la interfaz.
+- Validaciones: admin/contador; RFC con formato válido; RFC único en la empresa.
+- Devuelve: Propuesta del tercero; al confirmar, rafa_crear_tercero.
+
+Parámetros (* obligatorio):
+- `empresa_id` — string (uuid): Empresa
+- `razon_social` * — string: Razón social
+- `rfc` * — string: RFC (12 o 13 caracteres)
+- `tipo` * — cliente / proveedor / ambos: Tipo de tercero
+- `nombre_comercial` — string: Nombre comercial
+- `email` — string: Correo
+- `telefono` — string: Teléfono
+
+## proponer_acceso_proyecto
+
+Propone dar, cambiar o quitar el acceso de un usuario a un proyecto (ver programación financiera, editar cronograma, editar programación financiera). Solo administradores. Busca al usuario por nombre o usuario. Requiere confirmación.
+
+- Módulo: proyectos. Tipo: Acción. Roles: admin. Confirmación: Sí, en la interfaz.
+- Validaciones: Solo admin (RLS de proyecto_usuarios); Usuario único por nombre; Al quitar, debe tener acceso.
+- Devuelve: Propuesta con antes/después del acceso; al confirmar, rafa_asignar_acceso_proyecto.
+
+Parámetros (* obligatorio):
+- `proyecto_id` * — string (uuid): Proyecto
+- `usuario` — string: Nombre o usuario a buscar
+- `user_id` — string (uuid): Id del usuario (si ya se conoce)
+- `ver_programacion_financiera` — boolean: Puede ver la programación financiera
+- `editar_cronograma` — boolean: Puede editar el cronograma
+- `editar_programacion_financiera` — boolean: Puede editar la programación financiera
+- `quitar` — boolean: Quitar el acceso al proyecto

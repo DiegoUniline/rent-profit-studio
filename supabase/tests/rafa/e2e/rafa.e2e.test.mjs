@@ -640,3 +640,70 @@ test("Rafa abre por sí mismo un archivo guardado en otra charla del mismo centr
   assert.equal(ajeno.herramientas[0].resultado.ok, false);
   assert.match(ajeno.herramientas[0].resultado.resumen, /no es tuyo/);
 });
+
+// ================================================================ ACCIONES NUEVAS (con confirmación)
+async function proponerYConfirmar(rol, herramienta, args) {
+  guion(usar(herramienta, args), fin("Propuesta lista."));
+  const s = await chat(rol, `Prueba ${herramienta}`);
+  const r = resultado(s);
+  assert.equal(r.ok, true, r.resumen);
+  assert.equal(r.accion.estado, "propuesta", "no escribe hasta confirmar");
+  const c = await llamar(rol, { modo: "confirmar", accion_id: r.accion.id, huella: r.accion.huella });
+  assert.equal(c.status, 200, JSON.stringify(c.cuerpo));
+  assert.equal(c.cuerpo.accion.estado, "ejecutada", c.cuerpo.resumen);
+  return { propuesta: r, confirmacion: c.cuerpo };
+}
+
+test("acción: alta de tercero con RFC validado y sin duplicar", async () => {
+  await proponerYConfirmar("contador", "proponer_tercero", { empresa_id: E1, razon_social: "Constructora Prueba SA", rfc: "cpr010101ab1", tipo: "proveedor", email: "c@prueba.test" });
+  const [t] = await rest(`terceros?empresa_id=eq.${E1}&rfc=eq.CPR010101AB1&select=razon_social,tipo,email`);
+  assert.deepEqual(t, { razon_social: "Constructora Prueba SA", tipo: "proveedor", email: "c@prueba.test" });
+  guion(usar("proponer_tercero", { empresa_id: E1, razon_social: "Otra", rfc: "CPR010101AB1", tipo: "cliente" }), usar("proponer_tercero", { empresa_id: E1, razon_social: "Mal", rfc: "123", tipo: "cliente" }), fin());
+  const s = await chat("contador", "Otra vez");
+  assert.match(resultado(s, 0).resumen, /Ya existe el tercero "Constructora Prueba SA"/);
+  assert.match(resultado(s, 1).resumen, /no tiene formato válido/);
+  assert.equal(await contar(`terceros?empresa_id=eq.${E1}&rfc=eq.CPR010101AB1&select=id`), 1);
+});
+
+test("acción: cronograma de partida conserva lo no indicado y respeta permisos", async () => {
+  const [antes] = await rest(`presupuestos?id=eq.${PA}&select=fecha_inicio,fecha_fin,avance_manual`);
+  await proponerYConfirmar("contador", "proponer_cronograma_partida", { presupuesto_id: PA, avance_manual: 40, fecha_fin: "2027-03-31" });
+  const [despues] = await rest(`presupuestos?id=eq.${PA}&select=fecha_inicio,fecha_fin,avance_manual`);
+  assert.equal(Number(despues.avance_manual), 40);
+  assert.equal(despues.fecha_fin, "2027-03-31");
+  assert.equal(despues.fecha_inicio, antes.fecha_inicio);
+  guion(usar("proponer_cronograma_partida", { presupuesto_id: PA, avance_manual: 99 }), fin());
+  const sinPermiso = await chat("usuario", "Cambia el avance");
+  assert.equal(resultado(sinPermiso).ok, false);
+  assert.match(resultado(sinPermiso).resumen, /permiso/i);
+});
+
+test("acción: programación financiera de partida de proyecto (reparte lo que falta y reemplaza pagos)", async () => {
+  const { propuesta } = await proponerYConfirmar("contador", "proponer_programacion_financiera", {
+    presupuesto_id: PA, frecuencia: "mensual", fecha_inicio: "2026-12-01", numero_pagos: 4, anticipo_monto: 10000, anticipo_fecha: "2026-11-15",
+  });
+  const totalPropuesto = propuesta.accion.vista_previa.tablas[0].totales.monto;
+  const [prog] = await rest(`proyecto_programacion_financiera?presupuesto_id=eq.${PA}&select=id,frecuencia,numero_pagos,anticipo_monto`);
+  assert.equal(prog.frecuencia, "mensual");
+  assert.equal(Number(prog.anticipo_monto), 10000);
+  const pagos = await rest(`proyecto_programacion_pagos?programacion_id=eq.${prog.id}&select=fecha,monto,es_anticipo&order=orden`);
+  assert.equal(pagos.length, 5);
+  assert.equal(pagos[0].es_anticipo, true);
+  assert.equal(Math.round(pagos.reduce((t, p) => t + Number(p.monto), 0) * 100) / 100, totalPropuesto);
+  // Partida que no es de proyecto: se rechaza con explicación.
+  guion(usar("proponer_programacion_financiera", { presupuesto_id: PB, frecuencia: "mensual", fecha_inicio: "2026-12-01", numero_pagos: 2 }), fin());
+  const noProyecto = await chat("contador", "Programa la renta");
+  assert.match(resultado(noProyecto).resumen, /no pertenece a un proyecto activo/);
+});
+
+test("acción: accesos a proyecto solo por admin; dar y quitar", async () => {
+  const U2 = USUARIOS.usuario2.id;
+  await proponerYConfirmar("admin", "proponer_acceso_proyecto", { proyecto_id: P1, usuario: "usuario2", editar_cronograma: true });
+  const [acc] = await rest(`proyecto_usuarios?proyecto_id=eq.${P1}&user_id=eq.${U2}&select=editar_cronograma,ver_programacion_financiera`);
+  assert.deepEqual(acc, { editar_cronograma: true, ver_programacion_financiera: false });
+  await proponerYConfirmar("admin", "proponer_acceso_proyecto", { proyecto_id: P1, user_id: U2, quitar: true });
+  assert.equal(await contar(`proyecto_usuarios?proyecto_id=eq.${P1}&user_id=eq.${U2}&select=id`), 0);
+  guion(usar("proponer_acceso_proyecto", { proyecto_id: P1, usuario: "usuario2", editar_cronograma: true }), fin());
+  const contador = await chat("contador", "Dale acceso");
+  assert.equal(resultado(contador).ok, false);
+});

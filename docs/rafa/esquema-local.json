@@ -791,6 +791,69 @@
                 }
             ]
         },
+        "rafa_avisos": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "centro_negocio_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "date",
+                    "nombre": "semana",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "conversacion_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(user_id = auth.uid())",
+                    "nombre": "Leer avisos propios de Rafa",
+                    "comando": "SELECT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_avisos_centro_negocio_id_fkey",
+                    "definicion": "FOREIGN KEY (centro_negocio_id) REFERENCES centros_negocio(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "rafa_avisos_conversacion_id_fkey",
+                    "definicion": "FOREIGN KEY (conversacion_id) REFERENCES rafa_conversaciones(id) ON DELETE SET NULL"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "rafa_avisos_pkey",
+                    "definicion": "PRIMARY KEY (user_id, centro_negocio_id, semana)"
+                }
+            ]
+        },
         "presupuestos": {
             "rls": true,
             "columnas": [
@@ -2066,6 +2129,71 @@
                 }
             ]
         },
+        "asiento_guardados": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "operacion_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "asiento_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": "auth.uid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "jsonb",
+                    "nombre": "resultado",
+                    "defecto": "'{}'::jsonb"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(user_id = auth.uid())",
+                    "nombre": "Leer guardados de asiento propios",
+                    "comando": "SELECT"
+                },
+                {
+                    "check": "(user_id = auth.uid())",
+                    "roles": "authenticated",
+                    "using": null,
+                    "nombre": "Registrar guardados de asiento propios",
+                    "comando": "INSERT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "asiento_guardados_asiento_id_fkey",
+                    "definicion": "FOREIGN KEY (asiento_id) REFERENCES asientos_contables(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "asiento_guardados_pkey",
+                    "definicion": "PRIMARY KEY (operacion_id)"
+                }
+            ]
+        },
         "cuentas_contables": {
             "rls": true,
             "columnas": [
@@ -3265,6 +3393,71 @@
                 }
             ]
         },
+        "programacion_partida_guardados": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "operacion_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "programacion_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "user_id",
+                    "defecto": "auth.uid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "jsonb",
+                    "nombre": "resultado",
+                    "defecto": "'{}'::jsonb"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": null,
+                    "roles": "authenticated",
+                    "using": "(user_id = auth.uid())",
+                    "nombre": "Leer guardados de programación propios",
+                    "comando": "SELECT"
+                },
+                {
+                    "check": "(user_id = auth.uid())",
+                    "roles": "authenticated",
+                    "using": null,
+                    "nombre": "Registrar guardados de programación propios",
+                    "comando": "INSERT"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "FK",
+                    "nombre": "programacion_partida_guardados_programacion_id_fkey",
+                    "definicion": "FOREIGN KEY (programacion_id) REFERENCES proyecto_programacion_financiera(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "programacion_partida_guardados_pkey",
+                    "definicion": "PRIMARY KEY (operacion_id)"
+                }
+            ]
+        },
         "proyecto_programacion_financiera": {
             "rls": true,
             "columnas": [
@@ -3455,9 +3648,19 @@
             "argumentos": "_user_id uuid"
         },
         {
+            "nombre": "guardar_asiento",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_operacion uuid, p_id uuid, p_datos jsonb, p_movimientos jsonb, p_version timestamp with time zone"
+        },
+        {
             "nombre": "guardar_presupuesto",
             "seguridad": "SECURITY INVOKER",
             "argumentos": "p_operacion uuid, p_id uuid, p_datos jsonb, p_flujos jsonb, p_version timestamp with time zone"
+        },
+        {
+            "nombre": "guardar_programacion_partida",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_operacion uuid, p_datos jsonb, p_pagos jsonb"
         },
         {
             "nombre": "handle_new_user",
@@ -3470,6 +3673,11 @@
             "argumentos": "_user_id uuid, _role app_role"
         },
         {
+            "nombre": "rafa_actualizar_cronograma",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_cambio jsonb"
+        },
+        {
             "nombre": "rafa_ajustar_presupuestos",
             "seguridad": "SECURITY INVOKER",
             "argumentos": "p_accion_id uuid, p_cambios jsonb"
@@ -3478,6 +3686,11 @@
             "nombre": "rafa_aplicar_asientos",
             "seguridad": "SECURITY INVOKER",
             "argumentos": "p_accion_id uuid, p_asientos jsonb"
+        },
+        {
+            "nombre": "rafa_asignar_acceso_proyecto",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_acceso jsonb"
         },
         {
             "nombre": "rafa_cambiar_estado_programaciones",
@@ -3505,9 +3718,19 @@
             "argumentos": "p_accion_id uuid, p_tarea jsonb"
         },
         {
+            "nombre": "rafa_crear_tercero",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_tercero jsonb"
+        },
+        {
             "nombre": "rafa_guardar_plan",
             "seguridad": "SECURITY INVOKER",
             "argumentos": "p_operacion uuid, p_plan jsonb"
+        },
+        {
+            "nombre": "rafa_guardar_programacion_partida",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_datos jsonb, p_pagos jsonb"
         },
         {
             "nombre": "rafa_registrar_ejecucion",
@@ -3535,5 +3758,5 @@
             "argumentos": ""
         }
     ],
-    "migraciones_sha256": "79d7733a232052d5b6166c9abae87e3d9459e22235410e9f0a7c9ac5359d3378"
+    "migraciones_sha256": "8f0b5290171a0e86334f31e280fd6d4bf1ab10d67419d6bb0d6655c4cf7dc5c9"
 }
