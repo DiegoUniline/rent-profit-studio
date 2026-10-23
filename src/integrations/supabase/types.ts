@@ -16,22 +16,22 @@ export type Database = {
     Tables: {
       asiento_guardados: {
         Row: {
-          created_at: string
           asiento_id: string
+          created_at: string
           operacion_id: string
           resultado: Json
           user_id: string
         }
         Insert: {
-          created_at?: string
           asiento_id: string
+          created_at?: string
           operacion_id: string
           resultado?: Json
           user_id?: string
         }
         Update: {
-          created_at?: string
           asiento_id?: string
+          created_at?: string
           operacion_id?: string
           resultado?: Json
           user_id?: string
@@ -423,38 +423,6 @@ export type Database = {
           },
         ]
       }
-      programacion_partida_guardados: {
-        Row: {
-          created_at: string
-          programacion_id: string
-          operacion_id: string
-          resultado: Json
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          programacion_id: string
-          operacion_id: string
-          resultado?: Json
-          user_id?: string
-        }
-        Update: {
-          created_at?: string
-          programacion_id?: string
-          operacion_id?: string
-          resultado?: Json
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "programacion_partida_guardados_programacion_id_fkey"
-            columns: ["programacion_id"]
-            isOneToOne: false
-            referencedRelation: "proyecto_programacion_financiera"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       presupuesto_guardados: {
         Row: {
           created_at: string
@@ -652,6 +620,38 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      programacion_partida_guardados: {
+        Row: {
+          created_at: string
+          operacion_id: string
+          programacion_id: string
+          resultado: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          operacion_id: string
+          programacion_id: string
+          resultado?: Json
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          operacion_id?: string
+          programacion_id?: string
+          resultado?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programacion_partida_guardados_programacion_id_fkey"
+            columns: ["programacion_id"]
+            isOneToOne: false
+            referencedRelation: "proyecto_programacion_financiera"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       programaciones: {
         Row: {
@@ -1301,7 +1301,22 @@ export type Database = {
           semana?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "rafa_avisos_centro_negocio_id_fkey"
+            columns: ["centro_negocio_id"]
+            isOneToOne: false
+            referencedRelation: "centros_negocio"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rafa_avisos_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "rafa_conversaciones"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rafa_conversaciones: {
         Row: {
@@ -1675,16 +1690,16 @@ export type Database = {
         Args: { p_accion_id: string; p_cambio: Json }
         Returns: Json
       }
-      rafa_asignar_acceso_proyecto: {
-        Args: { p_accion_id: string; p_acceso: Json }
-        Returns: Json
-      }
       rafa_ajustar_presupuestos: {
         Args: { p_accion_id: string; p_cambios: Json }
         Returns: Json
       }
       rafa_aplicar_asientos: {
         Args: { p_accion_id: string; p_asientos: Json }
+        Returns: Json
+      }
+      rafa_asignar_acceso_proyecto: {
+        Args: { p_acceso: Json; p_accion_id: string }
         Returns: Json
       }
       rafa_cambiar_estado_programaciones: {
@@ -1707,12 +1722,12 @@ export type Database = {
         Args: { p_accion_id: string; p_tercero: Json }
         Returns: Json
       }
-      rafa_guardar_programacion_partida: {
-        Args: { p_accion_id: string; p_datos: Json; p_pagos: Json }
-        Returns: Json
-      }
       rafa_guardar_plan: {
         Args: { p_operacion: string; p_plan: Json }
+        Returns: Json
+      }
+      rafa_guardar_programacion_partida: {
+        Args: { p_accion_id: string; p_datos: Json; p_pagos: Json }
         Returns: Json
       }
       rafa_registrar_ejecucion: {
