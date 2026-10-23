@@ -17,7 +17,7 @@ No hubo acceso de lectura al proyecto de Lovable Cloud (`supabase/config.toml`):
 
 ## Riesgos técnicos
 
-- Escrituras no atómicas en la aplicación: guardar asiento, programación financiera de proyecto y tablero de tareas. (Ya son atómicas: partida con flujos `guardar_presupuesto` y plan de Rafa `rafa_guardar_plan`.)
+- Escrituras no atómicas en la aplicación: tablero de tareas. (Ya son atómicas: partida con flujos `guardar_presupuesto`, plan de Rafa `rafa_guardar_plan`, asientos `guardar_asiento` y programación financiera de proyecto `guardar_programacion_partida`.)
 - Duplicados previos a `20261017000000`: revisar con `supabase/diagnosticos/presupuestos_duplicados.sql` (solo lectura). No se eliminaron automáticamente.
 - La migración `20260810223000_fix_proyecto_programacion_financiera_columns.sql` falla al reaplicarse en una base nueva (su bloque espera `duplicate_object` y PostgreSQL lanza `duplicate_table`). El arnés de pruebas la ejecuta tolerando ese error.
 - RLS de lectura sin segmentación por empresa ni por rol en tablas contables; no hay asignación usuario→empresa. Rafa compensa en el servidor con la matriz de la interfaz, pero un cliente con la llave pública puede leer directamente.
@@ -28,7 +28,8 @@ No hubo acceso de lectura al proyecto de Lovable Cloud (`supabase/config.toml`):
 ## Capacidades de Rafa pendientes
 
 - La ruta `/rafa` y el botón flotante siguen limitados a admin/contador (como antes). El servidor ya atiende a usuario/arquitecto con herramientas de proyecto filtradas por acceso; abrirles el chat es una decisión pendiente.
-- Editar cronograma, programación financiera de proyecto, accesos y catálogos desde la conversación (hoy: consulta; se hacen en la interfaz).
+- Editar desde la conversación catálogos distintos de terceros (cuentas, centros, unidades) y usuarios/roles. Cronograma, programación financiera de proyecto, terceros y accesos ya son acciones con confirmación.
+- El aviso semanal se genera al abrir Rafa (una vez por semana por centro), no con un horario programado en el servidor.
 - Cancelar o eliminar asientos (excluido a propósito por ser destructivo).
 - Pruebas con el modelo de IA real: el arnés usa un modelo simulado; la calidad de interpretación depende del proveedor configurado (`LOVABLE_API_KEY`).
 - Embeddings: la recuperación usa BM25 sobre fragmentos; suficiente para el tamaño actual.

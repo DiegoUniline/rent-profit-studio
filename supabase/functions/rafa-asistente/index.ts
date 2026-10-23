@@ -12,6 +12,7 @@ import { PLAN_PARAMETROS, PROMPT_PLAN } from "../_shared/rafa/plan.ts";
 import { esUuid } from "../_shared/rafa/validacion.ts";
 import { crearExtractor } from "../_shared/rafa/extraccion.ts";
 import { cargarArchivosGuardados, crearAlmacenSupabase } from "../_shared/rafa/archivos.ts";
+import { asegurarAvisosSemana, resumenCentro } from "../_shared/rafa/centro.ts";
 
 const MODELO = Deno.env.get("RAFA_MODELO") || "google/gemini-3.6-flash";
 const URL_IA = Deno.env.get("RAFA_AI_URL") || "https://ai.gateway.lovable.dev/v1/chat/completions";
@@ -59,13 +60,26 @@ Deno.serve(async (req) => {
           },
           llamar,
           extractor,
-          almacen
+          almacen,
+          (archivos) => crearExtractor({ url: URL_IA, apiKey, modelo: MODELO, archivos })
         );
         return json(salida);
       } catch (e) {
         if (e instanceof ErrorModelo) return json({ error: e.message }, e.status === 429 || e.status === 402 ? e.status : 502);
         throw e;
       }
+    }
+
+    // Resumen del centro (página del centro) y avisos semanales: solo roles contables.
+    if (modo === "resumen_centro" || modo === "avisos_semana") {
+      if (ctx.usuario.roles.every((r) => r !== "admin" && r !== "contador")) {
+        return json({ error: "Tu rol no permite ver el resumen contable del centro." }, 403);
+      }
+      if (modo === "resumen_centro") {
+        if (!esUuid(body.centro_negocio_id)) return json({ error: "Centro de negocio inválido." }, 400);
+        return json(await resumenCentro(ctx, body.centro_negocio_id));
+      }
+      return json(await asegurarAvisosSemana(ctx));
     }
 
     if (modo === "confirmar" || modo === "cancelar") {

@@ -22,7 +22,7 @@ Enum `estado_asiento`: `borrador` (por defecto), `aplicado`, `cancelado`.
 
 Regla compartida `validarAsiento`: empresa, fecha y tipo; al menos un renglón; cada renglón con cuenta y monto en Debe o Haber; cuadrado (|debe − haber| < 0.01); las pólizas `diario` requieren al menos un renglón con partida. `AsientoDialog` (y Rafa) además exigen que cada partida ligada sea de la misma empresa y del centro del asiento (o sin centro); la página `/asientos/:id` (`AsientoDetalle`) **no** lo exige (diferencia conservada y registrada en pendientes).
 
-Guardar no es atómico en la aplicación: inserta/actualiza la cabecera, borra los renglones (al editar) e inserta los nuevos en llamadas separadas. Un fallo entre pasos puede dejar la cabecera sin renglones. Rafa crea borradores con la RPC `rafa_crear_asientos_borrador`, que hace todo en una transacción y nunca contabiliza.
+Guardar (`/asientos/:id`) usa la RPC `guardar_asiento` (migración `20261025000000`): una transacción, idempotente por clave de operación (`asiento_guardados`), totales y cuadre calculados en el servidor, renglones por id (actualiza, inserta nuevos y elimina solo los quitados, así los flujos de IVA ligados a renglones sin cambio se conservan) y control de versión con `updated_at`. Si algo falla no se guarda nada. Rafa crea borradores con la RPC `rafa_crear_asientos_borrador`, que hace todo en una transacción y nunca contabiliza.
 
 ## Permisos
 

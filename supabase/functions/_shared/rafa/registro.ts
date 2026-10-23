@@ -29,6 +29,13 @@ import {
   simularIncrementoTool,
 } from "./herramientas/acciones.ts";
 import { proponerPlanPresupuestoTool } from "./plan.ts";
+import { abrirArchivosTool } from "./herramientas/archivos.ts";
+import {
+  proponerAccesoProyectoTool,
+  proponerCronogramaTool,
+  proponerProgramacionFinancieraTool,
+  proponerTerceroTool,
+} from "./herramientas/acciones-proyecto.ts";
 
 // deno-lint-ignore no-explicit-any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,6 +66,11 @@ export const HERRAMIENTAS: Herramienta<any>[] = [
   proponerAplicarAsientosTool,
   proponerTareaTool,
   proponerPlanPresupuestoTool,
+  abrirArchivosTool,
+  proponerCronogramaTool,
+  proponerProgramacionFinancieraTool,
+  proponerTerceroTool,
+  proponerAccesoProyectoTool,
 ];
 
 const porNombre = new Map(HERRAMIENTAS.map((h) => [h.nombre, h]));

@@ -333,3 +333,34 @@ export const ETIQUETA_ESTADO_ACCION: Record<string, string> = {
   desactualizada: "Desactualizada · sin cambios",
   expirada: "Expirada · sin cambios",
 };
+
+// ---------------------------------------------------------------- resumen y avisos por centro
+export interface ResumenCentroRafa {
+  centro: { centro_id: string; centro_codigo: string; centro_nombre: string; empresa_nombre: string; proyecto_id: string | null; proyecto_nombre: string | null };
+  semana: { desde: string; hasta: string };
+  generado: string;
+  presupuesto: {
+    egresos: { presupuestado: number; ejercido: number; por_ejercer: number };
+    ingresos: { presupuestado: number; ejercido: number; por_ejercer: number };
+    partidas: number;
+    excedidas: { presupuesto_id: string; partida: string; presupuestado: number; ejercido: number; exceso: number }[];
+  } | null;
+  pagos_semana: {
+    egresos: number;
+    ingresos: number;
+    lista: { id: string; fecha: string; tipo: string; monto: number; partida: string | null; tercero: string | null; observaciones: string | null }[];
+  } | null;
+  excesos_semana: { presupuesto_id: string; partida: string; disponible_final: number }[] | null;
+  sin_partida: { cantidad: number; monto: number } | null;
+  tareas_vencidas: { id: string; titulo: string; vence: string | null; estado: string; responsable: string | null }[] | null;
+  avisos: string[];
+}
+
+export function resumenDeCentro(centroId: string) {
+  return invocar<ResumenCentroRafa>({ modo: "resumen_centro", centro_negocio_id: centroId });
+}
+
+/** Deja el aviso de la semana en la charla de cada centro (una vez por semana; lo decide el servidor). */
+export function generarAvisosSemana() {
+  return invocar<{ semana: string; generados: number; errores: string[] }>({ modo: "avisos_semana" });
+}

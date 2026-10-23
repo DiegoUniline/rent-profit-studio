@@ -36,5 +36,5 @@ for i in $(seq 1 60); do
 done
 
 export REST_URL=http://127.0.0.1:54321/rest/v1 SERVICIO="$SERVICIO" ANON="$ANON"
-node --test --test-concurrency=1 "$AQUI/guardado.e2e.test.mjs"
+node --test --test-concurrency=1 "$AQUI/guardado.e2e.test.mjs" "$AQUI/guardado-asientos.e2e.test.mjs"
 (cd "$RAIZ" && npx vitest run src/test/rafa-plan.integracion.test.ts src/test/rafa-centro.integracion.test.ts)

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { guardarProgramacionPartida, useClaveOperacion } from "@/lib/guardado-atomico";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -70,6 +71,8 @@ export function ProgramacionPartidaDialog({ open, onOpenChange, proyectoId, empr
   const { user } = useAuth();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const guardandoRef = useRef(false);
+  const { clave, reiniciar } = useClaveOperacion();
 
   const [tieneAnticipo, setTieneAnticipo] = useState(false);
   const [anticipoMonto, setAnticipoMonto] = useState("");
@@ -199,90 +202,28 @@ export function ProgramacionPartidaDialog({ open, onOpenChange, proyectoId, empr
       return;
     }
 
+    if (guardandoRef.current) return;
+    guardandoRef.current = true;
     setSaving(true);
     try {
-      const { data: existente } = await supabase
-        .from("proyecto_programacion_financiera")
-        .select("id")
-        .eq("presupuesto_id", partida.id)
-        .eq("proyecto_id", proyectoId)
-        .eq("empresa_id", empresaId)
-        .maybeSingle();
-
-      let programacionId: string;
-      const payload = {
-        presupuesto_id: partida.id,
-        proyecto_id: proyectoId,
-        empresa_id: empresaId,
-        modo: frecuencia === "personalizada" ? ("manual" as const) : ("automatica" as const),
-        tiene_anticipo: tieneAnticipo,
-        anticipo_monto: anticipo,
-        anticipo_fecha: tieneAnticipo && anticipoFecha ? format(anticipoFecha, "yyyy-MM-dd") : null,
-        frecuencia,
-        fecha_inicio: fechaInicio ? format(fechaInicio, "yyyy-MM-dd") : null,
-        numero_pagos: frecuencia === "personalizada" ? null : parseInt(numeroPagos, 10) || null,
-        updated_by: user?.id,
+      // Una sola llamada transaccional: programación + pagos (+ bitácora) o nada.
+      const solicitud = {
+        datos: {
+          presupuesto_id: partida.id,
+          proyecto_id: proyectoId,
+          empresa_id: empresaId,
+          modo: frecuencia === "personalizada" ? ("manual" as const) : ("automatica" as const),
+          frecuencia,
+          fecha_inicio: fechaInicio ? format(fechaInicio, "yyyy-MM-dd") : null,
+          numero_pagos: frecuencia === "personalizada" ? null : parseInt(numeroPagos, 10) || null,
+          tiene_anticipo: tieneAnticipo && anticipo > 0,
+          anticipo_monto: tieneAnticipo ? anticipo : 0,
+          anticipo_fecha: tieneAnticipo && anticipoFecha ? format(anticipoFecha, "yyyy-MM-dd") : null,
+        },
+        pagos: filasValidas.map((f) => ({ fecha: format(f.fecha!, "yyyy-MM-dd"), monto: parseFloat(f.monto), concepto: f.concepto || null })),
       };
-
-      if (existente) {
-        const { error } = await supabase
-          .from("proyecto_programacion_financiera")
-          .update(payload)
-          .eq("id", existente.id);
-        if (error) throw error;
-        programacionId = existente.id;
-      } else {
-        const { data: inserted, error } = await supabase
-          .from("proyecto_programacion_financiera")
-          .insert({ ...payload, created_by: user?.id })
-          .select("id")
-          .single();
-        if (error) throw error;
-        programacionId = inserted.id;
-      }
-
-      await supabase.from("proyecto_programacion_pagos").delete().eq("programacion_id", programacionId);
-
-      const filasAInsertar: any[] = [];
-      if (tieneAnticipo && anticipo > 0 && anticipoFecha) {
-        filasAInsertar.push({
-          programacion_id: programacionId,
-          proyecto_id: proyectoId,
-          fecha: format(anticipoFecha, "yyyy-MM-dd"),
-          monto: anticipo,
-          concepto: "Anticipo",
-          es_anticipo: true,
-          orden: -1,
-        });
-      }
-      filasValidas
-        .sort((a, b) => a.fecha!.getTime() - b.fecha!.getTime())
-        .forEach((f, i) => {
-          filasAInsertar.push({
-            programacion_id: programacionId,
-            proyecto_id: proyectoId,
-            fecha: format(f.fecha!, "yyyy-MM-dd"),
-            monto: parseFloat(f.monto),
-            concepto: f.concepto || null,
-            es_anticipo: false,
-            orden: i,
-          });
-        });
-
-      if (filasAInsertar.length > 0) {
-        const { error: insertError } = await supabase.from("proyecto_programacion_pagos").insert(filasAInsertar);
-        if (insertError) throw insertError;
-      }
-
-      if (user) {
-        await supabase.from("proyecto_auditoria").insert({
-          proyecto_id: proyectoId,
-          user_id: user.id,
-          accion: "programacion_financiera",
-          entidad_id: partida.id,
-          valor_nuevo: `${partida.partida} · ${frecuencia} · ${filasAInsertar.length} movimientos · ${formatCurrency(totalConAnticipo)}`,
-        });
-      }
+      await guardarProgramacionPartida(clave(solicitud), solicitud);
+      reiniciar();
 
       toast({ title: "Programación financiera guardada" });
       onOpenChange(false);
@@ -290,6 +231,7 @@ export function ProgramacionPartidaDialog({ open, onOpenChange, proyectoId, empr
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
+      guardandoRef.current = false;
       setSaving(false);
     }
   };

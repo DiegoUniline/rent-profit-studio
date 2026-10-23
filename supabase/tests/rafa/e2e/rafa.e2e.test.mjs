@@ -491,6 +491,7 @@ test("rechaza peticiones sin sesión válida", async () => {
 
 // ================================================================ CONVERSACIONES POR CENTRO
 const CN_OFICINA = "a1000000-0000-0000-0000-000000000002"; // Oficina Central (Empresa Uno)
+let archivoDelCentro = null;
 const ultimoUsuario = (body) => [...body.messages].reverse().find((m) => m.role === "user").content;
 
 test("conversación anclada a un centro: contexto automático, archivos guardados y reutilizados", async () => {
@@ -528,6 +529,7 @@ test("conversación anclada a un centro: contexto automático, archivos guardado
 
   const archivos = await rest(`rafa_archivos?conversacion_id=eq.${conv.id}&select=*`);
   assert.equal(archivos.length, 1);
+  archivoDelCentro = archivos[0];
   assert.equal(archivos[0].centro_negocio_id, CN_OFICINA);
   assert.equal(archivos[0].empresa_id, E1);
   assert.equal(archivos[0].nombre, "catálogo manzana 7.pdf");
@@ -542,7 +544,7 @@ test("conversación anclada a un centro: contexto automático, archivos guardado
     return fin("Revisé el catálogo.");
   });
   await chat("contador", "Revisa otra vez el catálogo", { conversacion_id: conv.id, archivos_guardados: [archivos[0].id] });
-  assert.match(sistemaVisto, /ARCHIVOS GUARDADOS EN ESTA CONVERSACIÓN: "catálogo manzana 7.pdf"/);
+  assert.match(sistemaVisto, /ARCHIVOS GUARDADOS \(de esta charla y de otras charlas del mismo centro\): "catálogo manzana 7.pdf" \(\d{4}-\d{2}-\d{2}; id=/);
   const parte = usuarioVisto.find((p) => p.type === "file");
   assert.equal(parte.file.filename, "catálogo manzana 7.pdf");
   assert.equal(parte.file.file_data, `data:application/pdf;base64,${pdf}`);
@@ -565,4 +567,143 @@ test("conversación nueva con centro elegido y consulta explícita de toda la em
   assert.equal(h.argumentos.centro_negocio_id, null, "null explícito = toda la empresa");
   assert.equal(h.argumentos.empresa_id, E1);
   assert.ok(h.resultado.tablas[0].filas.some((f) => f.centro !== "Oficina Central"));
+});
+
+// ================================================================ RESUMEN Y AVISO SEMANAL POR CENTRO
+test("resumen del centro: presupuesto, pagos de la semana, excesos y permisos", async () => {
+  const r = await llamar("contador", { modo: "resumen_centro", centro_negocio_id: CN_OFICINA });
+  assert.equal(r.status, 200, JSON.stringify(r.cuerpo));
+  const s = r.cuerpo;
+  assert.equal(s.centro.centro_nombre, "Oficina Central");
+  assert.match(s.semana.desde, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(new Date(`${s.semana.desde}T00:00:00Z`).getUTCDay(), 1, "la semana empieza en lunes");
+  // Mismo total que la base (pruebas anteriores ajustan la Renta): partidas activas del centro.
+  const suma = async (tipo) =>
+    (await rest(`presupuestos?centro_negocio_id=eq.${CN_OFICINA}&activo=eq.true&tipo_movimiento=eq.${tipo}&select=cantidad,precio_unitario`)).reduce(
+      (t, p) => t + Number(p.cantidad) * Number(p.precio_unitario),
+      0
+    );
+  assert.equal(s.presupuesto.egresos.presupuestado, Math.round((await suma("egreso")) * 100) / 100);
+  assert.equal(s.presupuesto.ingresos.presupuestado, Math.round((await suma("ingreso")) * 100) / 100);
+  assert.ok(s.presupuesto.egresos.presupuestado > 0 && s.presupuesto.ingresos.presupuestado > 0);
+  assert.ok(Array.isArray(s.pagos_semana.lista));
+  assert.ok(s.pagos_semana.lista.every((p) => p.fecha >= s.semana.desde && p.fecha <= s.semana.hasta));
+  assert.ok(Array.isArray(s.excesos_semana));
+  assert.equal(s.tareas_vencidas, null, "Oficina Central no tiene proyecto");
+  const sinRol = await llamar("usuario", { modo: "resumen_centro", centro_negocio_id: CN_OFICINA });
+  assert.equal(sinRol.status, 403);
+});
+
+test("aviso semanal: una vez por semana en la charla más reciente de cada centro", async () => {
+  const r1 = await llamar("contador", { modo: "avisos_semana" });
+  assert.equal(r1.status, 200, JSON.stringify(r1.cuerpo));
+  assert.ok(r1.cuerpo.generados >= 1, JSON.stringify(r1.cuerpo));
+  assert.deepEqual(r1.cuerpo.errores, []);
+  const [simultaneo1, simultaneo2] = await Promise.all([llamar("contador", { modo: "avisos_semana" }), llamar("contador", { modo: "avisos_semana" })]);
+  assert.equal(simultaneo1.cuerpo.generados + simultaneo2.cuerpo.generados, 0, "no se repite en la misma semana");
+  const avisos = await rest(`rafa_mensajes?user_id=eq.${USUARIOS.contador.id}&datos->>aviso_semana=eq.${r1.cuerpo.semana}&select=conversacion_id,contenido,datos`);
+  const deOficina = await rest(`rafa_conversaciones?user_id=eq.${USUARIOS.contador.id}&centro_negocio_id=eq.${CN_OFICINA}&select=id&order=updated_at.desc`);
+  const enOficina = avisos.filter((a) => deOficina.some((c) => c.id === a.conversacion_id));
+  assert.equal(enOficina.length, 1);
+  assert.match(enOficina[0].contenido, /Aviso semanal · Oficina Central/);
+  assert.equal(enOficina[0].datos.herramientas[0].nombre, "aviso_semanal");
+  assert.equal(await contar(`rafa_avisos?user_id=eq.${USUARIOS.contador.id}&centro_negocio_id=eq.${CN_OFICINA}&select=semana`), 1);
+  // Otro usuario sin conversaciones de centro: nada que avisar.
+  const ajeno = await llamar("admin", { modo: "avisos_semana" });
+  assert.equal(ajeno.status, 200);
+});
+
+test("Rafa abre por sí mismo un archivo guardado en otra charla del mismo centro", async () => {
+  assert.ok(archivoDelCentro, "depende de la prueba de archivos guardados");
+  let sistemaVisto = "";
+  let usuarioTrasAbrir = null;
+  guion(
+    (body) => {
+      sistemaVisto = sistema(body);
+      return usar("abrir_archivos", { archivo_ids: [archivoDelCentro.id] });
+    },
+    (body) => {
+      usuarioTrasAbrir = ultimoUsuario(body);
+      return fin("Leí el catálogo.");
+    }
+  );
+  const s = await chat("contador", "Revisa el catálogo que subí ayer", { centro_negocio_id: CN_OFICINA });
+  assert.notEqual(s.conversacion_id, archivoDelCentro.conversacion_id, "es otra charla del mismo centro");
+  assert.match(sistemaVisto, new RegExp(`"catálogo manzana 7.pdf" \\(\\d{4}-\\d{2}-\\d{2}, otra charla del centro; id=${archivoDelCentro.id}\\)`));
+  assert.equal(s.herramientas[0].resultado.ok, true, s.herramientas[0].resultado.resumen);
+  const parte = usuarioTrasAbrir.find((p) => p.type === "file");
+  assert.equal(parte.file.filename, "catálogo manzana 7.pdf");
+
+  // Otro usuario no puede abrirlo aunque conozca el id.
+  guion(usar("abrir_archivos", { archivo_ids: [archivoDelCentro.id] }), fin("No pude."));
+  const ajeno = await chat("admin", "Abre ese archivo", { centro_negocio_id: CN_OFICINA });
+  assert.equal(ajeno.herramientas[0].resultado.ok, false);
+  assert.match(ajeno.herramientas[0].resultado.resumen, /no es tuyo/);
+});
+
+// ================================================================ ACCIONES NUEVAS (con confirmación)
+async function proponerYConfirmar(rol, herramienta, args) {
+  guion(usar(herramienta, args), fin("Propuesta lista."));
+  const s = await chat(rol, `Prueba ${herramienta}`);
+  const r = resultado(s);
+  assert.equal(r.ok, true, r.resumen);
+  assert.equal(r.accion.estado, "propuesta", "no escribe hasta confirmar");
+  const c = await llamar(rol, { modo: "confirmar", accion_id: r.accion.id, huella: r.accion.huella });
+  assert.equal(c.status, 200, JSON.stringify(c.cuerpo));
+  assert.equal(c.cuerpo.accion.estado, "ejecutada", c.cuerpo.resumen);
+  return { propuesta: r, confirmacion: c.cuerpo };
+}
+
+test("acción: alta de tercero con RFC validado y sin duplicar", async () => {
+  await proponerYConfirmar("contador", "proponer_tercero", { empresa_id: E1, razon_social: "Constructora Prueba SA", rfc: "cpr010101ab1", tipo: "proveedor", email: "c@prueba.test" });
+  const [t] = await rest(`terceros?empresa_id=eq.${E1}&rfc=eq.CPR010101AB1&select=razon_social,tipo,email`);
+  assert.deepEqual(t, { razon_social: "Constructora Prueba SA", tipo: "proveedor", email: "c@prueba.test" });
+  guion(usar("proponer_tercero", { empresa_id: E1, razon_social: "Otra", rfc: "CPR010101AB1", tipo: "cliente" }), usar("proponer_tercero", { empresa_id: E1, razon_social: "Mal", rfc: "123", tipo: "cliente" }), fin());
+  const s = await chat("contador", "Otra vez");
+  assert.match(resultado(s, 0).resumen, /Ya existe el tercero "Constructora Prueba SA"/);
+  assert.match(resultado(s, 1).resumen, /no tiene formato válido/);
+  assert.equal(await contar(`terceros?empresa_id=eq.${E1}&rfc=eq.CPR010101AB1&select=id`), 1);
+});
+
+test("acción: cronograma de partida conserva lo no indicado y respeta permisos", async () => {
+  const [antes] = await rest(`presupuestos?id=eq.${PA}&select=fecha_inicio,fecha_fin,avance_manual`);
+  await proponerYConfirmar("contador", "proponer_cronograma_partida", { presupuesto_id: PA, avance_manual: 40, fecha_fin: "2027-03-31" });
+  const [despues] = await rest(`presupuestos?id=eq.${PA}&select=fecha_inicio,fecha_fin,avance_manual`);
+  assert.equal(Number(despues.avance_manual), 40);
+  assert.equal(despues.fecha_fin, "2027-03-31");
+  assert.equal(despues.fecha_inicio, antes.fecha_inicio);
+  guion(usar("proponer_cronograma_partida", { presupuesto_id: PA, avance_manual: 99 }), fin());
+  const sinPermiso = await chat("usuario", "Cambia el avance");
+  assert.equal(resultado(sinPermiso).ok, false);
+  assert.match(resultado(sinPermiso).resumen, /permiso/i);
+});
+
+test("acción: programación financiera de partida de proyecto (reparte lo que falta y reemplaza pagos)", async () => {
+  const { propuesta } = await proponerYConfirmar("contador", "proponer_programacion_financiera", {
+    presupuesto_id: PA, frecuencia: "mensual", fecha_inicio: "2026-12-01", numero_pagos: 4, anticipo_monto: 10000, anticipo_fecha: "2026-11-15",
+  });
+  const totalPropuesto = propuesta.accion.vista_previa.tablas[0].totales.monto;
+  const [prog] = await rest(`proyecto_programacion_financiera?presupuesto_id=eq.${PA}&select=id,frecuencia,numero_pagos,anticipo_monto`);
+  assert.equal(prog.frecuencia, "mensual");
+  assert.equal(Number(prog.anticipo_monto), 10000);
+  const pagos = await rest(`proyecto_programacion_pagos?programacion_id=eq.${prog.id}&select=fecha,monto,es_anticipo&order=orden`);
+  assert.equal(pagos.length, 5);
+  assert.equal(pagos[0].es_anticipo, true);
+  assert.equal(Math.round(pagos.reduce((t, p) => t + Number(p.monto), 0) * 100) / 100, totalPropuesto);
+  // Partida que no es de proyecto: se rechaza con explicación.
+  guion(usar("proponer_programacion_financiera", { presupuesto_id: PB, frecuencia: "mensual", fecha_inicio: "2026-12-01", numero_pagos: 2 }), fin());
+  const noProyecto = await chat("contador", "Programa la renta");
+  assert.match(resultado(noProyecto).resumen, /no pertenece a un proyecto activo/);
+});
+
+test("acción: accesos a proyecto solo por admin; dar y quitar", async () => {
+  const U2 = USUARIOS.usuario2.id;
+  await proponerYConfirmar("admin", "proponer_acceso_proyecto", { proyecto_id: P1, usuario: "usuario2", editar_cronograma: true });
+  const [acc] = await rest(`proyecto_usuarios?proyecto_id=eq.${P1}&user_id=eq.${U2}&select=editar_cronograma,ver_programacion_financiera`);
+  assert.deepEqual(acc, { editar_cronograma: true, ver_programacion_financiera: false });
+  await proponerYConfirmar("admin", "proponer_acceso_proyecto", { proyecto_id: P1, user_id: U2, quitar: true });
+  assert.equal(await contar(`proyecto_usuarios?proyecto_id=eq.${P1}&user_id=eq.${U2}&select=id`), 0);
+  guion(usar("proponer_acceso_proyecto", { proyecto_id: P1, usuario: "usuario2", editar_cronograma: true }), fin());
+  const contador = await chat("contador", "Dale acceso");
+  assert.equal(resultado(contador).ok, false);
 });

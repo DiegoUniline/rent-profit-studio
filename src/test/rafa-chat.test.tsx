@@ -81,7 +81,8 @@ describe("chat de Rafa", () => {
     tablas.rafa_mensajes = [{ id: "m-guardado", rol: "usuario", contenido: "Presupuesto de los lotes 52 al 66", datos: {}, version_conocimiento: "k", created_at: "2026-10-22T19:00:00Z" }];
     render(<MemoryRouter><RafaChat /></MemoryRouter>);
     await waitFor(() => expect(screen.getByText("Presupuesto de los lotes 52 al 66")).toBeInTheDocument());
-    expect(invoke).not.toHaveBeenCalled();
+    // Solo se piden los avisos de la semana; ningún mensaje se reenvía.
+    expect(invoke).not.toHaveBeenCalledWith("rafa-asistente", { body: expect.objectContaining({ modo: "chat" }) });
   });
 
   it("conserva el mensaje y la conversación si falla la lectura después de enviar", async () => {
@@ -286,6 +287,17 @@ describe("centros como proyectos (tipo ChatGPT)", () => {
   const MAQ = { razon_social: "Maq Rentable SA", nombre_comercial: "Maq Rentable" };
   const HUB = "c0000000-0000-0000-0000-000000000021";
   const SALINAS = "c0000000-0000-0000-0000-000000000025";
+  const RESUMEN = {
+    centro: { centro_id: HUB, centro_codigo: "CN021", centro_nombre: "MR Industrial Hub Pesqueria", empresa_nombre: "Maq Rentable", proyecto_id: "py", proyecto_nombre: "Hub" },
+    semana: { desde: "2026-10-19", hasta: "2026-10-25" },
+    generado: "2026-10-23",
+    presupuesto: { egresos: { presupuestado: 1000000, ejercido: 400000, por_ejercer: 600000 }, ingresos: { presupuestado: 0, ejercido: 0, por_ejercer: 0 }, partidas: 5, excedidas: [] },
+    pagos_semana: { egresos: 50000, ingresos: 0, lista: [{ id: "pr1", fecha: "2026-10-20", tipo: "egreso", monto: 50000, partida: "Pavimentos", tercero: null, observaciones: null }] },
+    excesos_semana: [{ presupuesto_id: "p9", partida: "Pavimentos", disponible_final: -2000 }],
+    sin_partida: { cantidad: 1, monto: 1500 },
+    tareas_vencidas: [{ id: "t1", titulo: "Revisar planos", vence: "2026-10-20", estado: "pendiente", responsable: null }],
+    avisos: [],
+  };
   const preparar = () => {
     tablas.centros_negocio = [
       { id: HUB, codigo: "CN021", nombre: "MR Industrial Hub Pesqueria", empresa_id: "e1", empresas: MAQ },
@@ -314,7 +326,11 @@ describe("centros como proyectos (tipo ChatGPT)", () => {
 
   it("clic en un centro abre su página con sus charlas en cuadros; escribir ahí crea una charla del centro", async () => {
     preparar();
-    invoke.mockResolvedValue({ data: { conversacion_id: "nueva-1", mensaje_id: "m1", contenido: "", version_conocimiento: "k" }, error: null });
+    invoke.mockImplementation(async (_f: string, { body }: { body: Record<string, unknown> }) => {
+      if (body.modo === "avisos_semana") return { data: { semana: "2026-10-19", generados: 0, errores: [] }, error: null };
+      if (body.modo === "resumen_centro") return { data: RESUMEN, error: null };
+      return { data: { conversacion_id: "nueva-1", mensaje_id: "m1", contenido: "", version_conocimiento: "k" }, error: null };
+    });
     const onCentroActual = vi.fn();
     render(<MemoryRouter><RafaChat onCentroActual={onCentroActual} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByTitle(/CN021 · MR Industrial Hub Pesqueria/)).toBeInTheDocument());
@@ -323,6 +339,11 @@ describe("centros como proyectos (tipo ChatGPT)", () => {
     await waitFor(() => expect(onCentroActual).toHaveBeenLastCalledWith(HUB));
     expect(screen.getByRole("heading", { name: "MR Industrial Hub Pesqueria" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Abrir charla Pagos de octubre" })).toBeInTheDocument();
+    // Resumen del centro arriba de las charlas.
+    await waitFor(() => expect(screen.getByLabelText("Resumen del centro")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: "Pavimentos" })).toHaveAttribute("href", "/presupuestos/p9/ejercido");
+    expect(screen.getByText("Revisar planos", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/1 sin partida/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Abrir charla Lotes manzana 7" })).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText(/Escribe a Rafa/), { target: { value: "¿Cómo vamos?" } });
