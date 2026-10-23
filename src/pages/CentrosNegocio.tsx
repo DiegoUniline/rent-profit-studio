@@ -19,8 +19,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FilterSelect } from "@/components/ui/filter-select";
-import { Briefcase, Plus, Edit, Power, Search, FolderKanban, MessageCircle } from "lucide-react";
+import { Briefcase, Plus, Edit, Search, FolderKanban, MessageCircle } from "lucide-react";
 import { CentroNegocioDialog } from "@/components/dialogs/CentroNegocioDialog";
+import { BotonBaja } from "@/components/BotonBaja";
 
 interface Empresa {
   id: string;
@@ -114,28 +115,6 @@ export default function CentrosNegocio() {
   useEffect(() => {
     fetchData();
   }, []);
-
-  const handleToggleActivo = async (centro: CentroNegocio) => {
-    const { error } = await supabase
-      .from("centros_negocio")
-      .update({ activo: !centro.activo })
-      .eq("id", centro.id);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el estado",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    toast({
-      title: centro.activo ? "Centro dado de baja" : "Centro reactivado",
-      description: `${centro.nombre} ha sido ${centro.activo ? "desactivado" : "activado"}`,
-    });
-    fetchData();
-  };
 
   const openNew = () => {
     setEditingCentro(null);
@@ -311,9 +290,7 @@ export default function CentrosNegocio() {
                           <Button variant="ghost" size="sm" onClick={() => openEdit(centro)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleToggleActivo(centro)}>
-                            <Power className="h-4 w-4" />
-                          </Button>
+                          <BotonBaja entidad="centro_negocio" id={centro.id} nombre={centro.nombre} activo={centro.activo} onCambio={fetchData} />
                         </TableCell>
                       )}
                     </TableRow>

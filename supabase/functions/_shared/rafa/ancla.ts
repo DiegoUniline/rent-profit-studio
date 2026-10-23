@@ -12,13 +12,15 @@ export interface AnclaConversacion {
   empresa_nombre: string;
   proyecto_id: string | null;
   proyecto_nombre: string | null;
+  /** false = el centro está dado de baja. */
+  activo?: boolean;
 }
 
 export async function cargarAncla(ctx: Contexto, centroId: string | null | undefined): Promise<AnclaConversacion | null> {
   if (!centroId) return null;
   const { data: centro } = await ctx.db
     .from("centros_negocio")
-    .select("id, codigo, nombre, empresa_id, empresas:empresa_id(razon_social, nombre_comercial)")
+    .select("id, codigo, nombre, empresa_id, activo, empresas:empresa_id(razon_social, nombre_comercial)")
     .eq("id", centroId)
     .maybeSingle();
   if (!centro?.empresa_id) return null;
@@ -36,6 +38,7 @@ export async function cargarAncla(ctx: Contexto, centroId: string | null | undef
     empresa_nombre: centro.empresas?.nombre_comercial || centro.empresas?.razon_social || "",
     proyecto_id: proyecto?.id ?? null,
     proyecto_nombre: proyecto?.nombre ?? null,
+    activo: centro.activo !== false,
   };
 }
 

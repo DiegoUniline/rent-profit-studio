@@ -28,3 +28,8 @@ Relaciones físicas (FK): presupuestos, asientos, programaciones y proyectos apu
 Pantalla `/centros-negocio` (`src/pages/CentrosNegocio.tsx`): alta/edición (`CentroNegocioDialog`), baja/reactivación (`activo`), y **Generar Project** (`handleGenerarProject`): si el centro no tiene proyecto, inserta `proyectos` con el mismo nombre y empresa; si ya existe, abre el existente. RLS de centros: lectura para todos los autenticados, escritura admin/contador, borrado admin.
 
 Rafa (`src/lib/rafa-apply.ts`) también puede crear un centro al aplicar un plan de presupuesto: calcula el siguiente código numérico de la empresa (máximo + 1 con relleno a 3 dígitos).
+
+
+## Baja de centros
+
+Dar de baja un centro (`cambiar_activo('centro_negocio', id, false, true)`) da de baja también sus partidas activas y su proyecto; `bajas_en_cascada` guarda cuáles para que reactivarlo restaure exactamente esos y no partidas que ya estaban dadas de baja por otro motivo. Las programaciones pendientes ligadas no se cancelan (Rafa lo advierte).

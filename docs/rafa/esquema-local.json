@@ -2070,6 +2070,69 @@
                 }
             ]
         },
+        "bajas_en_cascada": {
+            "rls": true,
+            "columnas": [
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "centro_negocio_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "text",
+                    "nombre": "entidad",
+                    "defecto": null
+                },
+                {
+                    "nulo": false,
+                    "tipo": "uuid",
+                    "nombre": "registro_id",
+                    "defecto": null
+                },
+                {
+                    "nulo": true,
+                    "tipo": "uuid",
+                    "nombre": "created_by",
+                    "defecto": "auth.uid()"
+                },
+                {
+                    "nulo": false,
+                    "tipo": "timestamp with time zone",
+                    "nombre": "created_at",
+                    "defecto": "now()"
+                }
+            ],
+            "triggers": [
+            ],
+            "politicas": [
+                {
+                    "check": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "roles": "authenticated",
+                    "using": "(has_role(auth.uid(), 'admin'::app_role) OR has_role(auth.uid(), 'contador'::app_role))",
+                    "nombre": "Contables gestionan bajas en cascada",
+                    "comando": "ALL"
+                }
+            ],
+            "restricciones": [
+                {
+                    "tipo": "CHECK",
+                    "nombre": "bajas_en_cascada_entidad_check",
+                    "definicion": "CHECK ((entidad = ANY (ARRAY['presupuesto'::text, 'proyecto'::text])))"
+                },
+                {
+                    "tipo": "FK",
+                    "nombre": "bajas_en_cascada_centro_negocio_id_fkey",
+                    "definicion": "FOREIGN KEY (centro_negocio_id) REFERENCES centros_negocio(id) ON DELETE CASCADE"
+                },
+                {
+                    "tipo": "PK",
+                    "nombre": "bajas_en_cascada_pkey",
+                    "definicion": "PRIMARY KEY (centro_negocio_id, entidad, registro_id)"
+                }
+            ]
+        },
         "rafa_ejecuciones": {
             "rls": true,
             "columnas": [
@@ -3633,6 +3696,11 @@
             "argumentos": ""
         },
         {
+            "nombre": "cambiar_activo",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_entidad text, p_id uuid, p_activo boolean, p_en_cascada boolean"
+        },
+        {
             "nombre": "cleanup_flujos_legacy_al_crear_programacion_propia",
             "seguridad": "SECURITY DEFINER",
             "argumentos": ""
@@ -3691,6 +3759,11 @@
             "nombre": "rafa_asignar_acceso_proyecto",
             "seguridad": "SECURITY INVOKER",
             "argumentos": "p_accion_id uuid, p_acceso jsonb"
+        },
+        {
+            "nombre": "rafa_cambiar_activo",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_cambio jsonb"
         },
         {
             "nombre": "rafa_cambiar_estado_programaciones",
@@ -3758,5 +3831,5 @@
             "argumentos": ""
         }
     ],
-    "migraciones_sha256": "8f0b5290171a0e86334f31e280fd6d4bf1ab10d67419d6bb0d6655c4cf7dc5c9"
+    "migraciones_sha256": "a9e7e8e4d07faac51fb4eef617643ef05031adaca5bdbadd22790ec1466a99af"
 }

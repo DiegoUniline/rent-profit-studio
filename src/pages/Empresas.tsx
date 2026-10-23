@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Building, Plus, Edit, Trash2, Search, Eye } from "lucide-react";
+import { BotonBaja } from "@/components/BotonBaja";
 import { z } from "zod";
 
 interface Empresa {
@@ -390,6 +391,9 @@ export default function Empresas() {
                           <Button variant="ghost" size="sm" onClick={() => openEdit(empresa)}>
                             <Edit className="h-4 w-4" />
                           </Button>
+                        )}
+                        {canEdit && (
+                          <BotonBaja entidad="empresa" id={empresa.id} nombre={empresa.razon_social} activo={empresa.activa} onCambio={fetchEmpresas} />
                         )}
                         {canDelete && (
                           <Button variant="ghost" size="sm" onClick={() => handleDelete(empresa)}>

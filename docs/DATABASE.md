@@ -197,6 +197,9 @@ Archivos que el usuario sube en una conversación con Rafa, clasificados por con
 | 9 | ruta | text | NO | — | UNIQUE (ruta en Storage) |
 | 10 | created_at | timestamptz | NO | now() | |
 
+#### `bajas_en_cascada`
+Registra qué partidas y proyecto se dieron de baja junto con un centro (`cambiar_activo` en cascada) para que reactivar el centro restaure exactamente esos. PK centro + entidad + registro. RLS: admin/contador.
+
 #### `rafa_avisos`, `asiento_guardados`, `programacion_partida_guardados`
 Tablas de control (sin datos de negocio): `rafa_avisos` (PK usuario + centro + semana) evita repetir el aviso semanal de Rafa; `asiento_guardados` y `programacion_partida_guardados` guardan el resultado de cada clave de operación de `guardar_asiento` y `guardar_programacion_partida` para que un reintento no repita el guardado. RLS: lectura propia.
 
