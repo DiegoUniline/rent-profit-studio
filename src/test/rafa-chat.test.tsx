@@ -13,6 +13,7 @@ vi.mock("@/integrations/supabase/client", () => {
       eq: () => q,
       in: () => q,
       order: () => q,
+      range: () => q,
       limit: () => Promise.resolve({ data: tablas[tabla] || [], error: errores[tabla] || null }),
       delete: () => q,
       then: (ok: (v: unknown) => void) => ok({ data: tablas[tabla] || [], error: null }),

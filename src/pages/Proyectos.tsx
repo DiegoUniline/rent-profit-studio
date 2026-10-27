@@ -20,7 +20,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { formatCurrency } from "@/lib/accounting-utils";
 import { calcularEjercidoPorPartida, calcularMontoPresupuestado, agregarFinanciero } from "@/lib/project-utils";
 import { FolderKanban, Search } from "lucide-react";
-import { traerTodo } from "@/lib/traer-todo";
+import { traerPorBloques, traerTodo } from "@/lib/traer-todo";
 
 interface ProyectoRow {
   id: string;
@@ -69,15 +69,17 @@ export default function Proyectos() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data: empresasData } = await supabase.from("empresas").select("id, razon_social").eq("activa", true);
+      const { data: empresasData } = await traerTodo((d, h) => supabase.from("empresas").select("id, razon_social").eq("activa", true).order("id").range(d, h));
       setEmpresas(empresasData || []);
 
       // RLS ya restringe esta consulta a los Projects autorizados para el usuario actual.
-      const { data: proyectosData, error: proyectosError } = await supabase
+      const { data: proyectosData, error: proyectosError } = await traerTodo((d, h) => supabase
         .from("proyectos")
         .select("id, nombre, centro_negocio_id, empresas(razon_social), centros_negocio(codigo, nombre)")
         .eq("activo", true)
-        .order("nombre");
+        .order("nombre")
+        .order("id")
+        .range(d, h));
       if (proyectosError) throw proyectosError;
       setProyectos((proyectosData || []) as any);
 
@@ -88,13 +90,13 @@ export default function Proyectos() {
         return;
       }
 
-      const { data: partidasData, error: partidasError } = await traerTodo((d, h) =>
+      const { data: partidasData, error: partidasError } = await traerPorBloques(centroIds, (b, d, h) =>
         supabase
           .from("presupuestos")
           .select("id, centro_negocio_id, cantidad, precio_unitario, fecha_inicio, fecha_fin, responsable:terceros!presupuestos_responsable_tercero_id_fkey(razon_social)")
           .eq("es_project", true)
           .eq("activo", true)
-          .in("centro_negocio_id", centroIds)
+          .in("centro_negocio_id", b)
           .order("id")
           .range(d, h)
       );
@@ -103,10 +105,14 @@ export default function Proyectos() {
 
       const partidaIds = (partidasData || []).map((p: any) => p.id);
       if (partidaIds.length > 0) {
-        const { data: movData } = await supabase
-          .from("asiento_movimientos")
-          .select("id, asiento_id, cuenta_id, debe, haber, partida, orden, presupuesto_id, asientos_contables:asiento_id(id, fecha, estado, tipo, empresa_id)")
-          .in("presupuesto_id", partidaIds);
+        const { data: movData } = await traerPorBloques(partidaIds, (b, d, h) =>
+          supabase
+            .from("asiento_movimientos")
+            .select("id, asiento_id, cuenta_id, debe, haber, partida, orden, presupuesto_id, asientos_contables:asiento_id(id, fecha, estado, tipo, empresa_id)")
+            .in("presupuesto_id", b)
+            .order("id")
+            .range(d, h)
+        );
 
         const movs: any[] = [];
         const asientosMap = new Map();

@@ -1,7 +1,7 @@
 import type { Herramienta, ResultadoHerramienta } from "../tipos.ts";
 import { s } from "../validacion.ts";
 import { ROLES_CONTABLES, exigirContable } from "../permisos.ts";
-import { enlaces, leerProyecto, ref, resolverEmpresa, exigirMismaEmpresa } from "../datos.ts";
+import { enlaces, leerProyecto, leerTodo, ref, resolverEmpresa, exigirMismaEmpresa } from "../datos.ts";
 import {
   DESCRIPCION_METODO,
   type MetodoEjercido,
@@ -556,15 +556,17 @@ export const flujoProyectadoTool: Herramienta<FiltroBase & { tipo_movimiento?: s
     const flujos = await leerFlujosLegacy(ctx, noProject);
     const propias = await leerProgramacionPropia(ctx, partidas);
     const proy = proyectadoPorPartida(partidas, flujos, propias, { desde: e.desde, hasta: e.hasta });
-    const { data: iva, error } = await ctx.db
-      .from("flujos_programados")
-      .select("fecha, monto, tipo")
-      .eq("empresa_id", empresa.id)
-      .eq("auto_generado", true)
-      .gte("fecha", e.desde)
-      .lte("fecha", e.hasta)
-      .limit(5000);
-    if (error) throw new Error(error.message);
+    // .limit(5000) no sirve: PostgREST corta en 1000 filas. Se pagina.
+    const { filas: iva } = await leerTodo<any>(() =>
+      ctx.db
+        .from("flujos_programados")
+        .select("fecha, monto, tipo")
+        .eq("empresa_id", empresa.id)
+        .eq("auto_generado", true)
+        .gte("fecha", e.desde)
+        .lte("fecha", e.hasta)
+        .order("id")
+    );
     const { programaciones } = await leerProgramaciones(ctx, { empresaId: empresa.id, desde: e.desde, hasta: e.hasta, estados: ["pendiente"], centroId: centroId || undefined });
 
     const meses = new Map<string, { mes: string; proyectado_ingresos: number; proyectado_egresos: number; iva_ingresos: number; iva_egresos: number; tesoreria_ingresos: number; tesoreria_egresos: number }>();

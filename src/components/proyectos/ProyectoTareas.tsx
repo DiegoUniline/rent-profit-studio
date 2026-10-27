@@ -28,6 +28,7 @@ import { TareaDialog, type Tarea } from "@/components/dialogs/TareaDialog";
 import { TareaKanban } from "@/components/proyectos/TareaKanban";
 import { ESTADO_BADGE_CLASS, ESTADO_LABELS, isTareaVencida, type TareaEstado } from "@/lib/tarea-utils";
 import { ListChecks, LayoutGrid, List, Plus, Pencil, Trash2 } from "lucide-react";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface TareaConResponsable extends Tarea {
   responsable?: { razon_social: string } | null;
@@ -57,11 +58,13 @@ export function ProyectoTareas({ proyectoId, empresaId, canEdit }: Props) {
 
   const fetchTareas = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await traerTodo((d, h) => supabase
       .from("proyecto_tareas")
       .select("*, responsable:responsable_tercero_id(razon_social)")
       .eq("proyecto_id", proyectoId)
-      .order("orden");
+      .order("orden")
+      .order("id")
+      .range(d, h));
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {

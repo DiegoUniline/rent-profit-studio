@@ -7,6 +7,7 @@ import {
   empresasVisibles,
   enlaces,
   leerProyecto,
+  leerTodo,
   ref,
   resolverEmpresa,
 } from "../datos.ts";
@@ -352,10 +353,10 @@ async function detalle(ctx: Contexto, entidad: EntidadDetalle, id: string): Prom
       return { ok: true, tipo: "consulta", resumen: `Tarea "${tarea.titulo}" (${tarea.estado}) del proyecto ${proyecto.nombre}.`, datos: { tarea, proyecto }, referencias };
     }
     const centro = await consultar<any>(ctx.db.from("centros_negocio").select("id, codigo, nombre").eq("id", proyecto.centro_negocio_id).maybeSingle());
-    const partidas = await consultar<any[]>(
-      ctx.db.from("presupuestos").select("id, partida, es_project, activo").eq("empresa_id", proyecto.empresa_id).eq("centro_negocio_id", proyecto.centro_negocio_id)
+    const { filas: partidas } = await leerTodo<any>(() =>
+      ctx.db.from("presupuestos").select("id, partida, es_project, activo").eq("empresa_id", proyecto.empresa_id).eq("centro_negocio_id", proyecto.centro_negocio_id).order("id")
     );
-    const tareas = await consultar<any[]>(ctx.db.from("proyecto_tareas").select("id, estado").eq("proyecto_id", proyecto.id));
+    const { filas: tareas } = await leerTodo<any>(() => ctx.db.from("proyecto_tareas").select("id, estado").eq("proyecto_id", proyecto.id).order("id"));
     const porEstado: Record<string, number> = {};
     (tareas || []).forEach((t) => (porEstado[t.estado] = (porEstado[t.estado] || 0) + 1));
     return {

@@ -2,6 +2,7 @@
 // chat/confirmar/cancelar) y lee las conversaciones propias (RLS).
 import { supabase } from "@/integrations/supabase/client";
 import type { PlanRafa } from "@/lib/rafa-types";
+import { traerPorBloques, traerTodo } from "@/lib/traer-todo";
 
 export interface ColumnaTablaRafa {
   clave: string;
@@ -236,7 +237,7 @@ export async function listarConversaciones(): Promise<ConversacionRafa[]> {
 /** Centros activos para anclar conversaciones. */
 /** Centros activos; con soloBajas, los dados de baja. */
 export async function listarCentros(soloBajas = false): Promise<CentroRafa[]> {
-  const { data, error } = await supabase.from("centros_negocio").select(COLUMNAS_CENTRO).eq("activo", !soloBajas).order("nombre");
+  const { data, error } = await traerTodo((d, h) => supabase.from("centros_negocio").select(COLUMNAS_CENTRO).eq("activo", !soloBajas).order("nombre").order("id").range(d, h));
   if (error) throw error;
   return (data || []) as unknown as CentroRafa[];
 }
@@ -283,11 +284,13 @@ export async function asignarCentro(conversacionId: string, centroId: string | n
 }
 
 export async function listarArchivos(conversacionId: string): Promise<ArchivoRafa[]> {
-  const { data, error } = await supabase
+  const { data, error } = await traerTodo((d, h) => supabase
     .from("rafa_archivos")
     .select("id, conversacion_id, nombre, mime, tamano, ruta, created_at")
     .eq("conversacion_id", conversacionId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("id")
+    .range(d, h));
   if (error) throw error;
   return (data || []) as ArchivoRafa[];
 }
@@ -312,10 +315,14 @@ export async function cargarMensajes(conversacionId: string): Promise<MensajeRaf
 /** Estado más reciente de las acciones mostradas (pueden haberse confirmado en otra pestaña). */
 export async function estadoAcciones(ids: string[]): Promise<Map<string, AccionRafa>> {
   if (ids.length === 0) return new Map();
-  const { data } = await supabase
-    .from("rafa_acciones")
-    .select("id, estado, herramienta, descripcion, requiere_confirmacion, huella, vista_previa, expira_at, resultado, error")
-    .in("id", ids);
+  const { data } = await traerPorBloques(ids, (b, d, h) =>
+    supabase
+      .from("rafa_acciones")
+      .select("id, estado, herramienta, descripcion, requiere_confirmacion, huella, vista_previa, expira_at, resultado, error")
+      .in("id", b)
+      .order("id")
+      .range(d, h)
+  );
   return new Map(((data || []) as unknown as AccionRafa[]).map((a) => [a.id, a]));
 }
 

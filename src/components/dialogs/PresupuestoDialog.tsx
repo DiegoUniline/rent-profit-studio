@@ -36,6 +36,7 @@ import { UnidadMedidaDialog } from "./UnidadMedidaDialog";
 import { ProgramacionPartidaDialog } from "./ProgramacionPartidaDialog";
 import { Plus, Trash2, Copy, Wand2, ExternalLink } from "lucide-react";
 import { flujosParaGuardar, firmaSolicitud, guardarPresupuesto, type SolicitudGuardado } from "@/lib/presupuesto-guardado";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -220,11 +221,13 @@ export function PresupuestoDialog({
   }, [open, presupuesto]);
 
   const loadFlujoRows = async (presupuestoId: string) => {
-    const { data, error } = await supabase
+    const { data, error } = await traerTodo((d, h) => supabase
       .from("flujos_programados")
       .select("*")
       .eq("presupuesto_id", presupuestoId)
-      .order("fecha", { ascending: true });
+      .order("fecha", { ascending: true })
+      .order("id")
+      .range(d, h));
 
     if (error) {
       toast({ title: "No se pudieron cargar los pagos programados", description: error.message, variant: "destructive" });
@@ -284,11 +287,13 @@ export function PresupuestoDialog({
         return;
       }
       setProgramacionProyectoActiva(true);
-      const { data: pagos } = await supabase
+      const { data: pagos } = await traerTodo((d, h) => supabase
         .from("proyecto_programacion_pagos")
         .select("monto")
         .eq("programacion_id", programacion.id)
-        .eq("proyecto_id", proyecto.id);
+        .eq("proyecto_id", proyecto.id)
+        .order("id")
+        .range(d, h));
       if (activo) setProgramadoPartida((pagos || []).reduce((s, p) => s + Number(p.monto), 0));
     })();
     return () => {
@@ -311,37 +316,45 @@ export function PresupuestoDialog({
       return;
     }
     setProgramacionProyectoActiva(true);
-    const { data: pagos } = await supabase
+    const { data: pagos } = await traerTodo((d, h) => supabase
       .from("proyecto_programacion_pagos")
       .select("monto")
       .eq("programacion_id", programacion.id)
-      .eq("proyecto_id", proyectoDePartida.id);
+      .eq("proyecto_id", proyectoDePartida.id)
+      .order("id")
+      .range(d, h));
     setProgramadoPartida((pagos || []).reduce((s, p) => s + Number(p.monto), 0));
   };
 
   const loadEmpresas = async () => {
-    const { data } = await supabase
+    const { data } = await traerTodo((d, h) => supabase
       .from("empresas")
       .select("id, razon_social")
       .eq("activa", true)
-      .order("razon_social");
+      .order("razon_social")
+      .order("id")
+      .range(d, h));
     if (data) setAllEmpresas(data);
   };
 
   const loadRelatedData = async (empresaId: string) => {
     const [cuentasRes, centrosRes] = await Promise.all([
-      supabase
+      traerTodo((d, h) => supabase
         .from("cuentas_contables")
         .select("id, codigo, nombre, empresa_id")
         .eq("empresa_id", empresaId)
         .eq("activa", true)
-        .order("codigo"),
-      supabase
+        .order("codigo")
+        .order("id")
+        .range(d, h)),
+      traerTodo((d, h) => supabase
         .from("centros_negocio")
         .select("id, codigo, nombre, empresa_id")
         .eq("empresa_id", empresaId)
         .eq("activo", true)
-        .order("nombre"),
+        .order("nombre")
+        .order("id")
+        .range(d, h)),
     ]);
 
     if (cuentasRes.data) setCuentas(cuentasRes.data);
@@ -349,11 +362,13 @@ export function PresupuestoDialog({
   };
 
   const loadUnidades = async () => {
-    const { data } = await supabase
+    const { data } = await traerTodo((d, h) => supabase
       .from("unidades_medida")
       .select("*")
       .eq("activa", true)
-      .order("codigo");
+      .order("codigo")
+      .order("id")
+      .range(d, h));
     if (data) setUnidades(data);
   };
 

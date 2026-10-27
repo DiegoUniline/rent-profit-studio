@@ -25,6 +25,7 @@ import {
   claseTipoMovimiento,
 } from "@/lib/tipo-movimiento";
 import { cn } from "@/lib/utils";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Tercero {
   id: string;
@@ -84,12 +85,14 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
   }, [open, partida]);
 
   const loadTerceros = async (empresaId: string) => {
-    const { data } = await supabase
+    const { data } = await traerTodo((d, h) => supabase
       .from("terceros")
       .select("id, razon_social")
       .eq("empresa_id", empresaId)
       .eq("activo", true)
-      .order("razon_social");
+      .order("razon_social")
+      .order("id")
+      .range(d, h));
     if (data) setTerceros(data);
   };
 
@@ -105,10 +108,12 @@ export function ProyectoPartidaSeguimientoDialog({ open, onOpenChange, partida, 
       setProgramado(0);
       return;
     }
-    const { data: pagos } = await supabase
+    const { data: pagos } = await traerTodo((d, h) => supabase
       .from("proyecto_programacion_pagos")
       .select("monto")
-      .eq("programacion_id", prog.id);
+      .eq("programacion_id", prog.id)
+      .order("id")
+      .range(d, h));
     setProgramado((pagos || []).reduce((s, p) => s + Number(p.monto), 0));
   };
 

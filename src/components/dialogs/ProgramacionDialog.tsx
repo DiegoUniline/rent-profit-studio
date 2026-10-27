@@ -111,9 +111,9 @@ export function ProgramacionDialog({
 
   const fetchCatalogs = async () => {
     const [empresasRes, centrosRes, tercerosRes, presupuestosRes] = await Promise.all([
-      supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social"),
-      supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("activo", true).order("codigo"),
-      supabase.from("terceros").select("id, razon_social, empresa_id").eq("activo", true).order("razon_social"),
+      traerTodo((d, h) => supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social").order("id").range(d, h)),
+      traerTodo((d, h) => supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("activo", true).order("codigo").order("id").range(d, h)),
+      traerTodo((d, h) => supabase.from("terceros").select("id, razon_social, empresa_id").eq("activo", true).order("razon_social").order("id").range(d, h)),
       traerTodo((d, h) =>
         supabase.from("presupuestos").select("id, partida, empresa_id, centro_negocio_id, cantidad, precio_unitario").eq("activo", true).order("partida").order("id").range(d, h)
       ),

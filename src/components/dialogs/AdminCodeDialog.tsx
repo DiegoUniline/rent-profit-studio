@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, ShieldAlert, Loader2 } from "lucide-react";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface AdminCodeDialogProps {
   open: boolean;
@@ -49,18 +50,22 @@ export function AdminCodeDialog({
 
     try {
       // Query profiles of admins with matching access code
-      const { data: adminProfiles, error } = await supabase
+      const { data: adminProfiles, error } = await traerTodo((d, h) => supabase
         .from("profiles")
         .select("user_id, codigo_acceso")
-        .not("codigo_acceso", "is", null);
+        .not("codigo_acceso", "is", null)
+        .order("id")
+        .range(d, h));
 
       if (error) throw error;
 
       // Get admin user_ids
-      const { data: adminRoles } = await supabase
+      const { data: adminRoles } = await traerTodo((d, h) => supabase
         .from("user_roles")
         .select("user_id")
-        .eq("role", "admin");
+        .eq("role", "admin")
+        .order("id")
+        .range(d, h));
 
       const adminUserIds = new Set(adminRoles?.map((r) => r.user_id) || []);
 

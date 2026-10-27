@@ -279,11 +279,13 @@ export default function Presupuestos() {
             .order("id", { ascending: true })
             .range(d, h)
         ),
-        supabase
+        traerTodo((d, h) => supabase
           .from("empresas")
           .select("id, razon_social")
           .eq("activa", true)
-          .order("razon_social"),
+          .order("razon_social")
+          .order("id")
+          .range(d, h)),
       ]);
 
       if (presupuestosRes.error) throw presupuestosRes.error;
@@ -308,6 +310,7 @@ export default function Presupuestos() {
             cuentas_contables(codigo)
           `)
           .not("presupuesto_id", "is", null)
+          .order("id")
           .range(from, from + PAGE_SIZE - 1);
 
         if (movError) throw movError;

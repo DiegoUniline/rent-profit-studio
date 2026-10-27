@@ -22,6 +22,7 @@ vi.mock("@/integrations/supabase/client", () => {
       eq: () => q,
       in: () => q,
       order: () => q,
+      range: () => q,
       limit: resultado,
       maybeSingle: () => Promise.resolve({ data: null, error: null }),
       insert: () => (escrituras.push(`insert:${tabla}`), q),

@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmpresaDialog } from "./EmpresaDialog";
 import { Tercero } from "@/pages/Terceros";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -131,11 +132,13 @@ export function TerceroDialog({
   }, [open, tercero]);
 
   const loadEmpresas = async () => {
-    const { data } = await supabase
+    const { data } = await traerTodo((d, h) => supabase
       .from("empresas")
       .select("id, razon_social")
       .eq("activa", true)
-      .order("razon_social");
+      .order("razon_social")
+      .order("id")
+      .range(d, h));
     if (data) setAllEmpresas(data);
   };
 

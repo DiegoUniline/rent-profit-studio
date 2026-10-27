@@ -21,6 +21,7 @@ import { BookOpen, Plus, Edit, Trash2, Search, Eye } from "lucide-react";
 import { BotonBaja } from "@/components/BotonBaja";
 import { CuentaDialog } from "@/components/dialogs/CuentaDialog";
 import { formatCurrency } from "@/lib/accounting-utils";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -115,6 +116,7 @@ export default function Cuentas() {
         const { data, error } = await supabase
           .from("asiento_movimientos")
           .select("cuenta_id, debe, haber, asiento_id")
+          .order("id")
           .range(from, from + PAGE_SIZE - 1);
         if (error) return { data: null, error };
         allData = allData.concat(data || []);
@@ -125,11 +127,13 @@ export default function Cuentas() {
     };
 
     const [cuentasRes, empresasRes, movimientosRes, asientosRes] = await Promise.all([
-      supabase
+      traerTodo((d, h) => supabase
         .from("cuentas_contables")
         .select("*, empresas(id, razon_social)")
-        .order("codigo"),
-      supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social"),
+        .order("codigo")
+        .order("id")
+        .range(d, h)),
+      traerTodo((d, h) => supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social").order("id").range(d, h)),
       fetchAllMovimientos(),
       (async () => {
         const PAGE_SIZE = 1000;
@@ -141,6 +145,7 @@ export default function Cuentas() {
             .from("asientos_contables")
             .select("id, estado")
             .eq("estado", "aplicado")
+            .order("id")
             .range(from, from + PAGE_SIZE - 1);
           if (error) return { data: null, error };
           allData = allData.concat(data || []);

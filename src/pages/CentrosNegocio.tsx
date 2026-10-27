@@ -22,6 +22,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { Briefcase, Plus, Edit, Search, FolderKanban, MessageCircle } from "lucide-react";
 import { CentroNegocioDialog } from "@/components/dialogs/CentroNegocioDialog";
 import { BotonBaja } from "@/components/BotonBaja";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -78,15 +79,19 @@ export default function CentrosNegocio() {
     setLoading(true);
     
     const [centrosRes, empresasRes] = await Promise.all([
-      supabase
+      traerTodo((d, h) => supabase
         .from("centros_negocio")
         .select("*, empresas(id, razon_social)")
-        .order("codigo"),
-      supabase
+        .order("codigo")
+        .order("id")
+        .range(d, h)),
+      traerTodo((d, h) => supabase
         .from("empresas")
         .select("id, razon_social")
         .eq("activa", true)
-        .order("razon_social"),
+        .order("razon_social")
+        .order("id")
+        .range(d, h)),
     ]);
 
     if (centrosRes.error) {

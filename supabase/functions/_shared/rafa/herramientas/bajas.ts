@@ -6,7 +6,7 @@
 import type { Herramienta } from "../tipos.ts";
 import { s } from "../validacion.ts";
 import { ROLES_CONTABLES, ErrorPermiso, exigirContable } from "../permisos.ts";
-import { enlaces, ref } from "../datos.ts";
+import { enlaces, leerTodo, ref } from "../datos.ts";
 import { type Preparacion, proponerAccion, registrarAccion } from "../acciones.ts";
 import { calcularMontoPresupuestado } from "../../negocio/calculos.ts";
 import { moneda, r2 } from "./util.ts";
@@ -51,7 +51,7 @@ async function prepararBaja(ctx: any, e: EntradaBaja): Promise<Preparacion> {
 
   if (e.entidad === "centro_negocio") {
     if (!nuevo) {
-      const { data: partidas } = await ctx.db.from("presupuestos").select("id, cantidad, precio_unitario").eq("centro_negocio_id", r.id).eq("activo", true);
+      const { filas: partidas } = await leerTodo<any>(() => ctx.db.from("presupuestos").select("id, cantidad, precio_unitario").eq("centro_negocio_id", r.id).eq("activo", true).order("id"));
       const { data: proyecto } = await ctx.db.from("proyectos").select("id, nombre, activo").eq("centro_negocio_id", r.id).maybeSingle();
       const total = r2((partidas || []).reduce((t: number, p: any) => t + calcularMontoPresupuestado(p.cantidad, p.precio_unitario), 0));
       if (cascada) {
@@ -61,7 +61,7 @@ async function prepararBaja(ctx: any, e: EntradaBaja): Promise<Preparacion> {
       } else if ((partidas || []).length) advertencias.push(`Sus ${(partidas || []).length} partidas activas (${moneda(total)}) seguirán activas.`);
       huellaExtra = { partidas: (partidas || []).map((p: any) => p.id).sort(), proyecto: proyecto?.activo ?? null };
     } else if (cascada) {
-      const { data: guardadas } = await ctx.db.from("bajas_en_cascada").select("entidad, registro_id").eq("centro_negocio_id", r.id);
+      const { filas: guardadas } = await leerTodo<any>(() => ctx.db.from("bajas_en_cascada").select("entidad, registro_id").eq("centro_negocio_id", r.id).order("registro_id"));
       const np = (guardadas || []).filter((g: any) => g.entidad === "presupuesto").length;
       const nq = (guardadas || []).filter((g: any) => g.entidad === "proyecto").length;
       if (np || nq) filas.push({ registro: `${np} partida(s) y ${nq} proyecto(s) dados de baja con el centro`, antes: "Baja", despues: "Activos" });

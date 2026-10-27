@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmpresaDialog } from "./EmpresaDialog";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -110,11 +111,13 @@ export function CentroNegocioDialog({
   }, [open, centro]);
 
   const loadEmpresas = async () => {
-    const { data } = await supabase
+    const { data } = await traerTodo((d, h) => supabase
       .from("empresas")
       .select("id, razon_social")
       .eq("activa", true)
-      .order("razon_social");
+      .order("razon_social")
+      .order("id")
+      .range(d, h));
     if (data) setAllEmpresas(data);
   };
 

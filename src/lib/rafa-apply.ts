@@ -87,6 +87,7 @@ export async function aplicarPlanRafa(p: PropuestaEditable, operacion: string = 
         .select("id, partida")
         .eq("centro_negocio_id", centroId)
         .eq("activo", true)
+        .order("id")
         .range(desde, desde + 999);
       if (error) throw new Error(`No se pudieron revisar los repetidos: ${error.message}`);
       (data || []).forEach((r) => {

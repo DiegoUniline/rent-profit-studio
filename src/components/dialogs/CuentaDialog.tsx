@@ -24,6 +24,7 @@ import { z } from "zod";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmpresaDialog } from "./EmpresaDialog";
 import { formatCurrency } from "@/lib/accounting-utils";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -167,31 +168,37 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
   }, [form.empresa_id]);
 
   const loadEmpresas = async () => {
-    const { data } = await supabase
+    const { data } = await traerTodo((d, h) => supabase
       .from("empresas")
       .select("id, razon_social")
       .eq("activa", true)
-      .order("razon_social");
+      .order("razon_social")
+      .order("id")
+      .range(d, h));
     if (data) setAllEmpresas(data);
   };
 
   const loadCuentas = async (empresaId: string) => {
-    const { data } = await supabase
+    const { data } = await traerTodo((d, h) => supabase
       .from("cuentas_contables")
       .select("*")
       .eq("empresa_id", empresaId)
       .eq("clasificacion", "titulo")
-      .order("codigo");
+      .order("codigo")
+      .order("id")
+      .range(d, h));
     
     if (data) {
       setCuentasPadre(data as CuentaContable[]);
     }
 
     // Also load all accounts for code suggestion
-    const { data: allData } = await supabase
+    const { data: allData } = await traerTodo((d, h) => supabase
       .from("cuentas_contables")
       .select("codigo")
-      .eq("empresa_id", empresaId);
+      .eq("empresa_id", empresaId)
+      .order("id")
+      .range(d, h));
     
     if (allData) {
       setAllCuentas(allData as CuentaContable[]);
@@ -216,6 +223,7 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
         .from("asiento_movimientos")
         .select("debe, haber, asiento_id")
         .eq("cuenta_id", cuentaId)
+        .order("id")
         .range(from, from + PAGE_SIZE - 1);
 
       if (error) break;
@@ -238,6 +246,7 @@ export function CuentaDialog({ open, onOpenChange, cuenta, empresas, defaultEmpr
         .from("asientos_contables")
         .select("id")
         .eq("estado", "aplicado")
+        .order("id")
         .range(from, from + PAGE_SIZE - 1);
 
       if (error) break;

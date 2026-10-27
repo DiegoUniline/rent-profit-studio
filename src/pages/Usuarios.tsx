@@ -19,6 +19,7 @@ import {
 import { Users, Edit, Plus, Search } from "lucide-react";
 import { NuevoUsuarioDialog } from "@/components/dialogs/NuevoUsuarioDialog";
 import { EditUsuarioDialog } from "@/components/dialogs/EditUsuarioDialog";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface UserWithRole {
   id: string;
@@ -57,10 +58,12 @@ export default function Usuarios() {
   const fetchUsers = async () => {
     setLoading(true);
     
-    const { data: profiles, error: profilesError } = await supabase
+    const { data: profiles, error: profilesError } = await traerTodo((d, h) => supabase
       .from("profiles")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(d, h));
 
     if (profilesError) {
       toast({
@@ -72,9 +75,11 @@ export default function Usuarios() {
       return;
     }
 
-    const { data: roles, error: rolesError } = await supabase
+    const { data: roles, error: rolesError } = await traerTodo((d, h) => supabase
       .from("user_roles")
-      .select("*");
+      .select("*")
+      .order("id")
+      .range(d, h));
 
     if (rolesError) {
       toast({

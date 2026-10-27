@@ -175,11 +175,13 @@ export default function AsientoDetalle() {
           }
 
           // Load movimientos
-          const { data: movimientosData } = await supabase
+          const { data: movimientosData } = await traerTodo((d, h) => supabase
             .from("asiento_movimientos")
             .select("*, cuentas_contables(codigo, nombre)")
             .eq("asiento_id", asientoId)
-            .order("orden");
+            .order("orden")
+            .order("id")
+            .range(d, h));
 
           if (movimientosData) {
             setMovimientos(
@@ -225,34 +227,42 @@ export default function AsientoDetalle() {
   }, [form.empresa_id]);
 
   const loadEmpresas = async () => {
-    const { data } = await supabase
+    const { data } = await traerTodo((d, h) => supabase
       .from("empresas")
       .select("id, razon_social")
       .eq("activa", true)
-      .order("razon_social");
+      .order("razon_social")
+      .order("id")
+      .range(d, h));
     if (data) setEmpresas(data);
   };
 
   const loadRelatedData = async (empresaId: string) => {
     const [cuentasRes, tercerosRes, centrosRes, presupuestosRes] = await Promise.all([
-      supabase
+      traerTodo((d, h) => supabase
         .from("cuentas_contables")
         .select("id, codigo, nombre, empresa_id")
         .eq("empresa_id", empresaId)
         .eq("activa", true)
-        .order("codigo"),
-      supabase
+        .order("codigo")
+        .order("id")
+        .range(d, h)),
+      traerTodo((d, h) => supabase
         .from("terceros")
         .select("id, razon_social, rfc, empresa_id")
         .eq("empresa_id", empresaId)
         .eq("activo", true)
-        .order("razon_social"),
-      supabase
+        .order("razon_social")
+        .order("id")
+        .range(d, h)),
+      traerTodo((d, h) => supabase
         .from("centros_negocio")
         .select("id, codigo, nombre, empresa_id")
         .eq("empresa_id", empresaId)
         .eq("activo", true)
-        .order("nombre"),
+        .order("nombre")
+        .order("id")
+        .range(d, h)),
       traerTodo((d, h) =>
         supabase
           .from("presupuestos")

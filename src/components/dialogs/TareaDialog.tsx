@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { Check, Trash2 } from "lucide-react";
 import type { TareaEstado } from "@/lib/tarea-utils";
 import { ESTADO_LABELS, PALETA_COLORES } from "@/lib/tarea-utils";
+import { traerTodo } from "@/lib/traer-todo";
 
 export interface Tarea {
   id: string;
@@ -65,13 +66,16 @@ export function TareaDialog({ open, onOpenChange, proyectoId, empresaId, tarea, 
 
   useEffect(() => {
     if (open) {
-      supabase
-        .from("terceros")
-        .select("id, razon_social")
-        .eq("empresa_id", empresaId)
-        .eq("activo", true)
-        .order("razon_social")
-        .then(({ data }) => setTerceros(data || []));
+      traerTodo((d, h) =>
+        supabase
+          .from("terceros")
+          .select("id, razon_social")
+          .eq("empresa_id", empresaId)
+          .eq("activo", true)
+          .order("razon_social")
+          .order("id")
+          .range(d, h)
+      ).then(({ data }) => setTerceros(data || []));
 
       if (tarea) {
         setTitulo(tarea.titulo);

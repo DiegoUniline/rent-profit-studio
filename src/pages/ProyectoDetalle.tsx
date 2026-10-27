@@ -79,7 +79,7 @@ import {
   Scale,
   AlertTriangle,
 } from "lucide-react";
-import { traerTodo } from "@/lib/traer-todo";
+import { traerPorBloques, traerTodo } from "@/lib/traer-todo";
 
 interface PartidaRow {
   id: string;
@@ -229,21 +229,29 @@ export default function ProyectoDetalle() {
       // fallback a flujos_programados: si no hay programación propia válida,
       // el proyectado de la partida es $0.
       if (idsProject.length > 0) {
-        const { data: programacionesData } = await supabase
-          .from("proyecto_programacion_financiera")
-          .select("id, presupuesto_id")
-          .eq("proyecto_id", id)
-          .eq("empresa_id", proyectoData.empresa_id)
-          .in("presupuesto_id", idsProject);
+        const { data: programacionesData } = await traerPorBloques(idsProject, (b, d, h) =>
+          supabase
+            .from("proyecto_programacion_financiera")
+            .select("id, presupuesto_id")
+            .eq("proyecto_id", id)
+            .eq("empresa_id", proyectoData.empresa_id)
+            .in("presupuesto_id", b)
+            .order("id")
+            .range(d, h)
+        );
 
         const map = new Map<string, { programacionId: string; pagos: { fecha: string; monto: number }[] }>();
         if (programacionesData && programacionesData.length > 0) {
           const programacionIds = programacionesData.map((p) => p.id);
-          const { data: pagosData } = await supabase
-            .from("proyecto_programacion_pagos")
-            .select("programacion_id, fecha, monto")
-            .eq("proyecto_id", id)
-            .in("programacion_id", programacionIds);
+          const { data: pagosData } = await traerPorBloques(programacionIds, (b, d, h) =>
+            supabase
+              .from("proyecto_programacion_pagos")
+              .select("programacion_id, fecha, monto")
+              .eq("proyecto_id", id)
+              .in("programacion_id", b)
+              .order("id")
+              .range(d, h)
+          );
           programacionesData.forEach((prog) => {
             map.set(prog.presupuesto_id, {
               programacionId: prog.id,
@@ -259,10 +267,14 @@ export default function ProyectoDetalle() {
       }
 
       if (idsProject.length > 0) {
-        const { data: movData } = await supabase
-          .from("asiento_movimientos")
-          .select("*, asientos_contables:asiento_id(id, fecha, estado, tipo, empresa_id)")
-          .in("presupuesto_id", idsProject);
+        const { data: movData } = await traerPorBloques(idsProject, (b, d, h) =>
+          supabase
+            .from("asiento_movimientos")
+            .select("*, asientos_contables:asiento_id(id, fecha, estado, tipo, empresa_id)")
+            .in("presupuesto_id", b)
+            .order("id")
+            .range(d, h)
+        );
 
         // Una partida de Project jamás toma flujos_programados legacy. Se
         // conserva el estado vacío para que resolverFlujosEfectivos agregue
@@ -316,18 +328,24 @@ export default function ProyectoDetalle() {
 
   const fetchAccesos = async () => {
     if (!id) return;
-    const { data: accesoRows } = await supabase
+    const { data: accesoRows } = await traerTodo((d, h) => supabase
       .from("proyecto_usuarios")
       .select("id, user_id, editar_cronograma, ver_programacion_financiera, editar_programacion_financiera")
-      .eq("proyecto_id", id);
+      .eq("proyecto_id", id)
+      .order("id")
+      .range(d, h));
 
     const userIds = (accesoRows || []).map((a) => a.user_id);
     const profilesMap = new Map<string, string>();
     if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, nombre_completo")
-        .in("user_id", userIds);
+      const { data: profiles } = await traerPorBloques(userIds, (b, d, h) =>
+        supabase
+          .from("profiles")
+          .select("user_id, nombre_completo")
+          .in("user_id", b)
+          .order("id")
+          .range(d, h)
+      );
       (profiles || []).forEach((p) => profilesMap.set(p.user_id, p.nombre_completo));
     }
     setAccesos(
@@ -341,13 +359,17 @@ export default function ProyectoDetalle() {
       }))
     );
 
-    const { data: rolesUsuario } = await supabase.from("user_roles").select("user_id").eq("role", "usuario");
+    const { data: rolesUsuario } = await traerTodo((d, h) => supabase.from("user_roles").select("user_id").eq("role", "usuario").order("id").range(d, h));
     const idsUsuario = (rolesUsuario || []).map((r) => r.user_id);
     if (idsUsuario.length > 0) {
-      const { data: profilesUsuario } = await supabase
-        .from("profiles")
-        .select("user_id, nombre_completo")
-        .in("user_id", idsUsuario);
+      const { data: profilesUsuario } = await traerPorBloques(idsUsuario, (b, d, h) =>
+        supabase
+          .from("profiles")
+          .select("user_id, nombre_completo")
+          .in("user_id", b)
+          .order("id")
+          .range(d, h)
+      );
       const asignados = new Set((accesoRows || []).map((a) => a.user_id));
       setUsuariosDisponibles(
         (profilesUsuario || [])

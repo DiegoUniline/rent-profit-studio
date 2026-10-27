@@ -21,6 +21,7 @@ import { EmpresaDialog } from "@/components/dialogs/EmpresaDialog";
 import { CuentaDialog } from "@/components/dialogs/CuentaDialog";
 import { UsuarioRoleDialog } from "@/components/dialogs/UsuarioRoleDialog";
 import { EmpresaViewDialog } from "@/components/dialogs/EmpresaViewDialog";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -89,27 +90,33 @@ export default function Dashboard() {
     setLoading(true);
     
     // Fetch empresas
-    const { data: empresasData } = await supabase
+    const { data: empresasData } = await traerTodo((d, h) => supabase
       .from("empresas")
       .select("id, tipo_persona, rfc, razon_social, nombre_comercial, ciudad, estado, activa")
-      .order("razon_social");
+      .order("razon_social")
+      .order("id")
+      .range(d, h));
     setEmpresas(empresasData || []);
 
     // Fetch cuentas
-    const { data: cuentasData } = await supabase
+    const { data: cuentasData } = await traerTodo((d, h) => supabase
       .from("cuentas_contables")
       .select("*, empresas(razon_social)")
-      .order("codigo");
+      .order("codigo")
+      .order("id")
+      .range(d, h));
     setCuentas(cuentasData || []);
 
     // Fetch usuarios (solo admin)
     if (role === "admin") {
-      const { data: profiles } = await supabase
+      const { data: profiles } = await traerTodo((d, h) => supabase
         .from("profiles")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(d, h));
 
-      const { data: roles } = await supabase.from("user_roles").select("*");
+      const { data: roles } = await traerTodo((d, h) => supabase.from("user_roles").select("*").order("id").range(d, h));
 
       const usersWithRoles: UserWithRole[] = (profiles || []).map((profile) => {
         const userRole = roles?.find((r) => r.user_id === profile.user_id);

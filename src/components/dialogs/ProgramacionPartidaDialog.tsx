@@ -32,6 +32,7 @@ import {
 } from "@/lib/project-utils";
 import { Plus, Trash2, Wand2 } from "lucide-react";
 import { format } from "date-fns";
+import { traerTodo } from "@/lib/traer-todo";
 
 export interface PartidaProgramable {
   id: string;
@@ -93,10 +94,12 @@ export function ProgramacionPartidaDialog({ open, onOpenChange, proyectoId, empr
   // Lo que ya está realmente pagado/ejercido en Asientos contables (no lo
   // programado): asiento_movimientos de asientos aplicados ligados a esta partida.
   const loadEjercido = async (presupuestoId: string) => {
-    const { data } = await supabase
+    const { data } = await traerTodo((d, h) => supabase
       .from("asiento_movimientos")
       .select("debe, haber, asientos_contables:asiento_id(estado)")
-      .eq("presupuesto_id", presupuestoId);
+      .eq("presupuesto_id", presupuestoId)
+      .order("id")
+      .range(d, h));
     const total = (data || [])
       .filter((m: any) => m.asientos_contables?.estado === "aplicado")
       .reduce((s, m: any) => s + Number(m.debe) + Number(m.haber), 0);
@@ -120,12 +123,14 @@ export function ProgramacionPartidaDialog({ open, onOpenChange, proyectoId, empr
       setFechaInicio(programacion.fecha_inicio ? new Date(programacion.fecha_inicio + "T00:00:00") : undefined);
       setNumeroPagos(programacion.numero_pagos ? String(programacion.numero_pagos) : "4");
 
-      const { data: pagosData } = await supabase
+      const { data: pagosData } = await traerTodo((d, h) => supabase
         .from("proyecto_programacion_pagos")
         .select("id, fecha, monto, concepto, es_anticipo")
         .eq("programacion_id", programacion.id)
         .eq("proyecto_id", proyectoId)
-        .order("orden");
+        .order("orden")
+        .order("id")
+        .range(d, h));
       setFilas(
         (pagosData || [])
           .filter((p) => !p.es_anticipo)

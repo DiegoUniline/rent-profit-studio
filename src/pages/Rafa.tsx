@@ -30,6 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa { id: string; nombre: string }
 interface Centro { id: string; nombre: string; empresa_id: string; codigo?: string }
@@ -83,10 +84,10 @@ export default function Rafa() {
   useEffect(() => {
     (async () => {
       const [e, c, t, cu] = await Promise.all([
-        supabase.from("empresas").select("id, razon_social, nombre_comercial").eq("activa", true),
-        supabase.from("centros_negocio").select("id, nombre, codigo, empresa_id").eq("activo", true),
-        supabase.from("terceros").select("id, razon_social, empresa_id").eq("activo", true),
-        supabase.from("cuentas_contables").select("id, codigo, nombre, empresa_id").eq("activa", true).eq("clasificacion", "saldo"),
+        traerTodo((d, h) => supabase.from("empresas").select("id, razon_social, nombre_comercial").eq("activa", true).order("id").range(d, h)),
+        traerTodo((d, h) => supabase.from("centros_negocio").select("id, nombre, codigo, empresa_id").eq("activo", true).order("id").range(d, h)),
+        traerTodo((d, h) => supabase.from("terceros").select("id, razon_social, empresa_id").eq("activo", true).order("id").range(d, h)),
+        traerTodo((d, h) => supabase.from("cuentas_contables").select("id, codigo, nombre, empresa_id").eq("activa", true).eq("clasificacion", "saldo").order("id").range(d, h)),
       ]);
       setEmpresas((e.data || []).map((x) => ({ id: x.id, nombre: x.nombre_comercial || x.razon_social })));
       setCentros((c.data || []) as Centro[]);

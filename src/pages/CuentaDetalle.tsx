@@ -155,6 +155,7 @@ export default function CuentaDetalle() {
             )
           `)
           .eq("cuenta_id", id)
+          .order("id")
           .range(from, from + PAGE_SIZE - 1);
         if (error) { movError = error; break; }
         allMovimientos = allMovimientos.concat(data || []);

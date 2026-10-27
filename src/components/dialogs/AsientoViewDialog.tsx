@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -110,11 +111,13 @@ export function AsientoViewDialog({
 
   const loadMovimientos = async (asientoId: string) => {
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await traerTodo((d, h) => supabase
       .from("asiento_movimientos")
       .select("*, cuentas_contables(id, codigo, nombre)")
       .eq("asiento_id", asientoId)
-      .order("orden");
+      .order("orden")
+      .order("id")
+      .range(d, h));
     
     if (data) {
       setMovimientos(data as Movimiento[]);

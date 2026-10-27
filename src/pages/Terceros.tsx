@@ -21,6 +21,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { Users2, Plus, Edit, Power, Eye, Search } from "lucide-react";
 import { TerceroDialog } from "@/components/dialogs/TerceroDialog";
 import { TerceroViewDialog } from "@/components/dialogs/TerceroViewDialog";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -108,15 +109,19 @@ export default function Terceros() {
     setLoading(true);
     
     const [tercerosRes, empresasRes] = await Promise.all([
-      supabase
+      traerTodo((d, h) => supabase
         .from("terceros")
         .select("*, empresas(id, razon_social)")
-        .order("razon_social"),
-      supabase
+        .order("razon_social")
+        .order("id")
+        .range(d, h)),
+      traerTodo((d, h) => supabase
         .from("empresas")
         .select("id, razon_social")
         .eq("activa", true)
-        .order("razon_social"),
+        .order("razon_social")
+        .order("id")
+        .range(d, h)),
     ]);
 
     if (tercerosRes.error) {

@@ -40,6 +40,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ProgramacionDialog } from "@/components/dialogs/ProgramacionDialog";
 import { ProyeccionProgramacion } from "@/components/reportes/ProyeccionProgramacion";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Programacion {
   id: string;
@@ -233,9 +234,9 @@ export default function Programacion() {
 
   const fetchCatalogs = async () => {
     const [empresasRes, centrosRes, tercerosRes] = await Promise.all([
-      supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social"),
-      supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("activo", true).order("codigo"),
-      supabase.from("terceros").select("id, razon_social, empresa_id").eq("activo", true).order("razon_social"),
+      traerTodo((d, h) => supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social").order("id").range(d, h)),
+      traerTodo((d, h) => supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("activo", true).order("codigo").order("id").range(d, h)),
+      traerTodo((d, h) => supabase.from("terceros").select("id, razon_social, empresa_id").eq("activo", true).order("razon_social").order("id").range(d, h)),
     ]);
     if (empresasRes.data) setEmpresas(empresasRes.data);
     if (centrosRes.data) setCentrosNegocio(centrosRes.data);
@@ -244,10 +245,12 @@ export default function Programacion() {
 
   const fetchCuentasYMovimientos = async () => {
     // Fetch cuentas contables para identificar bancos y cartera
-    const { data: cuentasData } = await supabase
+    const { data: cuentasData } = await traerTodo((d, h) => supabase
       .from("cuentas_contables")
       .select("id, codigo, nombre, naturaleza, empresa_id")
-      .eq("activa", true);
+      .eq("activa", true)
+      .order("id")
+      .range(d, h));
     
     if (cuentasData) setCuentas(cuentasData);
 
@@ -267,6 +270,7 @@ export default function Programacion() {
           asientos_contables!inner(estado)
         `)
         .eq("asientos_contables.estado", "aplicado")
+        .order("id")
         .range(from, from + PAGE_SIZE - 1);
 
       if (batch && batch.length > 0) {

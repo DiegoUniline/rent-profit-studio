@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/accounting-utils";
 import { ProgramacionPartidaDialog, PartidaProgramable } from "@/components/dialogs/ProgramacionPartidaDialog";
 import { Wand2, Landmark, Wallet, Clock, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
+import { traerPorBloques } from "@/lib/traer-todo";
 
 interface Props {
   proyectoId: string;
@@ -43,22 +44,30 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
   const fetchAll = async () => {
     setLoading(true);
     const ids = partidas.map((p) => p.id);
-    const { data: programaciones } = await supabase
-      .from("proyecto_programacion_financiera")
-      .select("id, presupuesto_id")
-      .eq("proyecto_id", proyectoId)
-      .eq("empresa_id", empresaId)
-      .in("presupuesto_id", ids);
+    const { data: programaciones } = await traerPorBloques(ids, (b, d, h) =>
+      supabase
+        .from("proyecto_programacion_financiera")
+        .select("id, presupuesto_id")
+        .eq("proyecto_id", proyectoId)
+        .eq("empresa_id", empresaId)
+        .in("presupuesto_id", b)
+        .order("id")
+        .range(d, h)
+    );
 
     const map = new Map<string, { programacionId: string; pagos: PagoRow[] }>();
     if (programaciones && programaciones.length > 0) {
       const programacionIds = programaciones.map((p) => p.id);
-      const { data: pagosData } = await supabase
-        .from("proyecto_programacion_pagos")
-        .select("id, programacion_id, fecha, monto, concepto, es_anticipo")
-        .eq("proyecto_id", proyectoId)
-        .in("programacion_id", programacionIds)
-        .order("fecha");
+      const { data: pagosData } = await traerPorBloques(programacionIds, (b, d, h) =>
+        supabase
+          .from("proyecto_programacion_pagos")
+          .select("id, programacion_id, fecha, monto, concepto, es_anticipo")
+          .eq("proyecto_id", proyectoId)
+          .in("programacion_id", b)
+          .order("fecha")
+          .order("id")
+          .range(d, h)
+      );
 
       programaciones.forEach((prog) => {
         map.set(prog.presupuesto_id, {
@@ -72,10 +81,14 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
     setPorPartida(map);
 
     // Ya pagado real (Asientos contables aplicados), independiente de lo programado.
-    const { data: movimientos } = await supabase
-      .from("asiento_movimientos")
-      .select("presupuesto_id, debe, haber, asientos_contables:asiento_id(estado)")
-      .in("presupuesto_id", ids);
+    const { data: movimientos } = await traerPorBloques(ids, (b, d, h) =>
+      supabase
+        .from("asiento_movimientos")
+        .select("presupuesto_id, debe, haber, asientos_contables:asiento_id(estado)")
+        .in("presupuesto_id", b)
+        .order("id")
+        .range(d, h)
+    );
     const ejercidoMap = new Map<string, number>();
     (movimientos || []).forEach((m: any) => {
       if (m.asientos_contables?.estado !== "aplicado") return;

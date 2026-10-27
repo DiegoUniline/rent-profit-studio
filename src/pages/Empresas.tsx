@@ -35,6 +35,7 @@ import { Label } from "@/components/ui/label";
 import { Building, Plus, Edit, Trash2, Search, Eye } from "lucide-react";
 import { BotonBaja } from "@/components/BotonBaja";
 import { z } from "zod";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -137,10 +138,12 @@ export default function Empresas() {
 
   const fetchEmpresas = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await traerTodo((d, h) => supabase
       .from("empresas")
       .select("*")
-      .order("razon_social");
+      .order("razon_social")
+      .order("id")
+      .range(d, h));
 
     if (error) {
       toast({

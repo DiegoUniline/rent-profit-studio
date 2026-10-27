@@ -87,6 +87,7 @@ export function EjercidoViewDialog({
           cuentas_contables (codigo, nombre)
         `)
         .eq("presupuesto_id", presupuestoId)
+        .order("id")
         .range(from, from + PAGE_SIZE - 1);
 
       if (batch && batch.length > 0) {

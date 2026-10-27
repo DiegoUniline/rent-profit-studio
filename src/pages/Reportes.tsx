@@ -35,7 +35,7 @@ import { resolverFlujosEfectivos } from "@/lib/project-utils";
 import { EstadoFinanciero } from "@/components/reportes/EstadoFinanciero";
 import { FlujoEfectivoPresupuesto } from "@/components/reportes/FlujoEfectivoPresupuesto";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { traerTodo } from "@/lib/traer-todo";
+import { traerPorBloques, traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -90,11 +90,13 @@ export default function Reportes() {
 
   const loadEmpresas = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await traerTodo((d, h) => supabase
         .from("empresas")
         .select("id, razon_social")
         .eq("activa", true)
-        .order("razon_social");
+        .order("razon_social")
+        .order("id")
+        .range(d, h));
 
       if (error) throw error;
       setEmpresas(data || []);
@@ -121,7 +123,8 @@ export default function Reportes() {
         query = query.eq("empresa_id", empresaId);
       }
 
-      const { data, error } = await query;
+      query = query.order("id");
+      const { data, error } = await traerTodo((d, h) => query.range(d, h));
       if (error) throw error;
       setCentrosNegocio(data || []);
       // Reset selection when empresa changes
@@ -154,7 +157,8 @@ export default function Reportes() {
         cuentasQuery = cuentasQuery.in("empresa_id", empresaIds);
       }
 
-      const { data: cuentasData, error: cuentasError } = await cuentasQuery;
+      cuentasQuery = cuentasQuery.order("id");
+      const { data: cuentasData, error: cuentasError } = await traerTodo((d, h) => cuentasQuery.range(d, h));
       if (cuentasError) throw cuentasError;
 
       // Cargar asientos aplicados
@@ -175,7 +179,8 @@ export default function Reportes() {
         asientosQuery = asientosQuery.in("centro_negocio_id", centrosSeleccionados);
       }
 
-      // Paginate asientos to avoid 1000-row limit
+      // Paginate asientos to avoid 1000-row limit (orden fijo para no saltar filas)
+      asientosQuery = asientosQuery.order("id");
       let asientosData: any[] = [];
       {
         const PAGE_SIZE = 1000;
@@ -209,6 +214,7 @@ export default function Reportes() {
               .from("asiento_movimientos")
               .select("*")
               .in("asiento_id", idsBatch)
+              .order("id")
               .range(from, from + PAGE_SIZE - 1);
 
             if (movError) throw movError;
@@ -233,6 +239,7 @@ export default function Reportes() {
           let presQuery = supabase
             .from("presupuestos")
             .select("id, centro_negocio_id")
+            .order("id")
             .range(from, from + PAGE_SIZE - 1);
 
           if (empresaId !== "todas") {
@@ -302,7 +309,8 @@ export default function Reportes() {
         query = query.in("centro_negocio_id", centrosSeleccionados);
       }
 
-      const { data, error } = await query;
+      query = query.order("id");
+      const { data, error } = await traerTodo((d, h) => query.range(d, h));
       if (error) throw error;
 
       // Transform data to match component interface
@@ -367,11 +375,15 @@ export default function Reportes() {
             .map((p: any) => p.centro_negocio_id as string)
         )];
         if (centrosProject.length > 0) {
-          const { data: proyectosVigentes } = await supabase
-            .from("proyectos")
-            .select("id, empresa_id, centro_negocio_id")
-            .eq("activo", true)
-            .in("centro_negocio_id", centrosProject);
+          const { data: proyectosVigentes } = await traerPorBloques(centrosProject, (b, d, h) =>
+            supabase
+              .from("proyectos")
+              .select("id, empresa_id, centro_negocio_id")
+              .eq("activo", true)
+              .in("centro_negocio_id", b)
+              .order("id")
+              .range(d, h)
+          );
           const proyectoPorCentro = new Map(
             (proyectosVigentes || []).map((p: any) => [`${p.empresa_id}:${p.centro_negocio_id}`, p.id])
           );
@@ -387,26 +399,19 @@ export default function Reportes() {
       const PAGE_SIZE = 1000;
 
       // 1. Load budget-linked flujos
+      // En bloques: con cientos de partidas, un solo .in() revienta el largo de la URL.
       if (ids.length > 0) {
-        let from = 0;
-        let hasMore = true;
-        while (hasMore) {
-          const { data: batch, error } = await supabase
+        const { data: flujosPartidas, error } = await traerPorBloques(ids, (b, d, h) =>
+          supabase
             .from("flujos_programados")
             .select("*")
-            .in("presupuesto_id", ids)
+            .in("presupuesto_id", b)
             .order("fecha", { ascending: true })
-            .range(from, from + PAGE_SIZE - 1);
-
-          if (error) throw error;
-          if (batch && batch.length > 0) {
-            allFlujos = allFlujos.concat(batch);
-            hasMore = batch.length === PAGE_SIZE;
-            from += PAGE_SIZE;
-          } else {
-            hasMore = false;
-          }
-        }
+            .order("id")
+            .range(d, h)
+        );
+        if (error) throw error;
+        allFlujos = flujosPartidas;
       }
 
       // 2. Load auto-generated IVA flujos by empresa
@@ -419,6 +424,7 @@ export default function Reportes() {
             .select("*")
             .eq("auto_generado", true)
             .order("fecha", { ascending: true })
+            .order("id")
             .range(from, from + PAGE_SIZE - 1);
 
           if (empresaId !== "todas") {
@@ -442,15 +448,21 @@ export default function Reportes() {
         }
       }
 
+      allFlujos.sort((a: any, b: any) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+
       // Toda partida convertida en Proyecto usa exclusivamente su programación
       // propia. Si aún no existe, queda en $0 y no revive flujos legacy.
       const programacionesPorPartida = new Map<string, { pagos: { fecha: string; monto: number }[] }>();
       if (idsProject.length > 0) {
-        const { data: programacionesData } = await supabase
-          .from("proyecto_programacion_financiera")
-          .select("id, presupuesto_id, proyecto_id, empresa_id")
-          .in("empresa_id", empresaIds)
-          .in("presupuesto_id", idsProject);
+        const { data: programacionesData } = await traerPorBloques(idsProject, (b, d, h) =>
+          supabase
+            .from("proyecto_programacion_financiera")
+            .select("id, presupuesto_id, proyecto_id, empresa_id")
+            .in("empresa_id", empresaIds)
+            .in("presupuesto_id", b)
+            .order("id")
+            .range(d, h)
+        );
 
         if (programacionesData && programacionesData.length > 0) {
           const programacionesValidas = programacionesData.filter(
@@ -463,10 +475,14 @@ export default function Reportes() {
             );
             return;
           }
-          const { data: pagosData } = await supabase
-            .from("proyecto_programacion_pagos")
-            .select("programacion_id, proyecto_id, fecha, monto")
-            .in("programacion_id", programacionIds);
+          const { data: pagosData } = await traerPorBloques(programacionIds, (b, d, h) =>
+            supabase
+              .from("proyecto_programacion_pagos")
+              .select("programacion_id, proyecto_id, fecha, monto")
+              .in("programacion_id", b)
+              .order("id")
+              .range(d, h)
+          );
           programacionesValidas.forEach((prog) => {
             programacionesPorPartida.set(prog.presupuesto_id, {
               pagos: (pagosData || [])

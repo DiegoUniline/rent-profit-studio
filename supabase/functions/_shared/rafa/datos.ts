@@ -78,7 +78,8 @@ export async function leerPorIds<T = any>(
     const { filas } = await leerTodo<T>(() => {
       let q = ctx.db.from(tabla).select(columnas).in(campo, b);
       if (extra) q = extra(q);
-      return q;
+      // Orden fijo: sin él, paginar con range() puede saltar o repetir filas.
+      return q.order("id");
     });
     todas.push(...filas);
   }

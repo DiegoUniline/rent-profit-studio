@@ -86,6 +86,7 @@ export default function EjercidoDetalle() {
           cuentas_contables (codigo, nombre)
         `)
         .eq("presupuesto_id", id)
+        .order("id")
         .range(from, from + PAGE_SIZE - 1);
 
       if (batch && batch.length > 0) {

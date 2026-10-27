@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import { AsientoViewDialog } from "@/components/dialogs/AsientoViewDialog";
 import { AdminCodeDialog } from "@/components/dialogs/AdminCodeDialog";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -223,11 +224,13 @@ export default function Asientos() {
         }
       }
 
-      const empresasRes = await supabase
+      const empresasRes = await traerTodo((d, h) => supabase
         .from("empresas")
         .select("id, razon_social")
         .eq("activa", true)
-        .order("razon_social");
+        .order("razon_social")
+        .order("id")
+        .range(d, h));
 
       if (empresasRes.error) throw empresasRes.error;
 
