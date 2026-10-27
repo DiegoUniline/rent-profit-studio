@@ -3403,6 +3403,18 @@
             ],
             "triggers": [
                 {
+                    "nombre": "trg_cronograma_sigue_pagos_del",
+                    "definicion": "CREATE TRIGGER trg_cronograma_sigue_pagos_del AFTER DELETE ON public.proyecto_programacion_pagos REFERENCING OLD TABLE AS viejos FOR EACH STATEMENT EXECUTE FUNCTION trg_cronograma_sigue_pagos_del()"
+                },
+                {
+                    "nombre": "trg_cronograma_sigue_pagos_ins",
+                    "definicion": "CREATE TRIGGER trg_cronograma_sigue_pagos_ins AFTER INSERT ON public.proyecto_programacion_pagos REFERENCING NEW TABLE AS nuevos FOR EACH STATEMENT EXECUTE FUNCTION trg_cronograma_sigue_pagos_ins()"
+                },
+                {
+                    "nombre": "trg_cronograma_sigue_pagos_upd",
+                    "definicion": "CREATE TRIGGER trg_cronograma_sigue_pagos_upd AFTER UPDATE ON public.proyecto_programacion_pagos REFERENCING OLD TABLE AS viejos NEW TABLE AS nuevos FOR EACH STATEMENT EXECUTE FUNCTION trg_cronograma_sigue_pagos_upd()"
+                },
+                {
                     "nombre": "trg_validar_pago_programacion_project",
                     "definicion": "CREATE TRIGGER trg_validar_pago_programacion_project BEFORE INSERT OR UPDATE ON public.proyecto_programacion_pagos FOR EACH ROW EXECUTE FUNCTION validar_pago_programacion_project()"
                 }
@@ -3686,6 +3698,11 @@
             "argumentos": "_presupuesto_id uuid, _fecha_inicio date, _fecha_fin date, _avance_manual numeric"
         },
         {
+            "nombre": "alinear_cronograma_con_pagos",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": "p_programaciones uuid[]"
+        },
+        {
             "nombre": "audit_presupuesto_change",
             "seguridad": "SECURITY DEFINER",
             "argumentos": ""
@@ -3816,6 +3833,21 @@
             "argumentos": ""
         },
         {
+            "nombre": "trg_cronograma_sigue_pagos_del",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": ""
+        },
+        {
+            "nombre": "trg_cronograma_sigue_pagos_ins",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": ""
+        },
+        {
+            "nombre": "trg_cronograma_sigue_pagos_upd",
+            "seguridad": "SECURITY DEFINER",
+            "argumentos": ""
+        },
+        {
             "nombre": "update_updated_at_column",
             "seguridad": "SECURITY INVOKER",
             "argumentos": ""
@@ -3831,5 +3863,5 @@
             "argumentos": ""
         }
     ],
-    "migraciones_sha256": "a9e7e8e4d07faac51fb4eef617643ef05031adaca5bdbadd22790ec1466a99af"
+    "migraciones_sha256": "750e4180df0905ab602df4e6df75f864301a5368a6ca93c9171a64e141da2cb5"
 }

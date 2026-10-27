@@ -17,6 +17,8 @@ interface Props {
   partidas: PartidaProgramable[];
   canView: boolean;
   canEdit: boolean;
+  /** Al guardar pagos: la barra del Gantt se alinea sola al flujo (trigger en BD); el padre recarga. */
+  onGuardado?: () => void;
 }
 
 interface PagoRow {
@@ -27,7 +29,7 @@ interface PagoRow {
   es_anticipo: boolean;
 }
 
-export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas, canView, canEdit }: Props) {
+export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas, canView, canEdit, onGuardado }: Props) {
   const [loading, setLoading] = useState(true);
   // presupuesto_id -> { programacionId, pagos }
   const [porPartida, setPorPartida] = useState<Map<string, { programacionId: string; pagos: PagoRow[] }>>(new Map());
@@ -321,7 +323,7 @@ export function ProgramacionFinancieraProyecto({ proyectoId, empresaId, partidas
         proyectoId={proyectoId}
         empresaId={empresaId}
         partida={selected?.partida || null}
-        onSuccess={fetchAll}
+        onSuccess={() => (onGuardado ? onGuardado() : fetchAll())}
       />
     </div>
   );

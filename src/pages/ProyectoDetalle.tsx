@@ -958,6 +958,7 @@ export default function ProyectoDetalle() {
               partidas={partidasProgramables}
               canView={canViewProgramacionFinanciera}
               canEdit={canEditProgramacionFinanciera}
+              onGuardado={fetchAll}
             />
           </TabsContent>
         )}

@@ -1,6 +1,6 @@
 # Esquema de la base (SQL local)
 
-ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-336e6b61f032). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `a9e7e8e4d07faac5`.
+ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-f2bf43d7d65a). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `750e4180df0905ab`.
 
 El significado de negocio de cada tabla y campo está en `docs/rafa/modulos/`.
 
@@ -930,6 +930,9 @@ Restricciones e índices:
 - INDICE `idx_ppp_proyecto`: `CREATE INDEX idx_ppp_proyecto ON public.proyecto_programacion_pagos USING btree (proyecto_id)`
 
 Triggers:
+- `trg_cronograma_sigue_pagos_del`
+- `trg_cronograma_sigue_pagos_ins`
+- `trg_cronograma_sigue_pagos_upd`
 - `trg_validar_pago_programacion_project`
 
 Políticas:
@@ -1013,6 +1016,7 @@ Políticas:
 ## Funciones
 
 - `actualizar_cronograma_partida(_presupuesto_id uuid, _fecha_inicio date, _fecha_fin date, _avance_manual numeric)` — SECURITY DEFINER
+- `alinear_cronograma_con_pagos(p_programaciones uuid[])` — SECURITY DEFINER
 - `audit_presupuesto_change()` — SECURITY DEFINER
 - `block_flujos_legacy_si_es_project_con_programacion_propia()` — SECURITY DEFINER
 - `cambiar_activo(p_entidad text, p_id uuid, p_activo boolean, p_en_cascada boolean)` — SECURITY INVOKER
@@ -1039,6 +1043,9 @@ Políticas:
 - `rafa_guardar_programacion_partida(p_accion_id uuid, p_datos jsonb, p_pagos jsonb)` — SECURITY INVOKER
 - `rafa_registrar_ejecucion(p_accion_id uuid, p_resultado jsonb)` — SECURITY INVOKER
 - `sync_iva_flujos()` — SECURITY DEFINER
+- `trg_cronograma_sigue_pagos_del()` — SECURITY DEFINER
+- `trg_cronograma_sigue_pagos_ins()` — SECURITY DEFINER
+- `trg_cronograma_sigue_pagos_upd()` — SECURITY DEFINER
 - `update_updated_at_column()` — SECURITY INVOKER
 - `validar_pago_programacion_project()` — SECURITY DEFINER
 - `validar_programacion_partida_project()` — SECURITY DEFINER
