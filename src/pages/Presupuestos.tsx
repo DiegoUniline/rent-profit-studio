@@ -63,6 +63,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -263,17 +264,21 @@ export default function Presupuestos() {
     setLoading(true);
     try {
       const [presupuestosRes, empresasRes] = await Promise.all([
-        supabase
-          .from("presupuestos")
-          .select(`
-            *,
-            empresas(id, razon_social),
-            cuentas_contables(id, codigo, nombre),
-            terceros!presupuestos_tercero_id_fkey(id, razon_social, rfc),
-            centros_negocio(id, codigo, nombre),
-            unidades_medida(id, codigo, nombre)
-          `)
-          .order("orden", { ascending: true }),
+        traerTodo((d, h) =>
+          supabase
+            .from("presupuestos")
+            .select(`
+              *,
+              empresas(id, razon_social),
+              cuentas_contables(id, codigo, nombre),
+              terceros!presupuestos_tercero_id_fkey(id, razon_social, rfc),
+              centros_negocio(id, codigo, nombre),
+              unidades_medida(id, codigo, nombre)
+            `)
+            .order("orden", { ascending: true })
+            .order("id", { ascending: true })
+            .range(d, h)
+        ),
         supabase
           .from("empresas")
           .select("id, razon_social")

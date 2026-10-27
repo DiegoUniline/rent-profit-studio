@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { DateInput } from "@/components/ui/date-input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Programacion {
   id: string;
@@ -113,7 +114,9 @@ export function ProgramacionDialog({
       supabase.from("empresas").select("id, razon_social").eq("activa", true).order("razon_social"),
       supabase.from("centros_negocio").select("id, codigo, nombre, empresa_id").eq("activo", true).order("codigo"),
       supabase.from("terceros").select("id, razon_social, empresa_id").eq("activo", true).order("razon_social"),
-      supabase.from("presupuestos").select("id, partida, empresa_id, centro_negocio_id, cantidad, precio_unitario").eq("activo", true).order("partida"),
+      traerTodo((d, h) =>
+        supabase.from("presupuestos").select("id, partida, empresa_id, centro_negocio_id, cantidad, precio_unitario").eq("activo", true).order("partida").order("id").range(d, h)
+      ),
     ]);
     if (empresasRes.data) setEmpresas(empresasRes.data);
     if (centrosRes.data) setCentros(centrosRes.data);

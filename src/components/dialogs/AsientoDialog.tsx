@@ -35,6 +35,7 @@ import { CuentaDialog } from "./CuentaDialog";
 import { TerceroDialog } from "./TerceroDialog";
 import { CentroNegocioDialog } from "./CentroNegocioDialog";
 import { validarAsiento } from "../../../supabase/functions/_shared/negocio/asientos";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -236,12 +237,16 @@ export function AsientoDialog({
         .eq("empresa_id", empresaId)
         .eq("activo", true)
         .order("nombre"),
-      supabase
-        .from("presupuestos")
-        .select("id, partida, empresa_id, cuenta_id, centro_negocio_id")
-        .eq("empresa_id", empresaId)
-        .eq("activo", true)
-        .order("partida"),
+      traerTodo((d, h) =>
+        supabase
+          .from("presupuestos")
+          .select("id, partida, empresa_id, cuenta_id, centro_negocio_id")
+          .eq("empresa_id", empresaId)
+          .eq("activo", true)
+          .order("partida")
+          .order("id")
+          .range(d, h)
+      ),
     ]);
 
     if (cuentasRes.data) setCuentas(cuentasRes.data);

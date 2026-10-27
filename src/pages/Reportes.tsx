@@ -35,6 +35,7 @@ import { resolverFlujosEfectivos } from "@/lib/project-utils";
 import { EstadoFinanciero } from "@/components/reportes/EstadoFinanciero";
 import { FlujoEfectivoPresupuesto } from "@/components/reportes/FlujoEfectivoPresupuesto";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface Empresa {
   id: string;
@@ -349,7 +350,8 @@ export default function Reportes() {
         presQuery = presQuery.in("centro_negocio_id", centrosSeleccionados);
       }
 
-      const { data: presIds, error: presError } = await presQuery;
+      presQuery = presQuery.order("id");
+      const { data: presIds, error: presError } = await traerTodo((d, h) => presQuery.range(d, h));
       if (presError) throw presError;
 
       const ids = (presIds || []).map((p: any) => p.id);

@@ -20,6 +20,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { formatCurrency } from "@/lib/accounting-utils";
 import { calcularEjercidoPorPartida, calcularMontoPresupuestado, agregarFinanciero } from "@/lib/project-utils";
 import { FolderKanban, Search } from "lucide-react";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface ProyectoRow {
   id: string;
@@ -87,12 +88,16 @@ export default function Proyectos() {
         return;
       }
 
-      const { data: partidasData, error: partidasError } = await supabase
-        .from("presupuestos")
-        .select("id, centro_negocio_id, cantidad, precio_unitario, fecha_inicio, fecha_fin, responsable:terceros!presupuestos_responsable_tercero_id_fkey(razon_social)")
-        .eq("es_project", true)
-        .eq("activo", true)
-        .in("centro_negocio_id", centroIds);
+      const { data: partidasData, error: partidasError } = await traerTodo((d, h) =>
+        supabase
+          .from("presupuestos")
+          .select("id, centro_negocio_id, cantidad, precio_unitario, fecha_inicio, fecha_fin, responsable:terceros!presupuestos_responsable_tercero_id_fkey(razon_social)")
+          .eq("es_project", true)
+          .eq("activo", true)
+          .in("centro_negocio_id", centroIds)
+          .order("id")
+          .range(d, h)
+      );
       if (partidasError) throw partidasError;
       setPartidas((partidasData || []) as any);
 

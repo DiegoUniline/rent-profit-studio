@@ -79,6 +79,7 @@ import {
   Scale,
   AlertTriangle,
 } from "lucide-react";
+import { traerTodo } from "@/lib/traer-todo";
 
 interface PartidaRow {
   id: string;
@@ -204,17 +205,21 @@ export default function ProyectoDetalle() {
 
       setProyecto(proyectoData as any);
 
-      const { data: partidasData, error: partidasError } = await supabase
-        .from("presupuestos")
-        .select(`
-          id, partida, cantidad, precio_unitario, fecha_inicio, fecha_fin, avance_manual, es_project, responsable_tercero_id, tipo_movimiento,
-          cuenta:cuenta_id (codigo, nombre),
-          responsable:terceros!presupuestos_responsable_tercero_id_fkey (razon_social)
-        `)
-        .eq("empresa_id", proyectoData.empresa_id)
-        .eq("centro_negocio_id", proyectoData.centro_negocio_id)
-        .eq("activo", true)
-        .order("partida");
+      const { data: partidasData, error: partidasError } = await traerTodo((d, h) =>
+        supabase
+          .from("presupuestos")
+          .select(`
+            id, partida, cantidad, precio_unitario, fecha_inicio, fecha_fin, avance_manual, es_project, responsable_tercero_id, tipo_movimiento,
+            cuenta:cuenta_id (codigo, nombre),
+            responsable:terceros!presupuestos_responsable_tercero_id_fkey (razon_social)
+          `)
+          .eq("empresa_id", proyectoData.empresa_id)
+          .eq("centro_negocio_id", proyectoData.centro_negocio_id)
+          .eq("activo", true)
+          .order("partida")
+          .order("id")
+          .range(d, h)
+      );
       if (partidasError) throw partidasError;
       setPartidas((partidasData || []) as any);
 
