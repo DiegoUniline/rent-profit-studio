@@ -3,7 +3,7 @@
 // así que cada PDF se divide en bloques de pocas páginas, se extraen en paralelo
 // y se unen en el mismo orden del archivo.
 
-// @ts-expect-error -- especificador npm: de Deno; el chequeo de la app no lo resuelve.
+// @ts-ignore -- especificador npm: de Deno; el chequeo de la app no lo resuelve.
 import { PDFDocument } from "npm:pdf-lib@1.17.1";
 
 export interface ArchivoAdjunto {
