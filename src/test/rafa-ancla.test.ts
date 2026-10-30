@@ -41,6 +41,12 @@ describe("ancla de la conversación (centro de negocio)", () => {
     expect(aplicarAncla(h("consulta", "texto"), { texto: "x" }, ANCLA)).toEqual({ texto: "x" });
   });
 
+  it("una acción marcada anclaCentro toma el centro de la conversación salvo que traiga sus partidas", () => {
+    const masiva = { ...h("accion", "empresa_id", "centro_negocio_id", "presupuesto_ids"), anclaCentro: true };
+    expect(aplicarAncla(masiva, { modo: "mover" }, ANCLA)).toEqual({ modo: "mover", empresa_id: ANCLA.empresa_id, centro_negocio_id: ANCLA.centro_id });
+    expect(aplicarAncla(masiva, { presupuesto_ids: ["p"] }, ANCLA)).toEqual({ presupuesto_ids: ["p"], empresa_id: ANCLA.empresa_id });
+  });
+
   it("sin ancla no cambia nada", () => {
     expect(aplicarAncla(h("consulta", "empresa_id", "centro_negocio_id"), {}, null)).toEqual({});
   });
@@ -52,6 +58,14 @@ describe("ancla de la conversación (centro de negocio)", () => {
     expect(p).toContain(`proyecto_id=${ANCLA.proyecto_id}`);
     expect(p).toContain('"catalogo.pdf" (2026-10-22; id=x)');
     expect(promptSistema(ctx, {}, undefined, "hola")).toContain("CENTRO DE NEGOCIO DE ESTA CONVERSACIÓN: ninguno");
+  });
+
+  it("ordena mover fechas de partidas con la herramienta masiva, sin buscar ni preguntar el tipo de fecha", () => {
+    const ctx = { usuario: { roles: ["contador"] }, hoy: "2026-10-30" } as unknown as Contexto;
+    const p = promptSistema(ctx, {}, undefined, "De la partida Lote 1 a la Lote 400, muévelas al 1 de diciembre", { ancla: ANCLA, archivos: [] });
+    expect(p).toMatch(/llama DIRECTO a proponer_reprogramacion_masiva/);
+    expect(p).toMatch(/NO busques antes las partidas/);
+    expect(p).toMatch(/NO preguntes qué tipo de fecha/);
   });
 
   it("guarda archivos en una ruta por usuario y conversación, con nombre seguro", () => {

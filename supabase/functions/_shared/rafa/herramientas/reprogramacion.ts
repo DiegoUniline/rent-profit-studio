@@ -377,7 +377,7 @@ export const proponerReprogramacionMasivaTool: Herramienta<EntradaReprogramacion
     "modo=mover: el primer pago cae en fecha_inicio conservando la separación (con fecha_fin se reparten entre ambas fechas); las partidas sin programación se programan en esa fecha (o mensual hasta fecha_fin). " +
     "modo=recorrer: corre cada pago N meses y/o días (negativo = adelantar). " +
     "modo=reprogramar: reemplaza por numero_pagos pagos con frecuencia desde fecha_inicio, repartiendo lo pendiente. " +
-    "Reemplaza lo ya programado (manda la última instrucción). Úsala SIEMPRE que sean 2 o más partidas.",
+    "Reemplaza lo ya programado (manda la última instrucción). Úsala SIEMPRE para mover fechas de partidas, directo: no busques antes las partidas ni preguntes qué tipo de fecha (la herramienta resuelve el rango completo).",
   parametros: s.objeto(
     {
       empresa_id: s.uuid("Empresa"),
