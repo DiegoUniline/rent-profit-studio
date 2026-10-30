@@ -1751,10 +1751,6 @@ export type Database = {
         Args: { p_accion_id: string; p_cambio: Json }
         Returns: Json
       }
-      rafa_reprogramar_masiva: {
-        Args: { p_accion_id: string; p_cambios: Json }
-        Returns: Json
-      }
       rafa_cambiar_estado_programaciones: {
         Args: { p_accion_id: string; p_cambios: Json }
         Returns: Json
@@ -1786,6 +1782,10 @@ export type Database = {
       rafa_registrar_ejecucion: {
         Args: { p_accion_id: string; p_resultado: Json }
         Returns: undefined
+      }
+      rafa_reprogramar_masiva: {
+        Args: { p_accion_id: string; p_cambios: Json }
+        Returns: Json
       }
     }
     Enums: {
