@@ -1,6 +1,6 @@
 # Esquema de la base (SQL local)
 
-ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-25a6f1805a6b). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `73a576755300407a`.
+ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-ef3d38e03d9f). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `8013424eb19942ea`.
 
 El significado de negocio de cada tabla y campo está en `docs/rafa/modulos/`.
 
