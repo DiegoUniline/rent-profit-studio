@@ -426,6 +426,12 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
       created_at: new Date().toISOString(),
     };
     setMensajes((prev) => [...prev, provisional]);
+    // La caja se limpia al enviar; si Rafa falla, se restaura lo escrito y adjuntado.
+    const pendiente = { texto, archivos, reusar, audioBlob };
+    if (mensajeDirecto === undefined) setTexto("");
+    setArchivos([]);
+    setReusar([]);
+    setAudioBlob(null);
     try {
       const adjuntos = await Promise.all(
         archivos.filter((f) => !f.type.startsWith("audio/")).map(async (f) => ({ filename: f.name, mime: f.type || "application/pdf", data: await toBase64(f) }))
@@ -446,10 +452,6 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
         audio,
         centro_negocio_id: conversacionId ? undefined : centroNueva,
       });
-      if (mensajeDirecto === undefined) setTexto("");
-      setArchivos([]);
-      setReusar([]);
-      setAudioBlob(null);
       setConversacionId(r.conversacion_id);
       try {
         await recargar(r.conversacion_id);
@@ -459,6 +461,10 @@ export function RafaChat({ contextoPantalla, onAbrirPlan, centroInicial, onCentr
       void cargarConversaciones();
     } catch (e) {
       setMensajes((prev) => prev.filter((m) => m.id !== provisional.id));
+      if (mensajeDirecto === undefined) setTexto((actual) => actual || pendiente.texto);
+      setArchivos(pendiente.archivos);
+      setReusar(pendiente.reusar);
+      setAudioBlob(pendiente.audioBlob);
       toast({ variant: "destructive", title: "Rafa no pudo responder", description: e instanceof Error ? e.message : "Error inesperado" });
     } finally {
       setEnviando(false);
