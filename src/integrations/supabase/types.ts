@@ -199,7 +199,15 @@ export type Database = {
           entidad?: string
           registro_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bajas_en_cascada_centro_negocio_id_fkey"
+            columns: ["centro_negocio_id"]
+            isOneToOne: false
+            referencedRelation: "centros_negocio"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       centros_negocio: {
         Row: {
@@ -1662,8 +1670,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      alinear_cronograma_con_pagos: {
+        Args: { p_programaciones: string[] }
+        Returns: undefined
+      }
       cambiar_activo: {
-        Args: { p_activo: boolean; p_en_cascada?: boolean; p_entidad: string; p_id: string }
+        Args: {
+          p_activo: boolean
+          p_en_cascada?: boolean
+          p_entidad: string
+          p_id: string
+        }
         Returns: Json
       }
       get_cronograma_publico: {
