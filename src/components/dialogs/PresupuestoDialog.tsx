@@ -394,7 +394,7 @@ export function PresupuestoDialog({
     setFlujoRows(prev => [...prev, {
       fecha: undefined,
       monto: "",
-      tipo: "egreso",
+      tipo: form.tipo_movimiento === "ingreso" ? "ingreso" : "egreso",
       descripcion: "",
       isNew: true,
     }]);
@@ -635,7 +635,13 @@ export function PresupuestoDialog({
                     <button
                       key={o.value}
                       type="button"
-                      onClick={() => setForm({ ...form, tipo_movimiento: o.value })}
+                      onClick={() => {
+                        setForm({ ...form, tipo_movimiento: o.value });
+                        // Los flujos siguen el tipo de la partida (Ingreso → entradas, Egreso → salidas).
+                        if (o.value === "ingreso" || o.value === "egreso") {
+                          setFlujoRows((prev) => prev.map((r) => (r.tipo === o.value ? r : { ...r, tipo: o.value as "ingreso" | "egreso" })));
+                        }
+                      }}
                       className={cn(
                         "px-3 py-2 text-sm font-medium rounded-md border transition-colors text-center",
                         selected

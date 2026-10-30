@@ -345,7 +345,7 @@ export default function Reportes() {
       // Get presupuesto IDs for the selected empresas
       let presQuery = supabase
         .from("presupuestos")
-        .select("id, es_project, empresa_id, centro_negocio_id")
+        .select("id, es_project, empresa_id, centro_negocio_id, tipo_movimiento")
         .eq("activo", true);
 
       if (empresaId !== "todas") {
@@ -364,6 +364,8 @@ export default function Reportes() {
 
       const ids = (presIds || []).map((p: any) => p.id);
       const idsProject = (presIds || []).filter((p: any) => p.es_project).map((p: any) => p.id);
+      // La dirección (entrada/salida) de cada flujo la decide el tipo de la partida.
+      const tipoPorPresupuesto = new Map<string, string | null>((presIds || []).map((p: any) => [p.id, p.tipo_movimiento]));
 
       // Alcance exacto presupuesto -> proyecto vigente, derivado por el centro
       // único del proyecto. Sirve para rechazar relaciones históricas o cruzadas.
@@ -471,7 +473,7 @@ export default function Reportes() {
           const programacionIds = programacionesValidas.map((p) => p.id);
           if (programacionIds.length === 0) {
             setFlujosProgramados(
-              resolverFlujosEfectivos(allFlujos, programacionesPorPartida, new Set(idsProject), new Set(ids))
+              resolverFlujosEfectivos(allFlujos, programacionesPorPartida, new Set(idsProject), new Set(ids), tipoPorPresupuesto)
             );
             return;
           }
@@ -494,7 +496,7 @@ export default function Reportes() {
       }
 
       setFlujosProgramados(
-        resolverFlujosEfectivos(allFlujos, programacionesPorPartida, new Set(idsProject), new Set(ids))
+        resolverFlujosEfectivos(allFlujos, programacionesPorPartida, new Set(idsProject), new Set(ids), tipoPorPresupuesto)
       );
     } catch (error: any) {
       console.error("Error loading flujos programados:", error);

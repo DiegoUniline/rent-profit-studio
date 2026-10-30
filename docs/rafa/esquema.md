@@ -1,6 +1,6 @@
 # Esquema de la base (SQL local)
 
-ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-f2bf43d7d65a). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `750e4180df0905ab`.
+ARCHIVO GENERADO por `scripts/rafa-conocimiento.mjs` desde `docs/rafa/esquema-local.json` (versión de conocimiento k-25a6f1805a6b). Origen: Base aislada construida con supabase/migrations/*.sql (SQL local; no certifica la base real). Hash de migraciones: `73a576755300407a`.
 
 El significado de negocio de cada tabla y campo está en `docs/rafa/modulos/`.
 
@@ -1042,6 +1042,7 @@ Políticas:
 - `rafa_guardar_plan(p_operacion uuid, p_plan jsonb)` — SECURITY INVOKER
 - `rafa_guardar_programacion_partida(p_accion_id uuid, p_datos jsonb, p_pagos jsonb)` — SECURITY INVOKER
 - `rafa_registrar_ejecucion(p_accion_id uuid, p_resultado jsonb)` — SECURITY INVOKER
+- `rafa_reprogramar_masiva(p_accion_id uuid, p_cambios jsonb)` — SECURITY INVOKER
 - `sync_iva_flujos()` — SECURITY DEFINER
 - `trg_cronograma_sigue_pagos_del()` — SECURITY DEFINER
 - `trg_cronograma_sigue_pagos_ins()` — SECURITY DEFINER

@@ -474,7 +474,8 @@ export default function ProyectoDetalle() {
   const flujosEfectivos = useMemo(
     () => {
       const idsVigentes = new Set(partidasProject.map((p) => p.id));
-      return resolverFlujosEfectivos(flujos, programacionesPorPartida, idsVigentes, idsVigentes);
+      const tipos = new Map(partidasProject.map((p) => [p.id, p.tipo_movimiento]));
+      return resolverFlujosEfectivos(flujos, programacionesPorPartida, idsVigentes, idsVigentes, tipos);
     },
     [programacionesPorPartida, flujos, partidasProject]
   );

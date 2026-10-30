@@ -38,6 +38,7 @@ Cada herramienta valida su entrada contra el esquema (rechaza parámetros no dec
 | `proponer_tercero` | terceros | Acción | admin, contador | Sí, en la interfaz |
 | `proponer_acceso_proyecto` | proyectos | Acción | admin | Sí, en la interfaz |
 | `proponer_baja` | general | Acción | admin, contador | Sí, en la interfaz |
+| `proponer_reprogramacion_masiva` | proyectos | Acción | admin, contador, usuario, arquitecto | Sí, en la interfaz |
 
 ## buscar_conocimiento
 
@@ -512,3 +513,26 @@ Parámetros (* obligatorio):
 - `id` * — string (uuid): Registro
 - `reactivar` — boolean: true para reactivar en vez de dar de baja
 - `en_cascada` — boolean: Solo centros: incluir sus partidas y proyecto (por defecto sí)
+
+## proponer_reprogramacion_masiva
+
+Propone mover o reprogramar las FECHAS de muchas partidas a la vez (hasta 1000) con una sola confirmación: "de la partida X a la Y" (desde_partida/hasta_partida en el orden de Presupuestos), por texto, o por lista de ids, dentro de un centro. modo=mover: el primer pago cae en fecha_inicio conservando la separación (con fecha_fin se reparten entre ambas fechas); las partidas sin programación se programan en esa fecha (o mensual hasta fecha_fin). modo=recorrer: corre cada pago N meses y/o días (negativo = adelantar). modo=reprogramar: reemplaza por numero_pagos pagos con frecuencia desde fecha_inicio, repartiendo lo pendiente. Reemplaza lo ya programado (manda la última instrucción). Úsala SIEMPRE que sean 2 o más partidas.
+
+- Módulo: proyectos. Tipo: Acción. Roles: admin, contador, usuario, arquitecto. Confirmación: Sí, en la interfaz.
+- Validaciones: Centro o lista de partidas obligatorio; máximo 1000 partidas activas; Permiso de editar programación financiera de cada proyecto; flujos sin proyecto solo admin/contador; Lo programado no supera el presupuesto; Al confirmar: rafa_reprogramar_masiva (una transacción; falla si los pagos cambiaron).
+- Devuelve: Propuesta con antes/después por partida; al confirmar reemplaza la programación de todas en una transacción.
+
+Parámetros (* obligatorio):
+- `empresa_id` — string (uuid): Empresa
+- `centro_negocio_id` — string (uuid): Centro de negocio de las partidas
+- `presupuesto_ids` — array: Partidas exactas (opcional)
+- `texto` — string: Solo partidas cuyo nombre contiene este texto
+- `desde_partida` — string: Nombre de la primera partida del rango
+- `hasta_partida` — string: Nombre de la última partida del rango
+- `modo` * — mover / recorrer / reprogramar: Qué hacer con las fechas
+- `fecha_inicio` — string (date): Fecha destino / primer pago
+- `fecha_fin` — string (date): Fecha final (opcional, solo mover)
+- `meses` — integer: Meses a recorrer (negativo = adelantar)
+- `dias` — integer: Días a recorrer (negativo = adelantar)
+- `frecuencia` — semanal / quincenal / mensual / trimestral / semestral / anual: Frecuencia (reprogramar)
+- `numero_pagos` — integer: Número de pagos (reprogramar, 1 a 120)

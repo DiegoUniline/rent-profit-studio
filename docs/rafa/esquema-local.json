@@ -3828,6 +3828,11 @@
             "argumentos": "p_accion_id uuid, p_resultado jsonb"
         },
         {
+            "nombre": "rafa_reprogramar_masiva",
+            "seguridad": "SECURITY INVOKER",
+            "argumentos": "p_accion_id uuid, p_cambios jsonb"
+        },
+        {
             "nombre": "sync_iva_flujos",
             "seguridad": "SECURITY DEFINER",
             "argumentos": ""
@@ -3863,5 +3868,5 @@
             "argumentos": ""
         }
     ],
-    "migraciones_sha256": "750e4180df0905ab602df4e6df75f864301a5368a6ca93c9171a64e141da2cb5"
+    "migraciones_sha256": "73a576755300407a400f39f4436d68ebd968172de1538dc248fe49b5c2e53573"
 }
