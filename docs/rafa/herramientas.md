@@ -516,7 +516,7 @@ Parámetros (* obligatorio):
 
 ## proponer_reprogramacion_masiva
 
-Propone mover o reprogramar las FECHAS de muchas partidas a la vez (hasta 1000) con una sola confirmación: "de la partida X a la Y" (desde_partida/hasta_partida en el orden de Presupuestos), por texto, o por lista de ids, dentro de un centro. modo=mover: el primer pago cae en fecha_inicio conservando la separación (con fecha_fin se reparten entre ambas fechas); las partidas sin programación se programan en esa fecha (o mensual hasta fecha_fin). modo=recorrer: corre cada pago N meses y/o días (negativo = adelantar). modo=reprogramar: reemplaza por numero_pagos pagos con frecuencia desde fecha_inicio, repartiendo lo pendiente. Reemplaza lo ya programado (manda la última instrucción). Úsala SIEMPRE para mover fechas de partidas, directo: no busques antes las partidas ni preguntes qué tipo de fecha (la herramienta resuelve el rango completo).
+Propone mover o reprogramar las FECHAS de muchas partidas a la vez (hasta 1000) con una sola confirmación: "de la partida X a la Y" (desde_partida/hasta_partida en el orden de Presupuestos), por texto, o por lista de ids, dentro de un centro. modo=mover: el primer pago cae en fecha_inicio conservando la separación (con fecha_fin se reparten entre ambas fechas); las partidas sin programación se programan en esa fecha (o mensual hasta fecha_fin). modo=recorrer: corre cada pago N meses y/o días (negativo = adelantar). modo=reprogramar: reemplaza por numero_pagos pagos con frecuencia desde fecha_inicio, repartiendo lo pendiente ("inicio y terminación el X" = reprogramar con numero_pagos 1 en X). modo=escalonar: "18 lotes por mes desde octubre": partidas_por_periodo partidas en cada periodo (frecuencia, mensual por omisión) desde fecha_inicio, en el orden de la lista; cada partida queda con un solo pago por lo pendiente. Los nombres se comparan sin importar Mza/Manzana, Lte/Lote, ceros a la izquierda ni la superficie ("Mza 1 Lote 5" = "Mza 01 Lte 05 98 m2"). Reemplaza lo ya programado (manda la última instrucción). Úsala SIEMPRE para mover fechas de partidas, directo: no busques antes las partidas ni preguntes qué tipo de fecha (la herramienta resuelve el rango completo).
 
 - Módulo: proyectos. Tipo: Acción. Roles: admin, contador, usuario, arquitecto. Confirmación: Sí, en la interfaz.
 - Validaciones: Centro o lista de partidas obligatorio; máximo 1000 partidas activas; Permiso de editar programación financiera de cada proyecto; flujos sin proyecto solo admin/contador; Lo programado no supera el presupuesto; Al confirmar: rafa_reprogramar_masiva (una transacción; falla si los pagos cambiaron).
@@ -529,10 +529,11 @@ Parámetros (* obligatorio):
 - `texto` — string: Solo partidas cuyo nombre contiene este texto
 - `desde_partida` — string: Nombre de la primera partida del rango
 - `hasta_partida` — string: Nombre de la última partida del rango
-- `modo` * — mover / recorrer / reprogramar: Qué hacer con las fechas
+- `modo` * — mover / recorrer / reprogramar / escalonar: Qué hacer con las fechas
 - `fecha_inicio` — string (date): Fecha destino / primer pago
 - `fecha_fin` — string (date): Fecha final (opcional, solo mover)
 - `meses` — integer: Meses a recorrer (negativo = adelantar)
 - `dias` — integer: Días a recorrer (negativo = adelantar)
-- `frecuencia` — semanal / quincenal / mensual / trimestral / semestral / anual: Frecuencia (reprogramar)
+- `frecuencia` — semanal / quincenal / mensual / trimestral / semestral / anual: Frecuencia (reprogramar / escalonar)
 - `numero_pagos` — integer: Número de pagos (reprogramar, 1 a 120)
+- `partidas_por_periodo` — integer: Partidas por periodo (escalonar, ej. 18 lotes por mes)

@@ -1,9 +1,51 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Esquema del plan de presupuesto que Rafa ya generaba (modo "plan") y que la
 // interfaz convierte en una propuesta editable (src/pages/Rafa.tsx →
 // RafaPropuesta → aplicarPlanRafa). Compartido por el modo plan y el chat.
 
-import type { EsquemaJson, Herramienta } from "./tipos.ts";
+import type { Contexto, EsquemaJson, Herramienta } from "./tipos.ts";
 import { ROLES_CONTABLES, exigirContable } from "./permisos.ts";
+import { leerTodo } from "./datos.ts";
+import { nombreCanonico } from "./herramientas/reprogramacion.ts";
+
+/** Misma comparación que usa el guardado del editor (src/lib/rafa-types.ts → normalizar). */
+const textoGuardado = (t: string) =>
+  (t || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * Partidas del plan que ya existen en su centro. Con el mismo texto el editor
+ * las ACTUALIZA al guardar; con otro texto que es la misma partida ("Mza 1
+ * Lote 5" vs "Mza 01 Lte 05 98 m2") se crearían DUPLICADAS: se avisan aparte.
+ */
+export async function partidasYaExistentes(ctx: Contexto, plan: Record<string, unknown>) {
+  const nombreCentro = textoGuardado(String((plan.centro_negocio as any)?.nombre || ""));
+  const conceptos = (Array.isArray(plan.partidas) ? plan.partidas : []).map((x: any) => String(x?.descripcion || "")).filter(Boolean);
+  if (!nombreCentro || !conceptos.length) return null;
+  const { data: centros } = await ctx.db.from("centros_negocio").select("id, codigo, nombre").eq("activo", true);
+  const candidatos = ((centros || []) as any[]).filter(
+    (c) => nombreCentro === textoGuardado(c.codigo) || nombreCentro.includes(textoGuardado(c.nombre))
+  );
+  if (candidatos.length !== 1) return null;
+  const centro = candidatos[0];
+  const { filas } = await leerTodo<{ partida: string }>(() =>
+    ctx.db.from("presupuestos").select("id, partida").eq("centro_negocio_id", centro.id).eq("activo", true).order("id")
+  );
+  const mismoTexto = new Set(filas.map((f) => textoGuardado(f.partida)));
+  const porCanonico = new Map(filas.map((f) => [nombreCanonico(f.partida), f.partida]));
+  const actualizan: string[] = [];
+  const duplicarian: string[] = [];
+  conceptos.forEach((c) => {
+    if (mismoTexto.has(textoGuardado(c))) actualizan.push(c);
+    else if (porCanonico.has(nombreCanonico(c))) duplicarian.push(`${c} (ya existe como "${porCanonico.get(nombreCanonico(c))}")`);
+  });
+  return { centro: `${centro.codigo} · ${centro.nombre}`, actualizan, duplicarian };
+}
 
 export const PLAN_PARAMETROS: EsquemaJson = {
   type: "object",
@@ -91,11 +133,22 @@ export const proponerPlanPresupuestoTool: Herramienta<Record<string, unknown>> =
   async ejecutar(ctx, plan) {
     exigirContable(ctx, "preparar planes de presupuesto");
     const partidas = Array.isArray(plan.partidas) ? plan.partidas.length : 0;
+    const existentes = await partidasYaExistentes(ctx, plan).catch(() => null);
+    const lista = (xs: string[]) => `${xs.slice(0, 8).join(", ")}${xs.length > 8 ? ` y ${xs.length - 8} más` : ""}`;
+    const advertencias = [
+      ...(existentes?.duplicarian.length
+        ? [`${existentes.duplicarian.length} partida(s) ya existen en ${existentes.centro} con otro nombre y se DUPLICARÍAN al guardar: ${lista(existentes.duplicarian)}. Quítalas del plan o usa el nombre exacto.`]
+        : []),
+      ...(existentes?.actualizan.length
+        ? [`${existentes.actualizan.length} de ${partidas} partida(s) ya existen en ${existentes.centro}; al guardar se ACTUALIZAN, no se duplican: ${lista(existentes.actualizan)}.`]
+        : []),
+    ];
     return {
       ok: true,
       tipo: "plan",
-      resumen: `PROPUESTA de plan con ${partidas} partidas lista para revisar en el editor; no se guardó nada.`,
-      datos: { plan },
+      resumen: `PROPUESTA de plan con ${partidas} partidas lista para revisar en el editor; no se guardó nada.${advertencias.length ? ` AVISA AL USUARIO: ${advertencias.join(" ")}` : ""}`,
+      advertencias,
+      datos: { plan, existentes },
     };
   },
 };
