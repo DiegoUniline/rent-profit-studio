@@ -4,7 +4,7 @@ Evidencia: código y SQL local. Fuentes: `src/components/dialogs/PresupuestoDial
 
 ## Qué representa un flujo programado
 
-`flujos_programados` es la **proyección temporal** (calendario de entradas/salidas esperadas) de una partida presupuestal que NO es de Proyecto: fecha, monto y tipo (`ingreso`/`egreso`, CHECK). No registra pagos ni cobros reales y no es la programación de tesorería (`programaciones`).
+`flujos_programados` es la **proyección temporal** (calendario de entradas/salidas esperadas) de una partida presupuestal que NO es de Proyecto: fecha, monto y tipo (`ingreso`/`egreso`, CHECK). El tipo sigue a `presupuestos.tipo_movimiento` de la partida: el formulario lo hereda al agregar renglones y al cambiar el tipo de la partida, y la migración `20261030000000` alineó los existentes (no automáticos, partidas que no son de Proyecto). Rafa los reprograma en lote con `proponer_reprogramacion_masiva`. No registra pagos ni cobros reales y no es la programación de tesorería (`programaciones`).
 
 Dos clases de filas:
 1. **Manuales** (`auto_generado = false`, `presupuesto_id` lleno): capturadas en el formulario de la partida (`PresupuestoDialog`) o generadas por Rafa al aplicar un plan (`aplicarPlanRafa`, reparto con `distribuirSaldoEntrePeriodos`).

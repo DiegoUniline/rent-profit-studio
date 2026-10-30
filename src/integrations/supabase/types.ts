@@ -1751,6 +1751,10 @@ export type Database = {
         Args: { p_accion_id: string; p_cambio: Json }
         Returns: Json
       }
+      rafa_reprogramar_masiva: {
+        Args: { p_accion_id: string; p_cambios: Json }
+        Returns: Json
+      }
       rafa_cambiar_estado_programaciones: {
         Args: { p_accion_id: string; p_cambios: Json }
         Returns: Json

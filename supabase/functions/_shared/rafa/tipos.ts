@@ -135,5 +135,7 @@ export interface Herramienta<E = any> {
   validaciones: string[];
   devuelve: string;
   confirmacion: "nunca" | "siempre" | "si_masivo";
+  /** Acción que, como las consultas, toma el centro de la conversación si no se indica otro. */
+  anclaCentro?: boolean;
   ejecutar(ctx: Contexto, entrada: E): Promise<ResultadoHerramienta>;
 }

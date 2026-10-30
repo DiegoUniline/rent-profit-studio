@@ -49,10 +49,11 @@ export async function cargarAncla(ctx: Contexto, centroId: string | null | undef
  * - empresa_id: en cualquier herramienta que lo acepte, salvo que se haya
  *   indicado otro proyecto u otro centro.
  * - centro_negocio_id (o proyecto_id si la herramienta solo acepta proyecto):
- *   solo en consultas y simulaciones; las propuestas usan sus propios ids.
+ *   en consultas, simulaciones y acciones marcadas `anclaCentro`; las demás
+ *   propuestas usan sus propios ids.
  */
 export function aplicarAncla(
-  h: Pick<Herramienta, "tipo" | "parametros"> | undefined,
+  h: Pick<Herramienta, "tipo" | "parametros" | "anclaCentro"> | undefined,
   argumentos: unknown,
   ancla: AnclaConversacion | null
 ): unknown {
@@ -65,8 +66,8 @@ export function aplicarAncla(
     (a.centro_negocio_id !== undefined && a.centro_negocio_id !== null && a.centro_negocio_id !== ancla.centro_id);
   if (props.empresa_id && a.empresa_id === undefined && !otroAlcance) a.empresa_id = ancla.empresa_id;
   const otraEmpresa = a.empresa_id !== undefined && a.empresa_id !== null && a.empresa_id !== ancla.empresa_id;
-  if ((h.tipo === "consulta" || h.tipo === "simulacion") && !otraEmpresa) {
-    if (props.centro_negocio_id && a.centro_negocio_id === undefined && a.proyecto_id === undefined && a.presupuesto_id === undefined) {
+  if ((h.tipo === "consulta" || h.tipo === "simulacion" || h.anclaCentro) && !otraEmpresa) {
+    if (props.centro_negocio_id && a.centro_negocio_id === undefined && a.proyecto_id === undefined && a.presupuesto_id === undefined && a.presupuesto_ids === undefined) {
       a.centro_negocio_id = ancla.centro_id;
     } else if (!props.centro_negocio_id && props.proyecto_id && a.proyecto_id === undefined && ancla.proyecto_id) {
       a.proyecto_id = ancla.proyecto_id;

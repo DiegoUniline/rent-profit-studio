@@ -742,3 +742,98 @@ test("baja de tercero y permisos: un usuario sin rol contable no puede dar de ba
   const sinRol = await chat("usuario", "Reactívalo");
   assert.equal(resultado(sinRol).ok, false);
 });
+
+// ================================================================ REPROGRAMACIÓN MASIVA
+test("reprogramación masiva: 400 partidas de proyecto con una confirmación, el Gantt sigue a los pagos", async () => {
+  const CN_OBRA = "a1000000-0000-0000-0000-000000000001";
+  const id = (i) => `b9000000-0000-0000-0000-${String(i).padStart(12, "0")}`;
+  const pid = (i) => `99000000-0000-0000-0000-${String(i).padStart(12, "0")}`;
+  const lotes = Array.from({ length: 400 }, (_, k) => k + 1);
+  await rest("presupuestos", {
+    metodo: "POST",
+    cuerpo: lotes.map((i) => ({
+      id: id(i), empresa_id: E1, centro_negocio_id: CN_OBRA, partida: `Lote ${i}`, cantidad: 1, precio_unitario: 1000,
+      activo: true, es_project: true, tipo_movimiento: "egreso", orden: 100 + i,
+    })),
+  });
+  // Todas menos la última ya programadas (2 pagos) con fechas distintas.
+  await rest("proyecto_programacion_financiera", {
+    metodo: "POST",
+    cuerpo: lotes.slice(0, -1).map((i) => ({ id: pid(i), presupuesto_id: id(i), proyecto_id: P1, empresa_id: E1, modo: "automatica", frecuencia: "mensual", fecha_inicio: "2026-11-10", numero_pagos: 2 })),
+  });
+  await rest("proyecto_programacion_pagos", {
+    metodo: "POST",
+    cuerpo: lotes.slice(0, -1).flatMap((i) => [
+      { programacion_id: pid(i), proyecto_id: P1, fecha: `2026-${i % 2 ? "11" : "12"}-10`, monto: 400, concepto: "Pago 1", orden: 0 },
+      { programacion_id: pid(i), proyecto_id: P1, fecha: `2027-${i % 2 ? "01" : "02"}-10`, monto: 600, concepto: "Pago 2", orden: 1 },
+    ]),
+  });
+
+  // El usuario dice "de la partida Lote 1 a la Lote 400, muévelas al 1 de mayo": una sola llamada.
+  const inicio = Date.now();
+  const { propuesta } = await proponerYConfirmar("contador", "proponer_reprogramacion_masiva", {
+    empresa_id: E1, centro_negocio_id: CN_OBRA, desde_partida: "Lote 1", hasta_partida: "Lote 400", modo: "mover", fecha_inicio: "2027-05-01",
+  });
+  assert.ok(Date.now() - inicio < 20000, "400 partidas en una sola operación");
+  assert.equal(propuesta.accion.vista_previa.tablas[0].filas.length, 400);
+  const pagos = await rest(`proyecto_programacion_pagos?programacion_id=in.(${lotes.slice(0, -1).map(pid).join(",")})&select=programacion_id,fecha,monto&order=fecha`);
+  assert.equal(pagos.length, 399 * 2);
+  assert.equal(pagos[0].fecha, "2027-05-01");
+  // Conserva la separación de cada partida (Lote 1: 61 días).
+  const deLote1 = pagos.filter((p) => p.programacion_id === pid(1)).map((p) => p.fecha);
+  assert.deepEqual(deLote1, ["2027-05-01", "2027-07-01"]);
+  // La que no tenía programación se programó completa en esa fecha.
+  const [prog400] = await rest(`proyecto_programacion_financiera?presupuesto_id=eq.${id(400)}&select=id`);
+  const pagos400 = await rest(`proyecto_programacion_pagos?programacion_id=eq.${prog400.id}&select=fecha,monto`);
+  assert.deepEqual(pagos400.map((p) => [p.fecha, Number(p.monto)]), [["2027-05-01", 1000]]);
+  // Gantt alineado a los pagos.
+  const [gantt] = await rest(`presupuestos?id=eq.${id(1)}&select=fecha_inicio,fecha_fin`);
+  assert.deepEqual(gantt, { fecha_inicio: "2027-05-01", fecha_fin: "2027-07-01" });
+
+  // Última instrucción manda: ahora recórrelas un mes (por texto).
+  await proponerYConfirmar("contador", "proponer_reprogramacion_masiva", { empresa_id: E1, centro_negocio_id: CN_OBRA, texto: "Lote", modo: "recorrer", meses: 1 });
+  const [gantt2] = await rest(`presupuestos?id=eq.${id(1)}&select=fecha_inicio,fecha_fin`);
+  assert.deepEqual(gantt2, { fecha_inicio: "2027-06-01", fecha_fin: "2027-08-01" });
+
+  // Rango ambiguo: Rafa debe preguntar; usuario sin permiso de programación: rechazado.
+  guion(usar("proponer_reprogramacion_masiva", { empresa_id: E1, centro_negocio_id: CN_OBRA, desde_partida: "Lote 1", hasta_partida: "Lote", modo: "recorrer", dias: 3 }), fin());
+  assert.match(resultado(await chat("contador", "Córrelas")).resumen, /coincide con \d+ partidas/);
+  guion(usar("proponer_reprogramacion_masiva", { empresa_id: E1, centro_negocio_id: CN_OBRA, texto: "Lote", modo: "recorrer", dias: 3 }), fin());
+  const sinPermiso = resultado(await chat("usuario", "Córrelas"));
+  assert.equal(sinPermiso.ok, false);
+  assert.match(sinPermiso.resumen, /permiso/i);
+});
+
+test("reprogramación masiva: flujos de partidas sin proyecto respetan Ingreso/Egreso y detectan cambios", async () => {
+  // Contador: puede mover flujos, pero quitar sobrantes (12 → 4) requiere admin; esa partida se omite y lo avisa.
+  guion(usar("proponer_reprogramacion_masiva", { empresa_id: E1, presupuesto_ids: [PB, PC], modo: "reprogramar", fecha_inicio: "2027-01-05", frecuencia: "mensual", numero_pagos: 4 }), fin());
+  const contador = resultado(await chat("contador", "Reprográmalas"));
+  assert.equal(contador.accion.vista_previa.tablas[0].filas.length, 1);
+  assert.match(contador.accion.vista_previa.advertencias.join(" "), /Renta de oficina .*requiere admin/);
+
+  const { propuesta } = await proponerYConfirmar("admin", "proponer_reprogramacion_masiva", {
+    empresa_id: E1, presupuesto_ids: [PB, PC], modo: "reprogramar", fecha_inicio: "2027-01-05", frecuencia: "mensual", numero_pagos: 4,
+  });
+  assert.equal(propuesta.accion.vista_previa.tablas[0].filas.length, 2);
+  const venta = await rest(`flujos_programados?presupuesto_id=eq.${PC}&select=fecha,monto,tipo&order=fecha`);
+  assert.equal(venta.length, 4);
+  assert.ok(venta.every((f) => f.tipo === "ingreso"), "partida de Ingreso (cuenta 4xx) → flujos de ingreso");
+  assert.equal(venta.reduce((t, f) => t + Number(f.monto), 0), 1100000);
+  const renta = await rest(`flujos_programados?presupuesto_id=eq.${PB}&auto_generado=eq.false&select=fecha,tipo&order=fecha`);
+  assert.deepEqual(renta.map((f) => f.fecha), ["2027-01-05", "2027-02-05", "2027-03-05", "2027-04-05"]);
+  assert.ok(renta.every((f) => f.tipo === "egreso"));
+
+  // El contador sí puede correr fechas (actualiza en su lugar).
+  await proponerYConfirmar("contador", "proponer_reprogramacion_masiva", { empresa_id: E1, presupuesto_ids: [PB], modo: "recorrer", dias: 10 });
+  assert.equal((await rest(`flujos_programados?presupuesto_id=eq.${PB}&auto_generado=eq.false&select=fecha&order=fecha&limit=1`))[0].fecha, "2027-01-15");
+
+  // Si alguien cambia los flujos entre la propuesta y la confirmación, no se aplica nada.
+  guion(usar("proponer_reprogramacion_masiva", { empresa_id: E1, presupuesto_ids: [PB, PC], modo: "recorrer", meses: 1 }), fin());
+  const r = resultado(await chat("contador", "Córrelas un mes"));
+  assert.equal(r.ok, true, r.resumen);
+  await rest("flujos_programados", { metodo: "POST", cuerpo: { presupuesto_id: PB, empresa_id: E1, fecha: "2027-09-05", monto: 1, tipo: "egreso" } });
+  const c = await llamar("contador", { modo: "confirmar", accion_id: r.accion.id, huella: r.accion.huella });
+  assert.notEqual(c.cuerpo.accion.estado, "ejecutada");
+  const ventaDespues = await rest(`flujos_programados?presupuesto_id=eq.${PC}&select=fecha&order=fecha`);
+  assert.equal(ventaDespues[0].fecha, "2027-01-05");
+});

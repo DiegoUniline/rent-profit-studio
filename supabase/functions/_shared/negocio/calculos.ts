@@ -149,28 +149,39 @@ export interface ProgramacionPropiaPartida {
  * flujos_programados (legacy) se excluyen aunque aún no tenga programación
  * propia (proyectado $0). Las partidas que no son de Proyecto siguen usando
  * flujos_programados.
+ *
+ * Dirección (entrada/salida): manda presupuestos.tipo_movimiento de la partida
+ * (`tipoPorPresupuesto`). Los pagos de proyecto no tienen tipo propio; los
+ * flujos legacy conservan el suyo solo si la partida no es Ingreso ni Egreso.
  */
-export function resolverFlujosEfectivos<T extends { presupuesto_id: string | null }>(
+export function resolverFlujosEfectivos<T extends { presupuesto_id: string | null; tipo?: string }>(
   flujosLegacy: T[],
   programacionesPorPartida: Map<string, ProgramacionPropiaPartida>,
   presupuestosGestionadosPorProyecto: ReadonlySet<string> = new Set(programacionesPorPartida.keys()),
-  presupuestosVigentes?: ReadonlySet<string>
-): (T | { presupuesto_id: string; fecha: string; monto: number; tipo: "egreso" })[] {
-  const resultado: (T | { presupuesto_id: string; fecha: string; monto: number; tipo: "egreso" })[] = [];
+  presupuestosVigentes?: ReadonlySet<string>,
+  tipoPorPresupuesto?: ReadonlyMap<string, string | null | undefined>
+): (T | { presupuesto_id: string; fecha: string; monto: number; tipo: "ingreso" | "egreso" })[] {
+  const resultado: (T | { presupuesto_id: string; fecha: string; monto: number; tipo: "ingreso" | "egreso" })[] = [];
+  const tipoDe = (id: string | null) => {
+    const t = id ? tipoPorPresupuesto?.get(id) : null;
+    return t === "ingreso" || t === "egreso" ? t : null;
+  };
 
   flujosLegacy.forEach((f) => {
     if (f.presupuesto_id && presupuestosVigentes && !presupuestosVigentes.has(f.presupuesto_id)) return;
     if (f.presupuesto_id && presupuestosGestionadosPorProyecto.has(f.presupuesto_id)) return;
-    resultado.push(f);
+    const tipo = tipoDe(f.presupuesto_id);
+    resultado.push(tipo && f.tipo !== tipo ? { ...f, tipo } : f);
   });
 
   programacionesPorPartida.forEach((propia, presupuestoId) => {
     if (!presupuestosGestionadosPorProyecto.has(presupuestoId)) return;
     if (presupuestosVigentes && !presupuestosVigentes.has(presupuestoId)) return;
+    const tipo = tipoDe(presupuestoId) ?? "egreso";
     propia.pagos.forEach((pago) => {
       const monto = numeroFinito(pago.monto);
       if (monto <= 0) return;
-      resultado.push({ presupuesto_id: presupuestoId, fecha: pago.fecha, monto, tipo: "egreso" });
+      resultado.push({ presupuesto_id: presupuestoId, fecha: pago.fecha, monto, tipo });
     });
   });
 
