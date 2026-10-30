@@ -837,3 +837,49 @@ test("reprogramación masiva: flujos de partidas sin proyecto respetan Ingreso/E
   const ventaDespues = await rest(`flujos_programados?presupuesto_id=eq.${PC}&select=fecha&order=fecha`);
   assert.equal(ventaDespues[0].fecha, "2027-01-05");
 });
+
+test("escalonar: \"de la Mza 1 Lote 05 a la Mza 1 Lote 18, 5 por mes desde octubre 2027\" con nombres guardados como Mza 01 Lte 05 98 m2", async () => {
+  const CN_OBRA = "a1000000-0000-0000-0000-000000000001";
+  const id = (k) => `b8000000-0000-0000-0000-${String(k).padStart(12, "0")}`;
+  await rest("presupuestos", {
+    metodo: "POST",
+    cuerpo: Array.from({ length: 34 }, (_, i) => ({
+      id: id(i + 1), empresa_id: E1, centro_negocio_id: CN_OBRA, partida: `Mza 01 Lte ${String(i + 1).padStart(2, "0")} 98 m2`,
+      cantidad: 1, precio_unitario: 265000, activo: true, es_project: true, tipo_movimiento: "ingreso", orden: 2000 + i,
+    })),
+  });
+  const { propuesta } = await proponerYConfirmar("contador", "proponer_reprogramacion_masiva", {
+    empresa_id: E1, centro_negocio_id: CN_OBRA, desde_partida: "Mza 1 Lote 05", hasta_partida: "Mza 1 Lote 18",
+    modo: "escalonar", partidas_por_periodo: 5, fecha_inicio: "2027-10-01",
+  });
+  assert.equal(propuesta.accion.vista_previa.tablas[0].filas.length, 14);
+  const fechaDe = async (k) => {
+    const [f] = await rest(`proyecto_programacion_financiera?presupuesto_id=eq.${id(k)}&select=id`);
+    return (await rest(`proyecto_programacion_pagos?programacion_id=eq.${f.id}&select=fecha,monto`)).map((p) => [p.fecha, Number(p.monto)]);
+  };
+  assert.deepEqual(await fechaDe(5), [["2027-10-01", 265000]]);
+  assert.deepEqual(await fechaDe(9), [["2027-10-01", 265000]]);
+  assert.deepEqual(await fechaDe(10), [["2027-11-01", 265000]]);
+  assert.deepEqual(await fechaDe(18), [["2027-12-01", 265000]]);
+  assert.equal(await contar(`proyecto_programacion_financiera?presupuesto_id=eq.${id(4)}&select=id`), 0, "fuera del rango no se toca");
+});
+
+test("plan de presupuesto avisa partidas que ya existen en el centro (se actualizan) y las que se duplicarían por otro nombre", async () => {
+  guion(
+    usar("proponer_plan_presupuesto", {
+      resumen: "Lotes", centro_negocio: { nombre: "Obra Norte" }, tercero: { nombre: "" }, iva: { incluir: false, tasa: 16 },
+      partidas: [
+        { descripcion: "Mza 01 Lte 05 98 m2", cantidad: 1, precio_unitario: 265000, importe: 265000 },
+        { descripcion: "Mza 1 Lote 6", cantidad: 1, precio_unitario: 265000, importe: 265000 },
+        { descripcion: "Partida totalmente nueva", cantidad: 1, precio_unitario: 1000, importe: 1000 },
+      ],
+      programacion: { tipo: "ingreso", frecuencia: "mensual", numero_pagos: 1, fecha_inicio: "2027-10-01" },
+    }),
+    fin()
+  );
+  const r = resultado(await chat("contador", "Carga estos lotes"));
+  assert.equal(r.ok, true, r.resumen);
+  assert.match(r.advertencias.join(" "), /1 partida\(s\) ya existen en CN001 · Obra Norte con otro nombre y se DUPLICARÍAN.*Mza 1 Lote 6 \(ya existe como "Mza 01 Lte 06 98 m2"\)/);
+  assert.match(r.advertencias.join(" "), /1 de 3 partida\(s\) ya existen .*se ACTUALIZAN/);
+  assert.match(r.resumen, /AVISA AL USUARIO/);
+});

@@ -25,13 +25,15 @@ export interface EntradaReprogramacion {
   texto?: string;
   desde_partida?: string;
   hasta_partida?: string;
-  modo: "mover" | "recorrer" | "reprogramar";
+  modo: "mover" | "recorrer" | "reprogramar" | "escalonar";
   fecha_inicio?: string;
   fecha_fin?: string;
   dias?: number;
   meses?: number;
   frecuencia?: Frecuencia;
   numero_pagos?: number;
+  /** escalonar: cuántas partidas caen en cada periodo (ej. 18 lotes por mes). */
+  partidas_por_periodo?: number;
 }
 
 interface Movimiento {
@@ -63,6 +65,28 @@ const normalizar = (t: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+/**
+ * Forma comparable de un nombre de partida, para que "Mza 1 Lote 05" encuentre
+ * "Mza 01 Lte 05 98 m2": Manzana/Mz → mza, Lote/Lt → lte, sin superficie (m2),
+ * sin ceros a la izquierda ni puntuación.
+ */
+export function nombreCanonico(t: string): string {
+  return normalizar(t)
+    .replace(/\b\d+(?:[.,]\d+)?\s*(?:m2|m²|mts2|mts²)(?![a-z0-9])/g, " ")
+    .replace(/[-.,;:#_/()]+/g, " ")
+    .replace(/\b(?:manzanas?|mza|mz)\s*(?=\d|\b)/g, "mza ")
+    .replace(/\b(?:lotes?|lte|lt)\s*(?=\d|\b)/g, "lte ")
+    .replace(/\b0+(\d)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** ¿`buscado` aparece en `nombre` como palabras completas? ("lte 1" no está en "lte 10"). */
+function contienePalabras(nombre: string, buscado: string): boolean {
+  if (!buscado) return false;
+  return new RegExp(`(^|[^a-z0-9])${buscado.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^a-z0-9])`).test(nombre);
+}
+
 /** Orden de la pantalla Presupuestos: `orden`, luego nombre con números naturales. */
 export function ordenarPartidas<T extends { orden: number | null; partida: string; id: string }>(partidas: T[]): T[] {
   return [...partidas].sort(
@@ -75,16 +99,21 @@ export function ordenarPartidas<T extends { orden: number | null; partida: strin
 
 /** Posición de la partida nombrada: coincidencia exacta o, si es única, parcial. */
 export function ubicarPartida(partidas: { partida: string }[], nombre: string): { indice: number } | { error: string } {
-  const buscado = normalizar(nombre);
-  const exactas = partidas.map((p, i) => (normalizar(p.partida) === buscado ? i : -1)).filter((i) => i >= 0);
+  const buscado = nombreCanonico(nombre);
+  const canon = partidas.map((p) => nombreCanonico(p.partida));
+  const exactas = canon.map((c, i) => (c === buscado ? i : -1)).filter((i) => i >= 0);
   if (exactas.length === 1) return { indice: exactas[0] };
   // Parcial por palabras completas: "lote 1" no es "lote 10".
-  const patron = new RegExp(`(^|[^a-z0-9])${buscado.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^a-z0-9])`);
-  const parciales = exactas.length ? exactas : partidas.map((p, i) => (patron.test(normalizar(p.partida)) ? i : -1)).filter((i) => i >= 0);
+  const parciales = exactas.length ? exactas : canon.map((c, i) => (contienePalabras(c, buscado) ? i : -1)).filter((i) => i >= 0);
   if (parciales.length === 1) return { indice: parciales[0] };
   if (!parciales.length) return { error: `No encontré la partida "${nombre}" en la selección.` };
   const ejemplos = parciales.slice(0, 5).map((i) => `"${partidas[i].partida}"`).join(", ");
   return { error: `"${nombre}" coincide con ${parciales.length} partidas (${ejemplos}${parciales.length > 5 ? ", …" : ""}); indica el nombre exacto.` };
+}
+
+/** Fecha del grupo k al escalonar (k = 0 es fecha_inicio). */
+export function fechaEscalon(fechaInicio: string, frecuencia: Frecuencia, k: number): string {
+  return isoLocal(calcularFechasPorFrecuencia(fechaLocal(fechaInicio), frecuencia, k + 1)[k]);
 }
 
 const diasEntre = (a: string, b: string) => Math.round((fechaLocal(b).getTime() - fechaLocal(a).getTime()) / 86400000);
@@ -145,6 +174,9 @@ async function prepararReprogramacion(ctx: any, e: EntradaReprogramacion): Promi
   if (e.modo === "reprogramar" && (!e.fecha_inicio || !e.frecuencia || !e.numero_pagos)) {
     return fallo(["Para reprogramar indica fecha del primer pago, frecuencia y número de pagos."], ["fecha_inicio", "frecuencia", "numero_pagos"]);
   }
+  if (e.modo === "escalonar" && (!e.fecha_inicio || !e.partidas_por_periodo)) {
+    return fallo(["Para escalonar indica la fecha del primer periodo y cuántas partidas van por periodo."], ["fecha_inicio", "partidas_por_periodo"]);
+  }
   if (e.fecha_fin && e.fecha_inicio && e.fecha_fin < e.fecha_inicio) return fallo(["La fecha final es anterior a la inicial."]);
   if (!e.centro_negocio_id && !(e.presupuesto_ids || []).length) {
     return fallo(["Indica el centro de negocio (o las partidas) a reprogramar."], ["centro_negocio_id"]);
@@ -164,8 +196,8 @@ async function prepararReprogramacion(ctx: any, e: EntradaReprogramacion): Promi
   }
   partidas = ordenarPartidas(partidas);
   if (e.texto) {
-    const t = normalizar(e.texto);
-    partidas = partidas.filter((p) => normalizar(p.partida).includes(t));
+    const t = nombreCanonico(e.texto);
+    partidas = partidas.filter((p) => contienePalabras(nombreCanonico(p.partida), t));
   }
   if (e.desde_partida || e.hasta_partida) {
     const desde = e.desde_partida ? ubicarPartida(partidas, e.desde_partida) : { indice: 0 };
@@ -220,6 +252,7 @@ async function prepararReprogramacion(ctx: any, e: EntradaReprogramacion): Promi
   const omitidas: string[] = [];
   const huella: unknown[] = [];
   let totalMovs = 0;
+  let escalonadas = 0;
 
   for (const p of partidas) {
     const presupuestado = r2(numeroFinito(p.cantidad) * numeroFinito(p.precio_unitario));
@@ -244,7 +277,16 @@ async function prepararReprogramacion(ctx: any, e: EntradaReprogramacion): Promi
     }
     const pendiente = p.es_project ? r2(presupuestado - (ejercido.get(p.id) || 0)) : presupuestado;
     let nuevos: Movimiento[];
-    if (e.modo === "reprogramar" || (e.modo === "mover" && !actuales.length)) {
+    if (e.modo === "escalonar") {
+      // N partidas por periodo, en el orden de la lista: cada una cobra/paga lo pendiente en un solo movimiento.
+      const fecha = fechaEscalon(e.fecha_inicio!, e.frecuencia ?? "mensual", Math.floor(escalonadas / e.partidas_por_periodo!));
+      nuevos = programarMonto(pendiente, { fecha_inicio: fecha, numero_pagos: 1 });
+      if (!nuevos.length) {
+        omitidas.push(`${p.partida} (${pendiente > 0 ? "sin monto que programar" : "ya está pagada o su presupuesto es $0"})`);
+        continue;
+      }
+      escalonadas++;
+    } else if (e.modo === "reprogramar" || (e.modo === "mover" && !actuales.length)) {
       nuevos = programarMonto(pendiente, e);
       if (!nuevos.length) {
         omitidas.push(`${p.partida} (${pendiente > 0 ? "sin monto que programar" : "ya está pagada o su presupuesto es $0"})`);
@@ -287,7 +329,7 @@ async function prepararReprogramacion(ctx: any, e: EntradaReprogramacion): Promi
       const anticipo = nuevos.find((m) => m.es_anticipo);
       const regulares = nuevos.filter((m) => !m.es_anticipo);
       // Correr fechas conserva la cadencia; repartir entre inicio y fin la vuelve manual.
-      const conservaCadencia = prog && actuales.length && (e.modo === "recorrer" || !e.fecha_fin);
+      const conservaCadencia = prog && actuales.length && (e.modo === "recorrer" || (e.modo === "mover" && !e.fecha_fin));
       const automatica = !actuales.length || e.modo === "reprogramar";
       cambiosProyecto.push({
         presupuesto_id: p.id,
@@ -320,7 +362,9 @@ async function prepararReprogramacion(ctx: any, e: EntradaReprogramacion): Promi
   }
 
   const queHace =
-    e.modo === "recorrer"
+    e.modo === "escalonar"
+      ? `${e.partidas_por_periodo} por periodo ${e.frecuencia ?? "mensual"} desde ${e.fecha_inicio} (${Math.ceil(escalonadas / e.partidas_por_periodo!)} periodos)`
+      : e.modo === "recorrer"
       ? `recorrer ${[e.meses ? `${e.meses} mes(es)` : "", e.dias ? `${e.dias} día(s)` : ""].filter(Boolean).join(" y ")}`
       : e.modo === "reprogramar"
         ? `${e.numero_pagos} pago(s) ${e.frecuencia} desde ${e.fecha_inicio}`
@@ -376,7 +420,9 @@ export const proponerReprogramacionMasivaTool: Herramienta<EntradaReprogramacion
     "Propone mover o reprogramar las FECHAS de muchas partidas a la vez (hasta 1000) con una sola confirmación: \"de la partida X a la Y\" (desde_partida/hasta_partida en el orden de Presupuestos), por texto, o por lista de ids, dentro de un centro. " +
     "modo=mover: el primer pago cae en fecha_inicio conservando la separación (con fecha_fin se reparten entre ambas fechas); las partidas sin programación se programan en esa fecha (o mensual hasta fecha_fin). " +
     "modo=recorrer: corre cada pago N meses y/o días (negativo = adelantar). " +
-    "modo=reprogramar: reemplaza por numero_pagos pagos con frecuencia desde fecha_inicio, repartiendo lo pendiente. " +
+    "modo=reprogramar: reemplaza por numero_pagos pagos con frecuencia desde fecha_inicio, repartiendo lo pendiente (\"inicio y terminación el X\" = reprogramar con numero_pagos 1 en X). " +
+    "modo=escalonar: \"18 lotes por mes desde octubre\": partidas_por_periodo partidas en cada periodo (frecuencia, mensual por omisión) desde fecha_inicio, en el orden de la lista; cada partida queda con un solo pago por lo pendiente. " +
+    "Los nombres se comparan sin importar Mza/Manzana, Lte/Lote, ceros a la izquierda ni la superficie (\"Mza 1 Lote 5\" = \"Mza 01 Lte 05 98 m2\"). " +
     "Reemplaza lo ya programado (manda la última instrucción). Úsala SIEMPRE para mover fechas de partidas, directo: no busques antes las partidas ni preguntes qué tipo de fecha (la herramienta resuelve el rango completo).",
   parametros: s.objeto(
     {
@@ -386,13 +432,14 @@ export const proponerReprogramacionMasivaTool: Herramienta<EntradaReprogramacion
       texto: s.texto("Solo partidas cuyo nombre contiene este texto", 120),
       desde_partida: s.texto("Nombre de la primera partida del rango", 200),
       hasta_partida: s.texto("Nombre de la última partida del rango", 200),
-      modo: s.enumerado(["mover", "recorrer", "reprogramar"], "Qué hacer con las fechas"),
+      modo: s.enumerado(["mover", "recorrer", "reprogramar", "escalonar"], "Qué hacer con las fechas"),
       fecha_inicio: s.fecha("Fecha destino / primer pago"),
       fecha_fin: s.fecha("Fecha final (opcional, solo mover)"),
       meses: s.entero("Meses a recorrer (negativo = adelantar)", -120, 120),
       dias: s.entero("Días a recorrer (negativo = adelantar)", -3650, 3650),
-      frecuencia: s.enumerado([...FRECUENCIAS], "Frecuencia (reprogramar)"),
+      frecuencia: s.enumerado([...FRECUENCIAS], "Frecuencia (reprogramar / escalonar)"),
       numero_pagos: s.entero("Número de pagos (reprogramar, 1 a 120)", 1, 120),
+      partidas_por_periodo: s.entero("Partidas por periodo (escalonar, ej. 18 lotes por mes)", 1, 1000),
     },
     ["modo"]
   ),

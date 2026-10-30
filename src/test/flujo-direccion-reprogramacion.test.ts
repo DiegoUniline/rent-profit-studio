@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { resolverFlujosEfectivos } from "@/lib/project-utils";
 import {
+  fechaEscalon,
   moverMovimientos,
+  nombreCanonico,
   ordenarPartidas,
   programarMonto,
   ubicarPartida,
@@ -88,5 +90,30 @@ describe("reprogramación masiva", () => {
     expect(programarMonto(90, { fecha_inicio: "2026-01-10", fecha_fin: "2026-03-05" }).map((m) => m.fecha)).toEqual(["2026-01-10", "2026-02-10"]);
     expect(programarMonto(90, { fecha_inicio: "2026-01-10" })).toEqual([{ fecha: "2026-01-10", monto: 90, concepto: "Pago 1", es_anticipo: false }]);
     expect(programarMonto(0, { fecha_inicio: "2026-01-10" })).toEqual([]);
+  });
+});
+
+describe("nombres como los escribe el ingeniero", () => {
+  it("Mza/Manzana, Lte/Lote, ceros a la izquierda y superficie no importan", () => {
+    expect(nombreCanonico("Mza 01 Lte 05 98 m2")).toBe("mza 1 lte 5");
+    expect(nombreCanonico("Manzana 1 Lote 5")).toBe("mza 1 lte 5");
+    expect(nombreCanonico("Mza 01 Lte 34 183.31 m2")).toBe("mza 1 lte 34");
+    expect(nombreCanonico("MZA.07-LTE.66")).toBe("mza 7 lte 66");
+  });
+
+  it("ubica el rango \"de la Mza 1 Lote 05 a la Mza 1 Lote 18\"", () => {
+    const lotes = ordenarPartidas(
+      Array.from({ length: 34 }, (_, k) => ({ id: String(k), orden: k + 1, partida: `Mza 01 Lte ${String(k + 1).padStart(2, "0")} 98 m2` }))
+    );
+    expect(ubicarPartida(lotes, "Mza 1 Lote 05")).toEqual({ indice: 4 });
+    expect(ubicarPartida(lotes, "Mza 1 Lote 18")).toEqual({ indice: 17 });
+    expect(ubicarPartida(lotes, "manzana 1 lote 1")).toEqual({ indice: 0 });
+    expect(ubicarPartida(lotes, "Mza 2 Lote 1")).toEqual({ error: expect.stringContaining("No encontré") });
+  });
+});
+
+describe("escalonar (N partidas por periodo)", () => {
+  it("18 lotes por mes desde octubre 2027 brinca de año", () => {
+    expect([0, 1, 2, 3].map((k) => fechaEscalon("2027-10-01", "mensual", k))).toEqual(["2027-10-01", "2027-11-01", "2027-12-01", "2028-01-01"]);
   });
 });
